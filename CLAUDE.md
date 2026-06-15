@@ -12,6 +12,7 @@ This file defines how work is done in this project. It encodes the patterns the 
 - **Escalate only genuine owner-decisions:** brand/UX direction, money/vendor/legal trade-offs, anything irreversible or outward-facing, anything requiring the owner's accounts/credentials, or a real fork with business (not technical) consequences. Everything technical, you decide.
 - **Don't re-derive settled facts.** The planning docs and prior decisions stand; build on them.
 - The owner works ~4h/day and reviews on DEV — optimize for "show working results on DEV," not "ask before each step."
+- **Don't ask permission to look or to test.** Searches, read-only commands, running PowerShell/bash, and running the build/test suites inside the `Rotationsplus` project need **no** approval — just do them and report. The only approval gates are: **modifying source/config files** (ask before the edit) and the **push-to-`develop`** decision (§6). Build, run, and test freely.
 
 ## 2. Deployment cycle — build once, promote the same artifact
 - **Environments:** DEV → PREPROD → PROD. Per-env resource groups, Key Vault, and variable groups. IaC in Bicep, pipelines in Azure DevOps YAML (clone SkyLimit templates).
@@ -38,8 +39,16 @@ This file defines how work is done in this project. It encodes the patterns the 
 ## 5. Stealth (until offboarding day)
 - Confidential project; the outgoing dev team must not learn of it. No changes to the legacy GitLab/Cloudflare/vendor accounts; build on isolated new accounts; secrets rotation deferred to offboarding day. See `Plan_Migration.md §2`. Don't touch the legacy EC2/RDS or do custom DNS for dev/preprod until after offboarding.
 
-## 6. Git / commits
-- Branch off `develop`; never commit straight to it. Commit/push only when asked. Keep PRs scoped (one concern). Conventional, descriptive messages.
+## 6. Git workflow & approval gates
+- **Always work on a feature branch.** Branch off `develop` (`feat/…`, `fix/…`, …); never commit straight to `develop`. One concern per branch/PR. Conventional, descriptive commit messages. Pushing the feature branch to `origin` (backup / draft PR) is fine without asking — the gate is the **merge into `develop`**, not the branch push.
+- **Approval gate (always).** When the work on a feature branch is complete and its tests pass, STOP and ask the owner for approval. Do not merge/push to `develop` on your own initiative — wait for the owner's explicit "push to develop" decision.
+- **On the owner's "push to develop" decision, run the review→fix loop until clean:**
+  1. Launch **independent adversarial reviewers** (`/code-review`, multiple agents) on the branch diff.
+  2. Verify each finding (don't trust blindly), then fix the real ones on the feature branch.
+  3. Re-run the reviewers. **Repeat the cycle until a pass yields no code changes.**
+  - Throughout the loop: keep the `Docs/` planning docs up to date whenever the change affects them, and after **every** change make sure tests are updated — add new tests for new behaviour (Definition of Done, §3). CI must be green.
+- **Then merge/push to `develop` and delete the feature branch** (no longer needed). `develop` auto-deploys to DEV.
+- **Deployment log:** every change that ships gets a row in `Docs/Deployment_Log.md` — date + time, PR number, environment, and a one-sentence summary.
 
 ## 7. Tooling notes
 - Figma (read-only MCP) is the **content/flow reference, not the visual target** — the UI is a fresh modern redesign; brand (logo + `#FF4874`) stays. Frame map: `Docs/Figma_Inventory.md`.
