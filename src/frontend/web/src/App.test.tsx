@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   logoutRedirect: vi.fn().mockResolvedValue(undefined),
   getMe: vi.fn(),
   getSpecialties: vi.fn(),
+  getPrograms: vi.fn(),
   state: { accounts: [] as unknown[] }
 }));
 
@@ -17,7 +18,11 @@ vi.mock("@azure/msal-react", () => ({
   })
 }));
 
-vi.mock("./api", () => ({ getMe: () => h.getMe(), getSpecialties: () => h.getSpecialties() }));
+vi.mock("./api", () => ({
+  getMe: () => h.getMe(),
+  getSpecialties: () => h.getSpecialties(),
+  getPrograms: () => h.getPrograms()
+}));
 
 import App from "./App";
 
@@ -27,6 +32,7 @@ describe("App", () => {
     h.logoutRedirect.mockClear();
     h.getMe.mockReset();
     h.getSpecialties.mockReset();
+    h.getPrograms.mockReset();
     h.state.accounts = [];
   });
 
@@ -78,6 +84,17 @@ describe("App", () => {
     expect(await screen.findByText("Specialties (2)")).toBeInTheDocument();
     expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
     expect(screen.getByText("Pediatrics")).toBeInTheDocument();
+  });
+
+  it("loads and renders programs when signed in", async () => {
+    h.state.accounts = [{ homeAccountId: "a" }];
+    h.getPrograms.mockResolvedValue([
+      { id: "p1", specialtyName: "Internal Medicine", programType: "InPerson", maxStudentsPerRotation: 2, minWeeksPerRotation: 4, retailAmountPerWeek: 1500 }
+    ]);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Load programs" }));
+    expect(await screen.findByText("Programs (1)")).toBeInTheDocument();
+    expect(screen.getByText(/Internal Medicine — InPerson/)).toBeInTheDocument();
   });
 
   it("signs out", async () => {

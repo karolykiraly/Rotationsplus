@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
-import { getMe, getSpecialties, type MeResponse, type Specialty } from "./api";
+import { getMe, getSpecialties, getPrograms, type MeResponse, type Specialty, type Program } from "./api";
 
 const BRAND = "#FF4874";
 
@@ -9,6 +9,7 @@ export default function App() {
   const { instance, accounts } = useMsal();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [specialties, setSpecialties] = useState<Specialty[] | null>(null);
+  const [programs, setPrograms] = useState<Program[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isSignedIn = accounts.length > 0;
 
@@ -20,6 +21,7 @@ export default function App() {
   const signOut = () => {
     setMe(null);
     setSpecialties(null);
+    setPrograms(null);
     void instance.logoutRedirect();
   };
 
@@ -41,6 +43,15 @@ export default function App() {
     }
   };
 
+  const loadPrograms = async () => {
+    try {
+      setError(null);
+      setPrograms(await getPrograms());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 640, margin: "3rem auto", padding: "0 1rem" }}>
       <h1 style={{ color: BRAND }}>Rotations Plus — Staff</h1>
@@ -57,6 +68,9 @@ export default function App() {
           </button>
           <button onClick={loadSpecialties} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Load specialties
+          </button>
+          <button onClick={loadPrograms} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
+            Load programs
           </button>
           <button onClick={signOut} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Sign out
@@ -86,6 +100,19 @@ export default function App() {
           <h2>Specialties ({specialties.length})</h2>
           <ul>
             {specialties.map((s) => <li key={s.id}>{s.name}</li>)}
+          </ul>
+        </section>
+      )}
+
+      {programs && (
+        <section style={{ marginTop: "1.5rem" }}>
+          <h2>Programs ({programs.length})</h2>
+          <ul>
+            {programs.map((p) => (
+              <li key={p.id}>
+                {p.specialtyName} — {p.programType} · {p.minWeeksPerRotation}+ wks · ${p.retailAmountPerWeek}/wk
+              </li>
+            ))}
           </ul>
         </section>
       )}

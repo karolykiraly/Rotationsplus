@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
@@ -19,6 +20,10 @@ builder.AddServiceDefaults();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+// Serialize enums as their string names (e.g. "InPerson") for a stable, readable API contract.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddRotationsPlusAuthorization();
 builder.Services.AddHttpContextAccessor();
@@ -63,6 +68,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapMeEndpoints();
 app.MapSpecialtyEndpoints();
+app.MapProgramEndpoints();
 
 app.Run();
 

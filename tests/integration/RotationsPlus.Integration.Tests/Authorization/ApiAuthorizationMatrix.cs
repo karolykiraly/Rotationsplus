@@ -23,6 +23,8 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/specialties", [RoleNames.Admin], "Create specialty (admin)"),
         new("PUT", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update specialty (admin)"),
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
+        new("GET", "/api/programs", RoleNames.Staff, "List marketplace programs"),
+        new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", RoleNames.Staff, "Get program by id"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>

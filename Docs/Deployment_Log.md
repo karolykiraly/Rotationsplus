@@ -4,6 +4,7 @@ Running record of every change that ships. One row per merge/deploy: date + time
 
 | Date / Time (PT) | PR | Env | Summary |
 |---|---|---|---|
+| 2026-06-15 16:16 | [#6](https://dev.azure.com/rotationsplus/Rotationsplus/_git/Rotationsplus/pullrequest/6) | DEV | Marketplace slice 3 — `Program` catalog: `RotationProgram` entity (Specialty FK, type, capacity, pricing), `AddPrograms` migration seeding 4 programs, `GET /api/programs[/{id}]`, string-enum API serialization, SPA list, integration + authz-matrix tests. |
 | 2026-06-15 14:16 | [#5](https://dev.azure.com/rotationsplus/Rotationsplus/_git/Rotationsplus/pullrequest/5) | DEV | Marketplace slice 2 — `Specialty` admin writes: AdminOnly `POST`/`PUT`/`DELETE` (validation, duplicate-409, soft-delete + restore-on-recreate, concurrent-create race handling); 8 integration tests + 3 authz-matrix write rows. |
 | 2026-06-15 13:39 | [#4](https://dev.azure.com/rotationsplus/Rotationsplus/_git/Rotationsplus/pullrequest/4) | DEV | Marketplace slice 1 — `Specialty` reference data: seeded migration (15 specialties), `GET /api/specialties[/{id}]` (StaffOnly), SPA list, integration + authz-matrix tests (matrix improved to authz-only semantics). |
 | 2026-06-15 13:09 | [#3](https://dev.azure.com/rotationsplus/Rotationsplus/_git/Rotationsplus/pullrequest/3) | DEV | Observability fix — wire the Azure Monitor OpenTelemetry exporter in `ServiceDefaults` so app traces/metrics/logs reach App Insights (the `APPLICATIONINSIGHTS_CONNECTION_STRING` was previously never read; 0 telemetry). |

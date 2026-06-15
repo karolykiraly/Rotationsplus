@@ -18,6 +18,16 @@ export interface Specialty {
   name: string;
 }
 
+/** Mirror of the API's ProgramSummaryResponse contract (enums serialized as strings). */
+export interface Program {
+  id: string;
+  specialtyName: string;
+  programType: string;
+  maxStudentsPerRotation: number;
+  minWeeksPerRotation: number;
+  retailAmountPerWeek: number;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
   if (!account) {
@@ -42,3 +52,6 @@ export const getMe = (): Promise<MeResponse> => getJson<MeResponse>("/api/me");
 
 /** Lists marketplace specialties (GET /api/specialties). */
 export const getSpecialties = (): Promise<Specialty[]> => getJson<Specialty[]>("/api/specialties");
+
+/** Lists marketplace programs (GET /api/programs). */
+export const getPrograms = (): Promise<Program[]> => getJson<Program[]>("/api/programs");
