@@ -34,4 +34,6 @@ Confidential; outgoing dev team must not learn of it. Build on new isolated acco
 1. Cron/notification equivalence → fix-forward accepted. 2. Innodata (external) → owner owns comms. 3. Full-rewrite parity vs review bandwidth → owner's call: status quo is a liability to escape, some regressions acceptable.
 
 ## Immediate next step when work resumes
-**P1 in progress** (started 2026-06-14): scaffolding the solution (clone SkyLimit layout), Bicep for DEV, Azure DevOps pipelines (build-all + deploy-dev), skeleton api/worker/SPA deploying to DEV through the pipeline, staff Entra login round-trip. Show results on DEV. Working spec = approved P1 plan. Frontend toolchain: **Vite 8 + Node 22** (owner override 2026-06-14, see `Plan_Architecture.md §3.7`).
+**P1 foundation deployed to DEV (2026-06-15).** Solution scaffolded, Bicep + pipelines (`build-all`, `deploy-dev`) in the `Rotationsplus` DevOps repo, api/worker/SPA live in `rg-rplus-dev`, staff Entra app config done (scope/consent/Admin role). URLs + bootstrap detail in `Azure_Foundation.md`. Frontend toolchain: **Vite 8 + Node 22**.
+
+Remaining to close P1: confirm the **interactive staff sign-in round-trip** on the SPA (`/api/me` returns Admin identity). Then P1 → done; next is the first domain module (and the weekly delta loop once snapshots arrive).

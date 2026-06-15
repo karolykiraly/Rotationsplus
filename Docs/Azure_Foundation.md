@@ -75,7 +75,13 @@ This document records the one-time Azure foundation that gates P1. It is the dur
 - ✅ 4.1 UAMI `id-rplus-dev` created (principalId `7e472b6f-cccc-46d1-b108-aa923de2d472`) + **AcrPull** on `rotationsplusacr`.
 - ✅ 4.2 Variable group `rplus-dev` (id 4) with secret `POSTGRES_ADMIN_PASSWORD`; service connection `azure-rotationsplus` + `acrName=rotationsplusacr` set in `variables.dev.yml`. (DevOps Environment `rplus-dev` auto-creates on first deploy run.)
 - ✅ 4.3 `access_as_user` scope present on `rplus-api`; granted + admin-consented to `rplus-web`; owner assigned the `Admin` app role on `rplus-api`.
-- ⏳ 4.3 step 3 (SWA redirect URI) — **after the first DEV deploy** (needs the SWA host).
+- ✅ 4.3 step 3 (SWA redirect URI) — registered `https://lively-field-00b389d0f.7.azurestaticapps.net` (+ `http://localhost:5173`) on `rplus-web` after the first successful DEV deploy (build 3, 2026-06-15).
+
+**DEV is live (2026-06-15):**
+- SPA: `https://lively-field-00b389d0f.7.azurestaticapps.net`
+- API: `https://ca-rplus-api-dev.graypond-8dfef1bd.westus2.azurecontainerapps.io` (`/health` = Healthy)
+- Worker (Hangfire dashboard): `https://ca-rplus-worker-dev.graypond-8dfef1bd.westus2.azurecontainerapps.io/admin/jobs`
+- Resource group `rg-rplus-dev`; images tag `:3`. API runs `minReplicas: 0` (scale-to-zero → first request cold-starts).
 
 These required Owner/RBAC or app-registration rights the pipeline service principal (Contributor) does not have.
 
