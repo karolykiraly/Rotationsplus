@@ -18,6 +18,11 @@ public static class ApiAuthorizationMatrix
         new("GET", "/api/specialties", RoleNames.Staff, "List marketplace specialties"),
         // A seeded id, so an authorized caller routes through to a real resource (not a 404).
         new("GET", "/api/specialties/aaaaaaaa-0000-0000-0000-000000000001", RoleNames.Staff, "Get specialty by id"),
+        // Admin-only writes. Non-existent id / empty body → authorized callers get 404/400 (not 401/403),
+        // which the authz-only matrix accepts; endpoint behaviour is covered by SpecialtyAdminEndpointTests.
+        new("POST", "/api/specialties", [RoleNames.Admin], "Create specialty (admin)"),
+        new("PUT", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update specialty (admin)"),
+        new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>
