@@ -123,7 +123,9 @@ var dbConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database=rotat
 module keyVault 'modules/keyVault.bicep' = {
   name: 'keyVault'
   params: {
-    name: 'kv-${namePrefix}-${environment}-${suffix}'
+    // Key Vault names are max 24 chars, alphanumeric + hyphens, no consecutive hyphens.
+    // 'kv' + prefix + env + 8 of the suffix keeps us under 24 for all environments.
+    name: 'kv${namePrefix}${environment}${take(suffix, 8)}'
     location: location
     tags: tags
     readerObjectIds: [appIdentity.properties.principalId]
