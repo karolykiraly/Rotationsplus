@@ -1,12 +1,12 @@
 # DEV pipeline variables. Owner sets the two marked TODO values to match the DevOps setup.
 variables:
   # ARM service connection (workload-identity federation) created during the Azure foundation.
-  azureServiceConnection: 'rplus-arm-dev'        # TODO(owner): set to the actual service connection name
+  azureServiceConnection: 'azure-rotationsplus'  # confirmed 2026-06-14 (DevOps project: Rotationsplus)
   resourceGroup: 'rg-rplus-dev'
   location: 'eastus2'
 
   # ACR (shared). Resource name vs. login server differ because of the tenant domain-label suffix.
-  acrName: 'rotationsplusacr'                     # TODO(owner): verify the ACR resource name
+  acrName: 'rotationsplusacr'                     # confirmed 2026-06-14
   acrLoginServer: 'rotationsplusacr-cvgsceanh0fpbdh3.azurecr.io'
 
   dotnetVersion: '9.0.x'
