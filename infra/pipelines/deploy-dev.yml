@@ -1,0 +1,136 @@
+# CD — every merge to develop builds, tests, pushes images, provisions DEV (Bicep),
+# and deploys api/worker (Container Apps) + SPA (Static Web App). DEV is the continuous-review env.
+#
+# Owner prerequisites (one-time):
+#   - DevOps Environment "rplus-dev" (approval gates as desired).
+#   - Variable group "rplus-dev" with secret POSTGRES_ADMIN_PASSWORD.
+#   - User-assigned MI "id-rplus-dev" in rg-rplus-dev, granted AcrPull on the ACR (see Azure_Foundation.md).
+#   - variables/variables.dev.yml: azureServiceConnection + acrName verified.
+
+trigger:
+  branches:
+    include:
+      - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - template: variables/variables.dev.yml
+  - group: rplus-dev # secret: POSTGRES_ADMIN_PASSWORD
+
+stages:
+  - stage: build
+    displayName: Build, test, push images
+    jobs:
+      - job: backend
+        displayName: Backend test + push images
+        steps:
+          - template: templates/build-dotnet.yml
+          - task: AzureCLI@2
+            displayName: Build & push container images
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az acr login --name $(acrName)
+                for proj in "api/RotationsPlus.Api:rplus-api" "worker/RotationsPlus.Worker:rplus-worker"; do
+                  path="src/${proj%%:*}/${proj##*/}.csproj"
+                  repo="${proj##*:}"
+                  echo "Publishing $path -> $(acrLoginServer)/$repo:$(Build.BuildId)"
+                  dotnet publish "$path" -c Release \
+                    -p:PublishProfile=DefaultContainer \
+                    -p:ContainerRegistry=$(acrLoginServer) \
+                    -p:ContainerRepository="$repo" \
+                    -p:ContainerImageTag=$(Build.BuildId)
+                done
+
+      - job: frontend
+        displayName: Frontend validate
+        steps:
+          - template: templates/build-frontend.yml
+
+  - stage: deploy
+    displayName: Deploy to DEV
+    dependsOn: build
+    condition: succeeded()
+    jobs:
+      - deployment: deploydev
+        displayName: Provision + deploy
+        environment: rplus-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: NodeTool@0
+                  displayName: Install Node $(nodeVersion)
+                  inputs:
+                    versionSpec: $(nodeVersion)
+
+                - task: AzureCLI@2
+                  name: infra
+                  displayName: Provision infrastructure (Bicep)
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      outputs=$(az deployment group create \
+                        --resource-group $(resourceGroup) \
+                        --template-file infra/bicep/main.bicep \
+                        --parameters infra/bicep/main.parameters.dev.bicepparam \
+                        --query properties.outputs -o json)
+                      apiFqdn=$(echo "$outputs" | jq -r '.apiFqdn.value')
+                      swaName=$(echo "$outputs" | jq -r '.swaName.value')
+                      swaHost=$(echo "$outputs" | jq -r '.swaDefaultHostname.value')
+                      echo "API: https://$apiFqdn  SWA: https://$swaHost"
+                      echo "##vso[task.setvariable variable=apiFqdn;isOutput=true]$apiFqdn"
+                      echo "##vso[task.setvariable variable=swaName;isOutput=true]$swaName"
+                      echo "##vso[task.setvariable variable=swaHost;isOutput=true]$swaHost"
+                  env:
+                    IMAGE_TAG: $(Build.BuildId)
+                    POSTGRES_ADMIN_PASSWORD: $(POSTGRES_ADMIN_PASSWORD)
+                    SPA_ALLOWED_ORIGIN: ''
+
+                # NOTE: P1 has no EF migrations yet. When the first entity lands, run the migrations
+                # bundle here (against the Key Vault connection string) before the new image serves traffic.
+
+                - task: AzureCLI@2
+                  displayName: Build SPA + deploy to Static Web App + open CORS
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      apiFqdn="$(infra.apiFqdn)"
+                      swaName="$(infra.swaName)"
+                      swaHost="$(infra.swaHost)"
+
+                      export VITE_API_BASE_URL="https://${apiFqdn}"
+                      export VITE_AAD_TENANT_ID="$(aadTenantId)"
+                      export VITE_AAD_CLIENT_ID="$(aadClientId)"
+                      export VITE_API_SCOPE="$(apiScope)"
+                      export VITE_AAD_REDIRECT_URI="https://${swaHost}"
+
+                      pushd src/frontend/web
+                      npm ci
+                      npm run build
+                      popd
+
+                      token=$(az staticwebapp secrets list --name "$swaName" \
+                        --resource-group $(resourceGroup) --query properties.apiKey -o tsv)
+                      npx --yes @azure/static-web-apps-cli@latest deploy src/frontend/web/dist \
+                        --deployment-token "$token" --env production
+
+                      # Allow the SWA origin on the API now that its host is known.
+                      az containerapp update --name ca-rplus-api-dev \
+                        --resource-group $(resourceGroup) \
+                        --set-env-vars "Cors__AllowedOrigins__0=https://${swaHost}"
+
+                      echo "DEV deployed. SPA: https://${swaHost}  API: https://${apiFqdn}"

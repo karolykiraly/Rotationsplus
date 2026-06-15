@@ -1,0 +1,27 @@
+# CI — validates every PR into develop/main. No deployment.
+# Ubuntu hosted agent (Docker available for Testcontainers integration tests).
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - develop
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - template: variables/variables.dev.yml
+
+jobs:
+  - job: backend
+    displayName: Backend — build + tests
+    steps:
+      - template: templates/build-dotnet.yml
+
+  - job: frontend
+    displayName: Frontend — build + tests
+    steps:
+      - template: templates/build-frontend.yml

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="9.5.2" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>fd156f1c-a0d6-437b-8af6-1405ae584e68</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\api\RotationsPlus.Api\RotationsPlus.Api.csproj" />
+    <ProjectReference Include="..\..\worker\RotationsPlus.Worker\RotationsPlus.Worker.csproj" />
+  </ItemGroup>
+
+</Project>

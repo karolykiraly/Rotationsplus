@@ -1,0 +1,22 @@
+# Installs, type-checks, tests (70% gate), and builds the SPA on Node 22.
+steps:
+  - task: NodeTool@0
+    displayName: Install Node $(nodeVersion)
+    inputs:
+      versionSpec: $(nodeVersion)
+
+  - script: npm ci
+    workingDirectory: src/frontend/web
+    displayName: npm ci
+
+  - script: npm run typecheck
+    workingDirectory: src/frontend/web
+    displayName: Typecheck
+
+  - script: npm run test:coverage
+    workingDirectory: src/frontend/web
+    displayName: Vitest (70% coverage gate)
+
+  - script: npm run build
+    workingDirectory: src/frontend/web
+    displayName: Build

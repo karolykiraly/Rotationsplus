@@ -1,0 +1,18 @@
+# DEV pipeline variables. Owner sets the two marked TODO values to match the DevOps setup.
+variables:
+  # ARM service connection (workload-identity federation) created during the Azure foundation.
+  azureServiceConnection: 'rplus-arm-dev'        # TODO(owner): set to the actual service connection name
+  resourceGroup: 'rg-rplus-dev'
+  location: 'eastus2'
+
+  # ACR (shared). Resource name vs. login server differ because of the tenant domain-label suffix.
+  acrName: 'rotationsplusacr'                     # TODO(owner): verify the ACR resource name
+  acrLoginServer: 'rotationsplusacr-cvgsceanh0fpbdh3.azurecr.io'
+
+  dotnetVersion: '9.0.x'
+  nodeVersion: '22.x'
+
+  # Frontend Entra config (non-secret IDs; workforce tenant + rplus-web).
+  aadTenantId: '36486bcb-8a3f-4499-b0fc-9a06f510ec0e'
+  aadClientId: 'f874b196-89e2-4216-88fc-e7c92f05e6b7'
+  apiScope: 'api://c7bd24f1-e55f-4a26-b826-6b1241a5a1bc/access_as_user'

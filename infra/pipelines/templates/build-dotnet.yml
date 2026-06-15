@@ -1,0 +1,25 @@
+# Restores, builds, and tests the .NET solution. Runs on an Ubuntu hosted agent
+# (Docker present → Testcontainers integration tests run here too).
+steps:
+  - task: UseDotNet@2
+    displayName: Install .NET SDK
+    inputs:
+      packageType: sdk
+      version: $(dotnetVersion)
+
+  - script: dotnet restore RotationsPlus.sln
+    displayName: Restore
+
+  - script: dotnet build RotationsPlus.sln -c Release --no-restore
+    displayName: Build
+
+  - script: dotnet test RotationsPlus.sln -c Release --no-build --logger trx --collect:"XPlat Code Coverage"
+    displayName: Test (unit + integration via Testcontainers)
+
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: VSTest
+      testResultsFiles: '**/*.trx'
+      failTaskOnFailedTests: true

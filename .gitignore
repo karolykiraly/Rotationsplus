@@ -1,0 +1,37 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.trx
+[Bb]uild[Ll]og.*
+
+# ---- Node / frontend ----
+node_modules/
+dist/
+.vite/
+*.local
+.eslintcache
+
+# ---- Secrets / local config (never commit; secrets live in Key Vault) ----
+*.env
+.env.*
+appsettings.*.local.json
+.azure/
+
+# ---- Bicep compile output (generated from .bicep) ----
+infra/bicep/main.json
+
+# ---- Legacy snapshots (tracked in their own Live_Code git repo, see Delta_Ledger.md) ----
+Live_Code/
+
+# ---- Tooling / editor / agent-local ----
+.claude/
+.idea/
+*.swp
+.DS_Store

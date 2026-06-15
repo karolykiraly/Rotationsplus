@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Central build conventions for all Rotations Plus projects (clone of SkyLimit).
+    Cloned pattern: net9.0, nullable, implicit usings, warnings-as-errors, central package versions.
+    Per-project csproj files still own their TargetFramework/SDK; this file owns the cross-cutting toggles.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

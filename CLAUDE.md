@@ -1,0 +1,46 @@
+# Rotations Plus — Project Working Agreement
+
+This file defines how work is done in this project. It encodes the patterns the owner wants carried over from the SkyLimit project and the conventions agreed during planning. Follow it by default; the planning docs in `Docs/` hold the decisions and detail.
+
+## 0. Read first
+- **`Docs/`** is the source of truth for decisions: `Plan_Architecture.md`, `Plan_Migration.md`, `Plan_Testing.md`, `Plan_Admin.md`, `Plan_Preceptor.md`, `Plan_Student.md`, `Plan_Sales_SDR.md`, `Figma_Inventory.md`. Read the relevant one before acting; don't re-litigate decisions already recorded there.
+- Reference patterns to imitate live in the SkyLimit repo (`D:\CLAUDE_PROJECTS\SkyLimit`): ServiceDefaults, Bicep modules, pipeline templates, Testcontainers/TestAuthHandler, MSAL httpClient. Clone the pattern, scale to this project's 2-app topology.
+
+## 1. Autonomy — act, don't ask about everything
+- **Default to acting.** When there's a sensible default, a documented decision, or a clear best practice, do it and report what you did — don't stop to ask.
+- **Give a recommendation, not a survey.** If a choice arises, pick the best option, state it briefly with the why, and proceed. Don't enumerate every alternative or ask the owner to choose unless it's genuinely their call.
+- **Escalate only genuine owner-decisions:** brand/UX direction, money/vendor/legal trade-offs, anything irreversible or outward-facing, anything requiring the owner's accounts/credentials, or a real fork with business (not technical) consequences. Everything technical, you decide.
+- **Don't re-derive settled facts.** The planning docs and prior decisions stand; build on them.
+- The owner works ~4h/day and reviews on DEV — optimize for "show working results on DEV," not "ask before each step."
+
+## 2. Deployment cycle — build once, promote the same artifact
+- **Environments:** DEV → PREPROD → PROD. Per-env resource groups, Key Vault, and variable groups. IaC in Bicep, pipelines in Azure DevOps YAML (clone SkyLimit templates).
+- **DEV:** every merge to `develop` auto-deploys (images → ACR tagged by build id, Bicep, deploy api/worker/SWA). DEV is the continuous-review environment.
+- **PREPROD:** promotes the **exact same image tags + SWA artifact** from DEV — no rebuild. Manual trigger, owner approval gate. Gets a masked prod-copy dataset for parity/perf testing.
+- **PROD:** same promotion pattern from PREPROD, double approval gate. Used at cutover and every release after.
+- **Hard rule:** nothing reaches PREPROD that didn't run on DEV; nothing reaches PROD that didn't pass the parity suite on PREPROD.
+- Secrets only in Key Vault (managed identity); never in code/config. URLs: `dev(-api).rotationsplus.org`, `preprod(-api).rotationsplus.org`, prod `www`/`api.rotationsplus.org`.
+
+## 3. Independent review & quality — tests ship with the code
+- **Tests in the same PR as the code. No "test later"** — the legacy system's 0% coverage is exactly what we're escaping. See `Plan_Testing.md`.
+- **Definition of done per PR:** code + tests together; new endpoint → integration tests + an authz-matrix row; new background job → time-boundary tests; new screen → component tests (+ e2e step if on a money path); CI green.
+- **Gates that block merge:** backend unit + integration (Testcontainers PostgreSQL + WebApplicationFactory + TestAuthHandler), frontend Vitest at **70% coverage**, dependency audit, the authz-matrix suite (every endpoint × role).
+- **Independent/adversarial review before merge:** run `/code-review` on the diff; verify findings rather than trusting them; for risk areas (pricing, state machine, auth, payments) prefer a second adversarial pass. Don't self-approve risky changes without verification.
+- **Migration-specific layers:** characterization tests (record legacy API, replay against new), the ETL verification harness (row counts/checksums/money-to-the-cent), per-dashboard parity checklists. These are gates, not nice-to-haves.
+- **Performance budgets are enforced** (API p95 < 300ms, mobile LCP < 2.5s) via k6 + Lighthouse CI, not aspirational.
+
+## 4. Engineering conventions (from SkyLimit)
+- .NET 9 modular monolith API + separate Hangfire Worker; EF Core + Npgsql; Service Bus for events; Redis for cache. React 18 + TS + Vite, TanStack Query + Zustand, MSAL, central typed httpClient.
+- Two-directory Entra: staff in workforce tenant, customers in External ID (see `Plan_Architecture.md §3.5`).
+- Time abstracted via `TimeProvider` (no `DateTime.UtcNow` in domain code) so scheduled logic is testable.
+- Match surrounding code style; sensitive columns encrypted via EF value converters; soft-delete + audit on key entities.
+
+## 5. Stealth (until offboarding day)
+- Confidential project; the outgoing dev team must not learn of it. No changes to the legacy GitLab/Cloudflare/vendor accounts; build on isolated new accounts; secrets rotation deferred to offboarding day. See `Plan_Migration.md §2`. Don't touch the legacy EC2/RDS or do custom DNS for dev/preprod until after offboarding.
+
+## 6. Git / commits
+- Branch off `develop`; never commit straight to it. Commit/push only when asked. Keep PRs scoped (one concern). Conventional, descriptive messages.
+
+## 7. Tooling notes
+- Figma (read-only MCP) is the **content/flow reference, not the visual target** — the UI is a fresh modern redesign; brand (logo + `#FF4874`) stays. Frame map: `Docs/Figma_Inventory.md`.
+- Windows/PowerShell environment; prefer the dedicated file/search tools over shell where one fits.
