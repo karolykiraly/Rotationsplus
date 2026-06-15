@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using RotationsPlus.Api.Modules.Identity;
+using RotationsPlus.Common.Data;
 
 namespace RotationsPlus.Api.Infrastructure;
 
@@ -9,9 +11,12 @@ namespace RotationsPlus.Api.Infrastructure;
 /// </summary>
 public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : DbContext(options)
 {
+    public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RotationsDbContext).Assembly);
+        modelBuilder.ApplySoftDeleteQueryFilters();
     }
 }

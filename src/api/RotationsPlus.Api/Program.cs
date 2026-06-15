@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Common.Data;
 using RotationsPlus.Common.Security;
 using RotationsPlus.ServiceDefaults;
 using Scalar.AspNetCore;
@@ -19,10 +21,20 @@ builder.Services
 
 builder.Services.AddRotationsPlusAuthorization();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddScoped<StaffProfileProvisioner>();
 
 // --- Data: single Postgres DB / single DbContext (connection name "rotationsdb"). ---
-builder.AddNpgsqlDbContext<RotationsDbContext>("rotationsdb");
+// The audit interceptor stamps audit columns + soft-deletes. HttpContextAccessor's backing store
+// is a static AsyncLocal, so a directly-constructed instance still resolves the current request's
+// principal — which keeps the interceptor a simple singleton regardless of DbContext pooling.
+// It reuses HttpCurrentUser so claim-reading lives in exactly one place.
+var auditInterceptor = new AuditSaveChangesInterceptor(
+    new HttpCurrentUser(new HttpContextAccessor()), TimeProvider.System);
+builder.AddNpgsqlDbContext<RotationsDbContext>(
+    "rotationsdb",
+    configureDbContextOptions: options => options.AddInterceptors(auditInterceptor));
 
 // --- CORS for the SPA. Origins come from config (localhost in Development; the SWA host on DEV). ---
 const string spaCorsPolicy = "spa";

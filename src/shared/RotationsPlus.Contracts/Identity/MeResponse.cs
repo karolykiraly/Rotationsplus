@@ -1,12 +1,15 @@
 namespace RotationsPlus.Contracts.Identity;
 
 /// <summary>
-/// Shape returned by GET /api/me — the authenticated staff identity. This is the P1 Entra
-/// login round-trip payload the SPA renders to prove end-to-end auth on DEV.
+/// Shape returned by GET /api/me — the authenticated staff identity plus the persisted profile
+/// it was provisioned into. <see cref="ProfileId"/> and <see cref="LastSignInAtUtc"/> come from the
+/// database (not the token), proving the full read/write round-trip on DEV.
 /// </summary>
 public sealed record MeResponse(
     string ObjectId,
     string? Name,
     string? Username,
     IReadOnlyList<string> Roles,
-    bool IsStaff);
+    bool IsStaff,
+    Guid ProfileId,
+    DateTimeOffset? LastSignInAtUtc);

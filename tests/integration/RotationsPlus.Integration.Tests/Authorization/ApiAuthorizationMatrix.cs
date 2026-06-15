@@ -1,0 +1,22 @@
+using RotationsPlus.Common.Authorization;
+
+namespace RotationsPlus.Integration.Tests.Authorization;
+
+/// <summary>One row of the authorization matrix: an endpoint and the roles allowed to reach it.</summary>
+public sealed record EndpointSpec(string Method, string Path, string[] AllowedRoles, string Description);
+
+/// <summary>
+/// The single source of truth for "every endpoint × role" (CLAUDE.md §3 merge gate).
+/// Add a row here whenever a new endpoint lands — <see cref="AuthorizationMatrixTests"/> then
+/// enforces, for every known role, that allowed roles get through and everyone else is rejected.
+/// </summary>
+public static class ApiAuthorizationMatrix
+{
+    public static readonly EndpointSpec[] Endpoints =
+    [
+        new("GET", "/api/me", RoleNames.Staff, "Current staff identity + provisioned profile"),
+    ];
+
+    /// <summary>Every role the system issues, across both Entra directories.</summary>
+    public static readonly string[] AllRoles = [.. RoleNames.Staff, .. RoleNames.Customer];
+}

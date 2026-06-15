@@ -52,6 +52,24 @@ stages:
                   -p:ContainerRepository=rplus-worker \
                   -p:ContainerImageTag=$(Build.BuildId)
 
+          - script: |
+              set -euo pipefail
+              dotnet tool install --global dotnet-ef --version 9.0.17
+              export PATH="$PATH:$HOME/.dotnet/tools"
+              # Self-contained bundle: a standalone linux-x64 executable that applies migrations
+              # without an SDK at deploy time. Build-time only — uses the design-time factory's
+              # placeholder connection; the real connection string is passed with --connection.
+              dotnet ef migrations bundle \
+                --project src/api/RotationsPlus.Api/RotationsPlus.Api.csproj \
+                --startup-project src/api/RotationsPlus.Api/RotationsPlus.Api.csproj \
+                --configuration Release --self-contained -r linux-x64 \
+                --output "$(Build.ArtifactStagingDirectory)/efbundle/efbundle"
+            displayName: Create EF migrations bundle
+
+          - publish: $(Build.ArtifactStagingDirectory)/efbundle
+            artifact: efbundle
+            displayName: Publish migrations bundle
+
       - job: frontend
         displayName: Frontend validate
         steps:
@@ -93,17 +111,36 @@ stages:
                       apiFqdn=$(echo "$outputs" | jq -r '.apiFqdn.value')
                       swaName=$(echo "$outputs" | jq -r '.swaName.value')
                       swaHost=$(echo "$outputs" | jq -r '.swaDefaultHostname.value')
+                      postgresFqdn=$(echo "$outputs" | jq -r '.postgresFqdn.value')
                       echo "API: https://$apiFqdn  SWA: https://$swaHost"
                       echo "##vso[task.setvariable variable=apiFqdn;isOutput=true]$apiFqdn"
                       echo "##vso[task.setvariable variable=swaName;isOutput=true]$swaName"
                       echo "##vso[task.setvariable variable=swaHost;isOutput=true]$swaHost"
+                      echo "##vso[task.setvariable variable=postgresFqdn;isOutput=true]$postgresFqdn"
                   env:
                     IMAGE_TAG: $(Build.BuildId)
                     POSTGRES_ADMIN_PASSWORD: $(POSTGRES_ADMIN_PASSWORD)
                     SPA_ALLOWED_ORIGIN: ''
 
-                # NOTE: P1 has no EF migrations yet. When the first entity lands, run the migrations
-                # bundle here (against the Key Vault connection string) before the new image serves traffic.
+                # Apply EF migrations with the self-contained bundle built in the build stage. The DB
+                # now exists (Bicep ran above); the admin password comes from the variable group and
+                # the host from the Bicep output — no Key Vault read needed (the pipeline SP has no KV
+                # access policy). The Postgres "AllowAllAzureServices" rule lets the hosted agent connect.
+                # DEV trade-off: the new image may briefly start before migrations finish (scale-to-zero,
+                # negligible traffic). PROD will split infra provisioning from app rollout to order this.
+                - download: current
+                  artifact: efbundle
+                  displayName: Download migrations bundle
+
+                - script: |
+                    set -euo pipefail
+                    bundle="$(Pipeline.Workspace)/efbundle/efbundle"
+                    chmod +x "$bundle"
+                    conn="Host=$(infra.postgresFqdn);Port=5432;Database=rotationsplus;Username=rplusadmin;Password=${POSTGRES_ADMIN_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
+                    "$bundle" --connection "$conn"
+                  displayName: Apply EF migrations
+                  env:
+                    POSTGRES_ADMIN_PASSWORD: $(POSTGRES_ADMIN_PASSWORD)
 
                 - task: AzureCLI@2
                   displayName: Build SPA + deploy to Static Web App + open CORS

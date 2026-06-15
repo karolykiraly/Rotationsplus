@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RotationsPlus.Api.Infrastructure;
 using Testcontainers.PostgreSql;
 
 namespace RotationsPlus.Integration.Tests;
@@ -38,7 +40,16 @@ public sealed class RotationsApiFactory : WebApplicationFactory<Program>, IAsync
         });
     }
 
-    public Task InitializeAsync() => _postgres.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+
+        // Apply the real EF migrations to the throwaway container — this also exercises the
+        // migration itself on every CI run (catches a broken migration before it reaches DEV).
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RotationsDbContext>();
+        await db.Database.MigrateAsync();
+    }
 
     // Explicit to avoid clashing with WebApplicationFactory's ValueTask DisposeAsync().
     async Task IAsyncLifetime.DisposeAsync()

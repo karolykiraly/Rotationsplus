@@ -7,6 +7,9 @@ export interface MeResponse {
   username?: string | null;
   roles: string[];
   isStaff: boolean;
+  /** Persisted profile id (from the DB, not the token) — proves the write round-trip. */
+  profileId: string;
+  lastSignInAtUtc?: string | null;
 }
 
 /** Acquires a workforce access token and calls GET /api/me — the P1 login round-trip. */

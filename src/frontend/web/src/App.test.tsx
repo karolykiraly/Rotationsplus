@@ -46,12 +46,15 @@ describe("App", () => {
       name: "Jane",
       username: "jane@x",
       roles: ["Admin"],
-      isStaff: true
+      isStaff: true,
+      profileId: "11111111-1111-1111-1111-111111111111",
+      lastSignInAtUtc: "2026-06-15T12:00:00Z"
     });
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Call /api/me" }));
     expect(await screen.findByText("Authenticated identity")).toBeInTheDocument();
     expect(screen.getByText("oid-1")).toBeInTheDocument();
+    expect(screen.getByText("11111111-1111-1111-1111-111111111111")).toBeInTheDocument();
   });
 
   it("shows an error when the API call fails", async () => {

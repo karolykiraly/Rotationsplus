@@ -61,6 +61,8 @@ export default function App() {
             <dt>Object ID</dt><dd>{me.objectId}</dd>
             <dt>Roles</dt><dd>{me.roles.length > 0 ? me.roles.join(", ") : "—"}</dd>
             <dt>Is staff</dt><dd>{String(me.isStaff)}</dd>
+            <dt>Profile ID</dt><dd>{me.profileId}</dd>
+            <dt>Last sign-in</dt><dd>{me.lastSignInAtUtc ? new Date(me.lastSignInAtUtc).toLocaleString() : "—"}</dd>
           </dl>
         </section>
       )}

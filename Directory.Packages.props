@@ -24,6 +24,9 @@
 
   <ItemGroup Label="Data (EF Core + Npgsql)">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.17" />
+    <!-- Pin Relational to match Core: Aspire/Npgsql pull it transitively at 9.0.9, which would
+         split Core (9.0.17) from Relational (9.0.9) and risk runtime MissingMethodExceptions. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.17" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.17" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.5.2" />
