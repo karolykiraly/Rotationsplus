@@ -34,6 +34,8 @@ Confidential; outgoing dev team must not learn of it. Build on new isolated acco
 1. Cron/notification equivalence → fix-forward accepted. 2. Innodata (external) → owner owns comms. 3. Full-rewrite parity vs review bandwidth → owner's call: status quo is a liability to escape, some regressions acceptable.
 
 ## Immediate next step when work resumes
-**P1 foundation deployed to DEV (2026-06-15).** Solution scaffolded, Bicep + pipelines (`build-all`, `deploy-dev`) in the `Rotationsplus` DevOps repo, api/worker/SPA live in `rg-rplus-dev`, staff Entra app config done (scope/consent/Admin role). URLs + bootstrap detail in `Azure_Foundation.md`. Frontend toolchain: **Vite 8 + Node 22**.
+**P1 foundation COMPLETE on DEV (2026-06-15).** Solution scaffolded, Bicep + pipelines (`build-all`, `deploy-dev`) in the `Rotationsplus` DevOps repo, api/worker/SPA live in `rg-rplus-dev`, staff Entra app config done (scope/consent/Admin role). URLs + bootstrap detail in `Azure_Foundation.md`. Frontend toolchain: **Vite 8 + Node 22**.
 
-Remaining to close P1: confirm the **interactive staff sign-in round-trip** on the SPA (`/api/me` returns Admin identity). Then P1 → done; next is the first domain module (and the weekly delta loop once snapshots arrive).
+✅ **Staff sign-in round-trip verified (2026-06-15):** signed in as charles@rotationsplus.com on the SPA → `/api/me` returned Name "Karoly Kiraly", Roles `["Admin"]`, isStaff `true`, oid `c9f28e33-…`. Full chain proven (MSAL PKCE → workforce token w/ `access_as_user` → audience/issuer validation → `StaffOnly` authz → `Admin` app-role claim). `Username` shows blank only because the test account is a *guest* (no `preferred_username`/`upn` claim); members will populate it post-offboarding — non-blocking.
+
+**Next:** first domain module (and the weekly delta loop once legacy snapshots arrive under `Live_Code/<date>/`). A small CD hygiene follow-up is open: add a path filter to `deploy-dev.yml` so docs-only commits don't trigger a full DEV redeploy.

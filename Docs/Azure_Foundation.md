@@ -77,6 +77,8 @@ This document records the one-time Azure foundation that gates P1. It is the dur
 - ✅ 4.3 `access_as_user` scope present on `rplus-api`; granted + admin-consented to `rplus-web`; owner assigned the `Admin` app role on `rplus-api`.
 - ✅ 4.3 step 3 (SWA redirect URI) — registered `https://lively-field-00b389d0f.7.azurestaticapps.net` (+ `http://localhost:5173`) on `rplus-web` after the first successful DEV deploy (build 3, 2026-06-15).
 
+**Staff login round-trip verified (2026-06-15):** signed in as charles@rotationsplus.com on the SPA → `/api/me` returned Name "Karoly Kiraly", Roles `["Admin"]`, isStaff `true`, oid `c9f28e33-afef-4b0a-b3de-5fe06be37985`. P1 is complete. (`Username` blank = guest account has no `preferred_username`/`upn` claim; non-blocking.)
+
 **DEV is live (2026-06-15):**
 - SPA: `https://lively-field-00b389d0f.7.azurestaticapps.net`
 - API: `https://ca-rplus-api-dev.graypond-8dfef1bd.westus2.azurecontainerapps.io` (`/health` = Healthy)

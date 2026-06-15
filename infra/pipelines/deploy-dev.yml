@@ -11,6 +11,11 @@ trigger:
   branches:
     include:
       - develop
+  paths:
+    exclude:
+      - Docs/**
+      - '**/*.md'
+      - .gitignore
 
 pool:
   vmImage: ubuntu-latest
