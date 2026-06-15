@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   loginRedirect: vi.fn().mockResolvedValue(undefined),
   logoutRedirect: vi.fn().mockResolvedValue(undefined),
   getMe: vi.fn(),
+  getSpecialties: vi.fn(),
   state: { accounts: [] as unknown[] }
 }));
 
@@ -16,7 +17,7 @@ vi.mock("@azure/msal-react", () => ({
   })
 }));
 
-vi.mock("./api", () => ({ getMe: () => h.getMe() }));
+vi.mock("./api", () => ({ getMe: () => h.getMe(), getSpecialties: () => h.getSpecialties() }));
 
 import App from "./App";
 
@@ -25,6 +26,7 @@ describe("App", () => {
     h.loginRedirect.mockClear();
     h.logoutRedirect.mockClear();
     h.getMe.mockReset();
+    h.getSpecialties.mockReset();
     h.state.accounts = [];
   });
 
@@ -63,6 +65,19 @@ describe("App", () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Call /api/me" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
+  });
+
+  it("loads and renders specialties when signed in", async () => {
+    h.state.accounts = [{ homeAccountId: "a" }];
+    h.getSpecialties.mockResolvedValue([
+      { id: "s1", name: "Internal Medicine" },
+      { id: "s2", name: "Pediatrics" }
+    ]);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Load specialties" }));
+    expect(await screen.findByText("Specialties (2)")).toBeInTheDocument();
+    expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
+    expect(screen.getByText("Pediatrics")).toBeInTheDocument();
   });
 
   it("signs out", async () => {

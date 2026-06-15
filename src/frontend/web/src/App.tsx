@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
-import { getMe, type MeResponse } from "./api";
+import { getMe, getSpecialties, type MeResponse, type Specialty } from "./api";
 
 const BRAND = "#FF4874";
 
 export default function App() {
   const { instance, accounts } = useMsal();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [specialties, setSpecialties] = useState<Specialty[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isSignedIn = accounts.length > 0;
 
@@ -18,6 +19,7 @@ export default function App() {
 
   const signOut = () => {
     setMe(null);
+    setSpecialties(null);
     void instance.logoutRedirect();
   };
 
@@ -25,6 +27,15 @@ export default function App() {
     try {
       setError(null);
       setMe(await getMe());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const loadSpecialties = async () => {
+    try {
+      setError(null);
+      setSpecialties(await getSpecialties());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -43,6 +54,9 @@ export default function App() {
         <div style={{ display: "flex", gap: "0.75rem" }}>
           <button onClick={callApi} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Call /api/me
+          </button>
+          <button onClick={loadSpecialties} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
+            Load specialties
           </button>
           <button onClick={signOut} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Sign out
@@ -64,6 +78,15 @@ export default function App() {
             <dt>Profile ID</dt><dd>{me.profileId}</dd>
             <dt>Last sign-in</dt><dd>{me.lastSignInAtUtc ? new Date(me.lastSignInAtUtc).toLocaleString() : "—"}</dd>
           </dl>
+        </section>
+      )}
+
+      {specialties && (
+        <section style={{ marginTop: "1.5rem" }}>
+          <h2>Specialties ({specialties.length})</h2>
+          <ul>
+            {specialties.map((s) => <li key={s.id}>{s.name}</li>)}
+          </ul>
         </section>
       )}
     </main>

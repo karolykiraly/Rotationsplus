@@ -3,6 +3,7 @@ using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Api.Modules.Identity;
+using RotationsPlus.Api.Modules.Marketplace;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Common.Data;
 using RotationsPlus.Common.Security;
@@ -61,6 +62,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapMeEndpoints();
+app.MapSpecialtyEndpoints();
 
 app.Run();
 

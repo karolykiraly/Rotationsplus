@@ -15,6 +15,9 @@ public static class ApiAuthorizationMatrix
     public static readonly EndpointSpec[] Endpoints =
     [
         new("GET", "/api/me", RoleNames.Staff, "Current staff identity + provisioned profile"),
+        new("GET", "/api/specialties", RoleNames.Staff, "List marketplace specialties"),
+        // A seeded id, so an authorized caller routes through to a real resource (not a 404).
+        new("GET", "/api/specialties/aaaaaaaa-0000-0000-0000-000000000001", RoleNames.Staff, "Get specialty by id"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>

@@ -5,7 +5,10 @@ namespace RotationsPlus.Integration.Tests.Authorization;
 
 /// <summary>
 /// The authorization-matrix gate: for every endpoint in <see cref="ApiAuthorizationMatrix"/>, an
-/// anonymous caller is 401, an allowed role gets a success status, and every other role is 403.
+/// anonymous caller is 401, an allowed role is authorized through (NOT 401/403), and every other
+/// role is 403. This asserts authorization only — the concrete success/validation/404 status of
+/// each endpoint is covered by endpoint-specific tests, which keeps the matrix valid for
+/// parameterized and write endpoints (where an authorized call may legitimately be 400/404).
 /// Theory data is all-strings so xUnit serializes it cleanly into readable case names.
 /// </summary>
 public class AuthorizationMatrixTests(RotationsApiFactory factory) : IClassFixture<RotationsApiFactory>
@@ -44,7 +47,9 @@ public class AuthorizationMatrixTests(RotationsApiFactory factory) : IClassFixtu
 
         if (allowedRoles.Contains(role))
         {
-            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Created, HttpStatusCode.NoContent);
+            // Authorized through — not rejected by authentication/authorization.
+            response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+            response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
         }
         else
         {

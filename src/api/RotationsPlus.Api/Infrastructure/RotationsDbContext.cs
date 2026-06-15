@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Modules.Identity;
+using RotationsPlus.Api.Modules.Marketplace;
 using RotationsPlus.Common.Data;
 
 namespace RotationsPlus.Api.Infrastructure;
@@ -12,6 +13,7 @@ namespace RotationsPlus.Api.Infrastructure;
 public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : DbContext(options)
 {
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+    public DbSet<Specialty> Specialties => Set<Specialty>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

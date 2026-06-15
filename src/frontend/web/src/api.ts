@@ -12,8 +12,13 @@ export interface MeResponse {
   lastSignInAtUtc?: string | null;
 }
 
-/** Acquires a workforce access token and calls GET /api/me — the P1 login round-trip. */
-export async function getMe(): Promise<MeResponse> {
+/** Mirror of the API's SpecialtyResponse contract. */
+export interface Specialty {
+  id: string;
+  name: string;
+}
+
+async function getJson<T>(path: string): Promise<T> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
   if (!account) {
     throw new Error("Not signed in");
@@ -21,13 +26,19 @@ export async function getMe(): Promise<MeResponse> {
 
   const result = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
 
-  const response = await fetch(`${apiBaseUrl}/api/me`, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: { Authorization: `Bearer ${result.accessToken}` }
   });
 
   if (!response.ok) {
-    throw new Error(`GET /api/me failed: ${response.status}`);
+    throw new Error(`GET ${path} failed: ${response.status}`);
   }
 
-  return (await response.json()) as MeResponse;
+  return (await response.json()) as T;
 }
+
+/** Acquires a workforce access token and calls GET /api/me — the staff login round-trip. */
+export const getMe = (): Promise<MeResponse> => getJson<MeResponse>("/api/me");
+
+/** Lists marketplace specialties (GET /api/specialties). */
+export const getSpecialties = (): Promise<Specialty[]> => getJson<Specialty[]>("/api/specialties");
