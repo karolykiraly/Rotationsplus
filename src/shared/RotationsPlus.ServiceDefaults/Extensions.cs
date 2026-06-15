@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,9 @@ public static class Extensions
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
 
+    // Set by Azure Container Apps (from Bicep). Its presence switches on the Azure Monitor exporter.
+    private const string AzureMonitorConnectionKey = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -41,10 +45,16 @@ public static class Extensions
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
+        var azureMonitorConnectionString = builder.Configuration[AzureMonitorConnectionKey];
+
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
+            if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+            {
+                logging.AddAzureMonitorLogExporter(o => o.ConnectionString = azureMonitorConnectionString);
+            }
         });
 
         builder.Services.AddOpenTelemetry()
@@ -64,11 +74,22 @@ public static class Extensions
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
-        // Exports to whatever OTLP endpoint is configured (App Insights via the OTel collector in Azure).
+        // OTLP endpoint (used by the Aspire dashboard locally, or any OTel collector).
         var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
         if (useOtlpExporter)
         {
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
+
+        // Application Insights (DEV/PREPROD/PROD): the container sets the connection string; without
+        // this exporter that string is never read and no app telemetry reaches App Insights.
+        // The matching log exporter is wired in ConfigureOpenTelemetry's logging pipeline.
+        var azureMonitorConnectionString = builder.Configuration[AzureMonitorConnectionKey];
+        if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+        {
+            builder.Services.AddOpenTelemetry()
+                .WithMetrics(metrics => metrics.AddAzureMonitorMetricExporter(o => o.ConnectionString = azureMonitorConnectionString))
+                .WithTracing(tracing => tracing.AddAzureMonitorTraceExporter(o => o.ConnectionString = azureMonitorConnectionString));
         }
 
         return builder;
