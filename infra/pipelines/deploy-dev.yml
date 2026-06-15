@@ -36,16 +36,16 @@ stages:
               inlineScript: |
                 set -euo pipefail
                 az acr login --name $(acrName)
-                for proj in "api/RotationsPlus.Api:rplus-api" "worker/RotationsPlus.Worker:rplus-worker"; do
-                  path="src/${proj%%:*}/${proj##*/}.csproj"
-                  repo="${proj##*:}"
-                  echo "Publishing $path -> $(acrLoginServer)/$repo:$(Build.BuildId)"
-                  dotnet publish "$path" -c Release \
-                    -p:PublishProfile=DefaultContainer \
-                    -p:ContainerRegistry=$(acrLoginServer) \
-                    -p:ContainerRepository="$repo" \
-                    -p:ContainerImageTag=$(Build.BuildId)
-                done
+                dotnet publish src/api/RotationsPlus.Api/RotationsPlus.Api.csproj -c Release \
+                  -p:PublishProfile=DefaultContainer \
+                  -p:ContainerRegistry=$(acrLoginServer) \
+                  -p:ContainerRepository=rplus-api \
+                  -p:ContainerImageTag=$(Build.BuildId)
+                dotnet publish src/worker/RotationsPlus.Worker/RotationsPlus.Worker.csproj -c Release \
+                  -p:PublishProfile=DefaultContainer \
+                  -p:ContainerRegistry=$(acrLoginServer) \
+                  -p:ContainerRepository=rplus-worker \
+                  -p:ContainerImageTag=$(Build.BuildId)
 
       - job: frontend
         displayName: Frontend validate
