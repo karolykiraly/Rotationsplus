@@ -71,7 +71,13 @@ This document records the one-time Azure foundation that gates P1. It is the dur
 
 ## 4. Owner bootstrap for P1 deploy (one-time)
 
-These are the only owner actions the P1 pipeline + login round-trip depend on. They require Owner/RBAC or app-registration rights the pipeline service principal (Contributor) does not have.
+**Status — completed 2026-06-15** (via `az` under the owner's signed-in session; script `infra/bootstrap/Bootstrap-Dev.ps1`):
+- ✅ 4.1 UAMI `id-rplus-dev` created (principalId `7e472b6f-cccc-46d1-b108-aa923de2d472`) + **AcrPull** on `rotationsplusacr`.
+- ✅ 4.2 Variable group `rplus-dev` (id 4) with secret `POSTGRES_ADMIN_PASSWORD`; service connection `azure-rotationsplus` + `acrName=rotationsplusacr` set in `variables.dev.yml`. (DevOps Environment `rplus-dev` auto-creates on first deploy run.)
+- ✅ 4.3 `access_as_user` scope present on `rplus-api`; granted + admin-consented to `rplus-web`; owner assigned the `Admin` app role on `rplus-api`.
+- ⏳ 4.3 step 3 (SWA redirect URI) — **after the first DEV deploy** (needs the SWA host).
+
+These required Owner/RBAC or app-registration rights the pipeline service principal (Contributor) does not have.
 
 ### 4.1 Per-environment managed identity (enables ACR pull + Key Vault without pipeline role-assignments)
 The pipeline SP is **Contributor**, which cannot create role assignments. So create a user-assigned MI per env and grant it AcrPull once:
