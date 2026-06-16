@@ -33,6 +33,7 @@ export const msalConfig: Configuration = {
   system: {
     loggerOptions: {
       logLevel: LogLevel.Warning,
+      /* v8 ignore next 3 -- deliberate no-op logger */
       loggerCallback: () => {
         /* no-op in P1 */
       }
@@ -43,3 +44,45 @@ export const msalConfig: Configuration = {
 export const loginRequest: RedirectRequest = { scopes: [apiScope] };
 
 export const msalInstance = new PublicClientApplication(msalConfig);
+
+// --- Customer (CIAM / External ID) sign-in: Student / Preceptor, rplus-web-ext app registration. ---
+// Separate authority + client from the staff app above; the customer portal slices consume this.
+// Non-secret IDs; override via VITE_CIAM_* env. See infra/ciam/README.md.
+const ciamTenantId =
+  import.meta.env.VITE_CIAM_TENANT_ID ?? "f963c59e-da79-40f4-a358-1cd77e78ddd0";
+const customerClientId =
+  import.meta.env.VITE_CIAM_CLIENT_ID ?? "d3a7f715-1e7f-4c45-bd73-4de5749e1164";
+const customerAuthority =
+  import.meta.env.VITE_CIAM_AUTHORITY ?? `https://${ciamTenantId}.ciamlogin.com/${ciamTenantId}`;
+
+/** Delegated scope exposed by rplus-api-ext; requested when a customer acquires an API token. */
+export const customerApiScope =
+  import.meta.env.VITE_CIAM_API_SCOPE ??
+  "api://75709454-b052-45b4-b9b4-9f3214d487c6/access_as_customer";
+
+export const customerMsalConfig: Configuration = {
+  auth: {
+    clientId: customerClientId,
+    authority: customerAuthority,
+    // CIAM authorities aren't under login.microsoftonline.com, so MSAL needs them allow-listed.
+    knownAuthorities: [`${ciamTenantId}.ciamlogin.com`],
+    redirectUri,
+    postLogoutRedirectUri: redirectUri
+  },
+  cache: {
+    cacheLocation: "sessionStorage"
+  },
+  system: {
+    loggerOptions: {
+      logLevel: LogLevel.Warning,
+      /* v8 ignore next 3 -- deliberate no-op logger */
+      loggerCallback: () => {
+        /* no-op */
+      }
+    }
+  }
+};
+
+export const customerLoginRequest: RedirectRequest = { scopes: [customerApiScope] };
+
+export const customerMsalInstance = new PublicClientApplication(customerMsalConfig);

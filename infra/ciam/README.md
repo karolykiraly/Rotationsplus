@@ -6,9 +6,11 @@ the preceptor onboarding flow.
 
 **Division of labour:**
 - **You (Azure, this folder):** run `Configure-Ciam.ps1` + a few portal clicks. ~30 min.
-- **Me (code, a later slice):** add the second JWT-bearer scheme to the API (validate CIAM customer
-  tokens + map `Student`/`Preceptor` roles) and the customer MSAL config in the SPA. I already have
-  the IDs from memory; once you've run the script I'll wire it and ship it through the normal review loop.
+- **Me (code):** ✅ **Done — marketplace slice 8 / PR #15.** The API now validates CIAM customer
+  tokens via a second JWT-bearer scheme behind an issuer-routing "Smart" policy scheme and maps the
+  `Student`/`Preceptor` roles (`GET /api/customer/me` proves the round-trip); the SPA carries the
+  customer MSAL config (`rplus-web-ext` / CIAM authority). **Customer sign-in goes live once the two
+  portal steps below are done** (user flow + admin consent) — until then the wiring is dormant.
 
 The workforce (staff) side — `rplus-api` / `rplus-web` — is already wired and working; **none of this
 touches it.**

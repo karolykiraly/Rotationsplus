@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
@@ -15,11 +15,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// --- Authentication: workforce (staff) Entra tokens, validated for the rplus-api audience.
-//     Customer (CIAM) scheme is added in a later phase; P1 proves the staff round-trip. ---
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+// --- Authentication: two Entra directories (Plan_Architecture.md §3.5). Staff tokens come from the
+//     workforce tenant (AzureAd), customers from the External ID / CIAM tenant (AzureAdCustomer).
+//     The "Smart" policy scheme is the default: it peeks each token's issuer and forwards to the
+//     matching real scheme, so one pipeline accepts both. Role-based policies (StaffOnly/CustomerOnly)
+//     then gate by the roles each directory emits. ---
+var customerTenantId = builder.Configuration["AzureAdCustomer:TenantId"];
+var authentication = builder.Services
+    .AddAuthentication(AuthenticationSchemes.Smart)
+    .AddPolicyScheme(AuthenticationSchemes.Smart, AuthenticationSchemes.Smart, options =>
+        options.ForwardDefaultSelector = context => AuthSchemeSelector.Select(context, customerTenantId));
+
+authentication.AddMicrosoftIdentityWebApi(
+    builder.Configuration.GetSection("AzureAd"), AuthenticationSchemes.Workforce);
+authentication.AddMicrosoftIdentityWebApi(
+    builder.Configuration.GetSection("AzureAdCustomer"), AuthenticationSchemes.Customer);
 
 // Serialize enums as their string names (e.g. "InPerson") for a stable, readable API contract.
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -67,6 +77,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapMeEndpoints();
+app.MapCustomerMeEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPreceptorEndpoints();

@@ -25,6 +25,8 @@ Status enum today: `registered, pending, member_profile_completed, member_activa
 
 **Rewrite:** signup/login become Entra External ID flows (email verification handled by Entra; Google sign-in available). The status-based routing after login is preserved in the app (claims + `users.status`). Preceptor-group skip-OTP behavior re-implemented as pre-provisioned Entra accounts for group members.
 
+> **Customer MSAL wiring caveat (from slice 8):** the dormant customer (CIAM) MSAL instance shares an origin + `sessionStorage` with the staff instance — when activating preceptor sign-in, give it a distinct `redirectUri` and make API token acquisition issuer/instance-scoped. Full detail in `Plan_Student.md §3`.
+
 ## 3. Onboarding — `CompletePreceptorProfile.js` (~117KB, the big one)
 
 Multi-step stepper; every step below is a rewrite-spec section (decompose into per-step components + React Hook Form + zod, save-per-step):

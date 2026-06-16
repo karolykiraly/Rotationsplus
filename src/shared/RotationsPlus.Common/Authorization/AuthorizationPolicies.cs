@@ -12,7 +12,15 @@ public static class AuthorizationPolicies
 
 public static class AuthorizationPolicyExtensions
 {
-    /// <summary>Registers the baseline role-based policies used across the API.</summary>
+    /// <summary>
+    /// Registers the baseline role-based policies used across the API. The cross-directory boundary
+    /// (staff vs customer) is enforced in two layers: (1) the "Smart" scheme routes each token to the
+    /// workforce or CIAM validator by issuer, so only genuinely-issued tokens authenticate; (2) these
+    /// RequireRole policies gate on directory-specific role names, which are kept disjoint across the
+    /// two Entra directories (invariant pinned by RoleBoundaryTests). Pinning each policy to its
+    /// authenticating scheme is the next hardening step, gated on the integration harness learning to
+    /// forward the real schemes to the TestAuthHandler (see Docs/Plan_Testing.md).
+    /// </summary>
     public static IServiceCollection AddRotationsPlusAuthorization(this IServiceCollection services)
     {
         services.AddAuthorizationBuilder()
