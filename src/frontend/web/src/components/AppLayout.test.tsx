@@ -55,6 +55,7 @@ describe("AppLayout", () => {
     expect(await screen.findByText("Ada Admin")).toBeInTheDocument();
     expect(screen.getByText("Staff console")).toBeInTheDocument();
     expect(screen.getByText("Specialties")).toBeInTheDocument();
+    expect(screen.getByText("Programs")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(h.logoutRedirect).toHaveBeenCalled();

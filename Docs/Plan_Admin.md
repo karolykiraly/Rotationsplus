@@ -15,7 +15,7 @@
 
 ## 2. Route inventory (all ~45 routes)
 
-> **Build status.** Slice 9 (PR #16) stood up the SPA foundation the rest of this inventory builds on: React Router + TanStack Query + React Hook Form/zod, a role-gated admin shell (sidebar/topbar, brand `#FF4874`, tablet-usable), and the first management screen — **Specialties CRUD** (`/admin/specialties`, route grouping under `/admin/programs` in this table but shipped as its own page since Programs reference specialties). Programs (`/admin/programs[/:slug]`) and Preceptors admin CRUD are the next slices, reusing the same list+modal+mutation patterns.
+> **Build status.** Slice 9 (PR #16) stood up the SPA foundation the rest of this inventory builds on: React Router + TanStack Query + React Hook Form/zod, a role-gated admin shell (sidebar/topbar, brand `#FF4874`, tablet-usable). Management screens shipped on those patterns: **Specialties CRUD** (`/admin/specialties`, slice 9) and **Programs CRUD** (`/admin/programs`, slice 10 / PR #17 — specialty/type/preceptor dropdowns, capacity + money validation, edit pre-fills from program detail). **Preceptors admin CRUD** is the last core marketplace screen (slice 11). The richer legacy routes (rotations, leads/CRM, honorarium, reports, contacts) come after.
 
 ### Core
 | Route | Component | Purpose | Key APIs |

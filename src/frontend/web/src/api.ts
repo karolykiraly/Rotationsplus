@@ -18,15 +18,52 @@ export interface Specialty {
   name: string;
 }
 
+/** Program delivery types (mirrors the API's ProgramType enum; serialized as these string names). */
+export type ProgramType =
+  | "InPerson"
+  | "InPersonResearch"
+  | "Consultation"
+  | "ConsultationSub"
+  | "TeleRotation"
+  | "TeleResearch"
+  | "Dental";
+
 /** Mirror of the API's ProgramSummaryResponse contract (enums serialized as strings). */
 export interface Program {
   id: string;
   specialtyName: string;
-  programType: string;
+  programType: ProgramType;
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
   preceptorName?: string | null;
+}
+
+/** Mirror of the API's ProgramDetailResponse contract — the editable shape. */
+export interface ProgramDetail {
+  id: string;
+  specialtyId: string;
+  specialtyName: string;
+  programType: ProgramType;
+  maxStudentsPerRotation: number;
+  minWeeksPerRotation: number;
+  retailAmountPerWeek: number;
+  weeklyHonorarium: number;
+  description?: string | null;
+  preceptorId?: string | null;
+  preceptorName?: string | null;
+}
+
+/** Admin create/update payload (mirrors Create/UpdateProgramRequest). */
+export interface ProgramInput {
+  specialtyId: string;
+  programType: ProgramType;
+  maxStudentsPerRotation: number;
+  minWeeksPerRotation: number;
+  retailAmountPerWeek: number;
+  weeklyHonorarium: number;
+  description?: string | null;
+  preceptorId?: string | null;
 }
 
 /** Mirror of the API's PreceptorSummaryResponse contract (enums serialized as strings). */
@@ -114,6 +151,16 @@ export const updateSpecialty = (id: string, name: string): Promise<Specialty> =>
 export const deleteSpecialty = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/specialties/${id}`);
 
-// ---- Programs / Preceptors (read) ----
+// ---- Programs (read: StaffOnly; writes: AdminOnly) ----
 export const getPrograms = (): Promise<Program[]> => request<Program[]>("GET", "/api/programs");
+export const getProgram = (id: string): Promise<ProgramDetail> =>
+  request<ProgramDetail>("GET", `/api/programs/${id}`);
+export const createProgram = (input: ProgramInput): Promise<ProgramDetail> =>
+  request<ProgramDetail>("POST", "/api/programs", input);
+export const updateProgram = (id: string, input: ProgramInput): Promise<ProgramDetail> =>
+  request<ProgramDetail>("PUT", `/api/programs/${id}`, input);
+export const deleteProgram = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/programs/${id}`);
+
+// ---- Preceptors (read) ----
 export const getPreceptors = (): Promise<Preceptor[]> => request<Preceptor[]>("GET", "/api/preceptors");

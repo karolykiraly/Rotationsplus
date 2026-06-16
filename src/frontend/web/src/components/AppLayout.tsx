@@ -42,7 +42,12 @@ export function AppLayout() {
                 >
                   Specialties
                 </NavLink>
-                <span className="nav-item disabled" title="Coming soon">Programs</span>
+                <NavLink
+                  to="/admin/programs"
+                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                >
+                  Programs
+                </NavLink>
                 <span className="nav-item disabled" title="Coming soon">Preceptors</span>
               </>
             )}
