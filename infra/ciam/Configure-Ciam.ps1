@@ -3,7 +3,7 @@
     Configures the Rotations Plus CIAM (Microsoft Entra External ID) app registrations so customers
     (Student / Preceptor) can sign in and call the API.
 
-    It is IDEMPOTENT — safe to re-run; it adds only what is missing. Use -WhatIf to preview without
+    It is IDEMPOTENT - safe to re-run; it adds only what is missing. Use -WhatIf to preview without
     changing anything.
 
 .DESCRIPTION
@@ -16,7 +16,7 @@
       4. Ensures service principals exist for both apps (needed for consent + role assignment).
       5. Prints a summary block with the exact values to paste into the API + SPA config.
 
-    NOT scripted here (portal-only — see README.md): creating the sign-up/sign-in user flow, granting
+    NOT scripted here (portal-only - see README.md): creating the sign-up/sign-in user flow, granting
     admin consent (a one-click button), Google social login, and branding.
 
 .NOTES
@@ -44,12 +44,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
 $graph = 'https://graph.microsoft.com/v1.0'
 
-function Get-GraphObject {
-    param([string]$Uri)
-    az rest --method GET --uri $Uri --only-show-errors | ConvertFrom-Json
+function Get-AppByAppId {
+    # 'az ad app show' avoids the parenthesised Graph URI form applications(appId='..'), which the
+    # Windows az.cmd wrapper (cmd.exe) mis-parses ("was unexpected at this time").
+    param([string]$AppId)
+    $json = az ad app show --id $AppId --only-show-errors
+    if (-not $json) { throw "App registration $AppId not found in this tenant ($CiamTenantId)." }
+    return ($json | ConvertFrom-Json)
 }
 
 function Set-GraphObject {
@@ -57,8 +60,10 @@ function Set-GraphObject {
     if (-not $PSCmdlet.ShouldProcess($What, 'PATCH')) { return }
     $tmp = New-TemporaryFile
     try {
-        ($Body | ConvertTo-Json -Depth 20) | Set-Content -Path $tmp -Encoding utf8
-        az rest --method PATCH --uri $Uri --headers 'Content-Type=application/json' --body "@$tmp" --only-show-errors | Out-Null
+        # WriteAllText => UTF-8 without BOM (az rejects a BOM in --body @file). PATCH URIs use the
+        # /applications/{objectId} form (no parentheses), so they pass through az.cmd cleanly.
+        [System.IO.File]::WriteAllText($tmp.FullName, ($Body | ConvertTo-Json -Depth 20))
+        az rest --method PATCH --uri $Uri --headers 'Content-Type=application/json' --body "@$($tmp.FullName)" --only-show-errors | Out-Null
     } finally { Remove-Item $tmp -Force }
 }
 
@@ -70,7 +75,7 @@ if (-not $ctx -or $ctx.tenantId -ne $CiamTenantId) {
 Write-Host "Signed in to CIAM tenant $CiamTenantId as $($ctx.user.name)" -ForegroundColor Cyan
 
 # --- 1 & 2. API app: identifier URI + access_as_customer scope + Student/Preceptor app roles ---------
-$api = Get-GraphObject "$graph/applications(appId='$ApiAppId')"
+$api = Get-AppByAppId $ApiAppId
 Write-Host "API app: $($api.displayName) ($ApiAppId)" -ForegroundColor Cyan
 
 $identifierUri = "api://$ApiAppId"
@@ -78,7 +83,7 @@ $identifierUris = @($api.identifierUris)
 if ($identifierUris -notcontains $identifierUri) { $identifierUris += $identifierUri }
 
 # Reuse an existing scope id if already present (idempotent), else mint one.
-$scopes = @($api.api.oauth2PermissionScopes)
+$scopes = @(); if ($api.api -and $api.api.oauth2PermissionScopes) { $scopes = @($api.api.oauth2PermissionScopes) }
 $scope = $scopes | Where-Object { $_.value -eq $ScopeName } | Select-Object -First 1
 if (-not $scope) {
     $scope = [pscustomobject]@{
@@ -121,11 +126,11 @@ Set-GraphObject "$graph/applications/$($api.id)" @{
 } "API app ($ApiAppId): identifierUris + scope + app roles"
 
 # --- 3. Customer SPA: redirect URIs + delegated permission to the API scope -------------------------
-$web = Get-GraphObject "$graph/applications(appId='$WebAppId')"
+$web = Get-AppByAppId $WebAppId
 Write-Host "SPA app: $($web.displayName) ($WebAppId)" -ForegroundColor Cyan
 
 $wantRedirects = @("https://$SwaHostname/") + $DevRedirectUris
-$spaRedirects = @($web.spa.redirectUris)
+$spaRedirects = @(); if ($web.spa -and $web.spa.redirectUris) { $spaRedirects = @($web.spa.redirectUris) }
 foreach ($u in $wantRedirects) { if ($spaRedirects -notcontains $u) { $spaRedirects += $u; Write-Host "  + SPA redirect $u" -ForegroundColor Green } }
 
 # requiredResourceAccess -> API app, delegated (Scope) access_as_customer.
@@ -159,7 +164,7 @@ foreach ($appId in @($ApiAppId, $WebAppId)) {
 # --- 5. Summary: values to wire into config ---------------------------------------------------------
 $authority = "https://$($CiamTenantId).ciamlogin.com/$CiamTenantId"
 Write-Host ""
-Write-Host "=== CIAM configuration summary — paste these into config ===" -ForegroundColor Yellow
+Write-Host "=== CIAM configuration summary - paste these into config ===" -ForegroundColor Yellow
 [pscustomobject]@{
     CiamTenantId          = $CiamTenantId
     CiamAuthority         = $authority
