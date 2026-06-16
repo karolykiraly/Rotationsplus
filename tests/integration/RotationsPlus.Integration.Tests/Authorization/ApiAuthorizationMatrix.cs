@@ -30,6 +30,11 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/programs", [RoleNames.Admin], "Create program (admin)"),
         new("PUT", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update program (admin)"),
         new("DELETE", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete program (admin)"),
+        new("GET", "/api/preceptors", RoleNames.Staff, "List marketplace preceptors"),
+        new("GET", "/api/preceptors/dddddddd-0000-0000-0000-000000000001", RoleNames.Staff, "Get preceptor by id"),
+        new("POST", "/api/preceptors", [RoleNames.Admin], "Create preceptor (admin)"),
+        new("PUT", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update preceptor (admin)"),
+        new("DELETE", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete preceptor (admin)"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>

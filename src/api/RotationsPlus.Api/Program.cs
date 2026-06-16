@@ -69,6 +69,7 @@ if (app.Environment.IsDevelopment())
 app.MapMeEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
+app.MapPreceptorEndpoints();
 
 app.Run();
 

@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   getMe: vi.fn(),
   getSpecialties: vi.fn(),
   getPrograms: vi.fn(),
+  getPreceptors: vi.fn(),
   state: { accounts: [] as unknown[] }
 }));
 
@@ -21,7 +22,8 @@ vi.mock("@azure/msal-react", () => ({
 vi.mock("./api", () => ({
   getMe: () => h.getMe(),
   getSpecialties: () => h.getSpecialties(),
-  getPrograms: () => h.getPrograms()
+  getPrograms: () => h.getPrograms(),
+  getPreceptors: () => h.getPreceptors()
 }));
 
 import App from "./App";
@@ -33,6 +35,7 @@ describe("App", () => {
     h.getMe.mockReset();
     h.getSpecialties.mockReset();
     h.getPrograms.mockReset();
+    h.getPreceptors.mockReset();
     h.state.accounts = [];
   });
 
@@ -95,6 +98,17 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load programs" }));
     expect(await screen.findByText("Programs (1)")).toBeInTheDocument();
     expect(screen.getByText(/Internal Medicine — InPerson/)).toBeInTheDocument();
+  });
+
+  it("loads and renders preceptors when signed in", async () => {
+    h.state.accounts = [{ homeAccountId: "a" }];
+    h.getPreceptors.mockResolvedValue([
+      { id: "pr1", fullName: "Jane Carter", email: "jane@x", primarySpecialtyName: "Internal Medicine", city: "Chicago", state: "IL", status: "MemberActivated" }
+    ]);
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Load preceptors" }));
+    expect(await screen.findByText("Preceptors (1)")).toBeInTheDocument();
+    expect(screen.getByText(/Jane Carter — Internal Medicine/)).toBeInTheDocument();
   });
 
   it("signs out", async () => {

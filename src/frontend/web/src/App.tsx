@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
-import { getMe, getSpecialties, getPrograms, type MeResponse, type Specialty, type Program } from "./api";
+import { getMe, getSpecialties, getPrograms, getPreceptors, type MeResponse, type Specialty, type Program, type Preceptor } from "./api";
 
 const BRAND = "#FF4874";
 
@@ -10,6 +10,7 @@ export default function App() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [specialties, setSpecialties] = useState<Specialty[] | null>(null);
   const [programs, setPrograms] = useState<Program[] | null>(null);
+  const [preceptors, setPreceptors] = useState<Preceptor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isSignedIn = accounts.length > 0;
 
@@ -22,6 +23,7 @@ export default function App() {
     setMe(null);
     setSpecialties(null);
     setPrograms(null);
+    setPreceptors(null);
     void instance.logoutRedirect();
   };
 
@@ -52,6 +54,15 @@ export default function App() {
     }
   };
 
+  const loadPreceptors = async () => {
+    try {
+      setError(null);
+      setPreceptors(await getPreceptors());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 640, margin: "3rem auto", padding: "0 1rem" }}>
       <h1 style={{ color: BRAND }}>Rotations Plus — Staff</h1>
@@ -71,6 +82,9 @@ export default function App() {
           </button>
           <button onClick={loadPrograms} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Load programs
+          </button>
+          <button onClick={loadPreceptors} style={{ background: BRAND, color: "white", border: 0, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
+            Load preceptors
           </button>
           <button onClick={signOut} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, padding: "0.6rem 1.2rem", borderRadius: 6, cursor: "pointer" }}>
             Sign out
@@ -111,6 +125,20 @@ export default function App() {
             {programs.map((p) => (
               <li key={p.id}>
                 {p.specialtyName} — {p.programType} · {p.minWeeksPerRotation}+ wks · ${p.retailAmountPerWeek}/wk
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {preceptors && (
+        <section style={{ marginTop: "1.5rem" }}>
+          <h2>Preceptors ({preceptors.length})</h2>
+          <ul>
+            {preceptors.map((p) => (
+              <li key={p.id}>
+                {p.fullName} — {p.primarySpecialtyName}
+                {p.city ? ` · ${p.city}, ${p.state}` : ""} · {p.status}
               </li>
             ))}
           </ul>

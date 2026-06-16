@@ -15,6 +15,7 @@ public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : 
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
     public DbSet<Specialty> Specialties => Set<Specialty>();
     public DbSet<RotationProgram> Programs => Set<RotationProgram>();
+    public DbSet<Preceptor> Preceptors => Set<Preceptor>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

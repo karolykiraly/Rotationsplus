@@ -28,6 +28,17 @@ export interface Program {
   retailAmountPerWeek: number;
 }
 
+/** Mirror of the API's PreceptorSummaryResponse contract (enums serialized as strings). */
+export interface Preceptor {
+  id: string;
+  fullName: string;
+  email: string;
+  primarySpecialtyName: string;
+  city?: string | null;
+  state?: string | null;
+  status: string;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
   if (!account) {
@@ -55,3 +66,6 @@ export const getSpecialties = (): Promise<Specialty[]> => getJson<Specialty[]>("
 
 /** Lists marketplace programs (GET /api/programs). */
 export const getPrograms = (): Promise<Program[]> => getJson<Program[]>("/api/programs");
+
+/** Lists marketplace preceptors (GET /api/preceptors). */
+export const getPreceptors = (): Promise<Preceptor[]> => getJson<Preceptor[]>("/api/preceptors");
