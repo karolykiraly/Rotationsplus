@@ -5,6 +5,7 @@ using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Api.Modules.Marketplace;
+using RotationsPlus.Api.Modules.Rotations;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Common.Data;
 using RotationsPlus.Common.Security;
@@ -81,6 +82,7 @@ app.MapCustomerMeEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPreceptorEndpoints();
+app.MapRotationEndpoints();
 
 app.Run();
 

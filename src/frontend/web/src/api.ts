@@ -117,6 +117,59 @@ export interface PreceptorInput {
   bio?: string | null;
 }
 
+/** Rotation lifecycle statuses (mirrors the API's RotationStatus enum; serialized as these names). */
+export type RotationStatus =
+  | "Pending"
+  | "NotStarted"
+  | "Active"
+  | "ToBeEvaluated"
+  | "Completed"
+  | "Cancelled"
+  | "Refunded"
+  | "Abandoned"
+  | "Rejected";
+
+/** Mirror of the API's RotationSummaryResponse contract (enums serialized as strings; dates as YYYY-MM-DD). */
+export interface Rotation {
+  id: string;
+  studentName: string;
+  studentEmail: string;
+  specialtyName: string;
+  programType: ProgramType;
+  preceptorName?: string | null;
+  startDate: string;
+  endDate: string;
+  weeks: number;
+  status: RotationStatus;
+}
+
+/** Mirror of the API's RotationDetailResponse contract — the editable shape. */
+export interface RotationDetail {
+  id: string;
+  programId: string;
+  specialtyName: string;
+  programType: ProgramType;
+  preceptorName?: string | null;
+  studentName: string;
+  studentEmail: string;
+  studentOid?: string | null;
+  startDate: string;
+  endDate: string;
+  weeks: number;
+  status: RotationStatus;
+}
+
+/** Admin create/update payload (mirrors Create/UpdateRotationRequest). Weeks is derived server-side. */
+export interface RotationInput {
+  programId: string;
+  studentName: string;
+  studentEmail: string;
+  studentOid?: string | null;
+  startDate: string;
+  endDate: string;
+  status: RotationStatus;
+}
+
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
 export class ApiError extends Error {
   constructor(
@@ -216,3 +269,20 @@ export const updatePreceptor = (id: string, input: PreceptorInput): Promise<Prec
   request<PreceptorDetail>("PUT", `/api/preceptors/${id}`, input);
 export const deletePreceptor = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/preceptors/${id}`);
+
+// ---- Rotations (AdminOnly — reads + writes) ----
+export const getRotations = (params?: { status?: RotationStatus; programId?: string }): Promise<Rotation[]> => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.programId) q.set("programId", params.programId);
+  const suffix = q.toString();
+  return request<Rotation[]>("GET", `/api/rotations${suffix ? `?${suffix}` : ""}`);
+};
+export const getRotation = (id: string): Promise<RotationDetail> =>
+  request<RotationDetail>("GET", `/api/rotations/${id}`);
+export const createRotation = (input: RotationInput): Promise<RotationDetail> =>
+  request<RotationDetail>("POST", "/api/rotations", input);
+export const updateRotation = (id: string, input: RotationInput): Promise<RotationDetail> =>
+  request<RotationDetail>("PUT", `/api/rotations/${id}`, input);
+export const deleteRotation = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/rotations/${id}`);

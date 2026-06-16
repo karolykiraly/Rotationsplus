@@ -17,6 +17,8 @@
 
 > **Build status.** Slice 9 (PR #16) stood up the SPA foundation the rest of this inventory builds on: React Router + TanStack Query + React Hook Form/zod, a role-gated admin shell (sidebar/topbar, brand `#FF4874`, tablet-usable). Management screens shipped on those patterns — the marketplace admin trio is complete: **Specialties CRUD** (`/admin/specialties`, slice 9), **Programs CRUD** (`/admin/programs`, slice 10 / PR #17), and **Preceptors CRUD** (`/admin/preceptors`, slice 11 / PR #18 — identity/professional fields, valid-email + duplicate-409 handling, status lifecycle dropdown, edit pre-fills from detail). The richer legacy routes (rotations, leads/CRM, honorarium, reports, contacts) come after, along with the SPA hardening backlog (§5b).
 
+> **Build progress (new admin console):** `/admin/specialties`, `/admin/programs`, `/admin/preceptors` (marketplace CRUD) shipped slices 9–11. **`/admin/rotations`** shipped slice 14 (2026-06-16, PR #21) — admin CRUD over the `Rotation` booking with the full legacy status filter, create/edit/delete; the edit modal's payment/docs/change-date sub-flows and the dashboard/CRM/analytics routes remain to be built on these patterns.
+
 ### Core
 | Route | Component | Purpose | Key APIs |
 |---|---|---|---|

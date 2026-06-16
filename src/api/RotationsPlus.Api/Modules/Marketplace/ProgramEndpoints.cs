@@ -180,6 +180,16 @@ public static class ProgramEndpoints
                 return Results.NotFound();
             }
 
+            // Block deletion while live rotations reference this program. The FK is Restrict, but that
+            // only governs hard deletes — a soft-delete is an UPDATE, so without this guard the program
+            // would be filtered out from under its rotations and the admin rotations list (which projects
+            // the program's non-nullable ProgramType/SpecialtyName through the navigation) would 500.
+            // Soft-deleted rotations don't count: the global filter already hides them from that list.
+            if (await db.Rotations.AnyAsync(r => r.ProgramId == id, cancellationToken))
+            {
+                return Results.Conflict("This program has rotations booked against it and can't be deleted.");
+            }
+
             db.Programs.Remove(program); // interceptor converts the delete into a soft-delete
             await db.SaveChangesAsync(cancellationToken);
             return Results.NoContent();

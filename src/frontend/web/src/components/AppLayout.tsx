@@ -54,6 +54,14 @@ export function AppLayout() {
                 >
                   Preceptors
                 </NavLink>
+
+                <div className="nav-label">Operations</div>
+                <NavLink
+                  to="/admin/rotations"
+                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                >
+                  Rotations
+                </NavLink>
               </>
             )}
           </nav>

@@ -40,6 +40,12 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/preceptors", [RoleNames.Admin], "Create preceptor (admin)"),
         new("PUT", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update preceptor (admin)"),
         new("DELETE", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete preceptor (admin)"),
+        // Rotation management is AdminOnly (reads too — students see their own via the portal later).
+        new("GET", "/api/rotations", [RoleNames.Admin], "List rotations (admin)"),
+        new("GET", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001", [RoleNames.Admin], "Get rotation by id (admin)"),
+        new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
+        new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
+        new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>

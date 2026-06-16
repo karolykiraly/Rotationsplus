@@ -57,6 +57,7 @@ describe("AppLayout", () => {
     expect(screen.getByText("Specialties")).toBeInTheDocument();
     expect(screen.getByText("Programs")).toBeInTheDocument();
     expect(screen.getByText("Preceptors")).toBeInTheDocument();
+    expect(screen.getByText("Rotations")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(h.logoutRedirect).toHaveBeenCalled();
@@ -67,5 +68,6 @@ describe("AppLayout", () => {
     renderLayout();
     expect(await screen.findByText("Cody Coordinator")).toBeInTheDocument();
     expect(screen.queryByText("Specialties")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rotations")).not.toBeInTheDocument();
   });
 });

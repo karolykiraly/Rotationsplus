@@ -116,6 +116,18 @@ table.data { width: 100%; border-collapse: collapse; }
 
 .state { padding: 48px 20px; text-align: center; color: var(--ink-soft); }
 
+/* Secondary line under a primary cell value (e.g. a student's email under their name). */
+.muted { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
+
+/* Filter row above a table (e.g. the rotation status filter). */
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.toolbar label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.toolbar select {
+  font-family: inherit; font-size: 14px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+}
+.toolbar select:focus { outline: 2px solid var(--brand-tint); border-color: var(--brand); }
+
 /* ---- Banners ---- */
 .banner { padding: 11px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
 .banner.error { background: var(--danger-tint); color: var(--danger); }

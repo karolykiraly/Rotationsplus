@@ -4,6 +4,7 @@ import { HomePage } from "./pages/HomePage";
 import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
 import { PreceptorsPage } from "./preceptors/PreceptorsPage";
+import { RotationsPage } from "./rotations/RotationsPage";
 import { CustomerMsalShell } from "./portal/CustomerMsalShell";
 import { BrowsePage } from "./portal/BrowsePage";
 import { ProgramDetailPage } from "./portal/ProgramDetailPage";
@@ -18,7 +19,8 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: "admin/specialties", element: <SpecialtiesPage /> },
       { path: "admin/programs", element: <ProgramsPage /> },
-      { path: "admin/preceptors", element: <PreceptorsPage /> }
+      { path: "admin/preceptors", element: <PreceptorsPage /> },
+      { path: "admin/rotations", element: <RotationsPage /> }
     ]
   },
   {
