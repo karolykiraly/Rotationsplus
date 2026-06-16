@@ -18,6 +18,9 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/main.tsx",
+        // Pure composition/wiring (no logic) — exercised by booting the app, not unit-tested.
+        "src/router.tsx",
+        "src/queryClient.ts",
         "src/vite-env.d.ts",
         "src/setupTests.ts"
       ],

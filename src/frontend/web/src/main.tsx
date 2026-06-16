@@ -1,9 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { MsalProvider } from "@azure/msal-react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "react-router-dom";
 import { EventType, type AuthenticationResult } from "@azure/msal-browser";
 import { msalInstance } from "./authConfig";
-import App from "./App";
+import { queryClient } from "./queryClient";
+import { router } from "./router";
+import "./styles.css";
 
 // MSAL v5 must be initialized before use.
 void msalInstance.initialize().then(() => {
@@ -21,7 +25,9 @@ void msalInstance.initialize().then(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <MsalProvider instance={msalInstance}>
-        <App />
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
       </MsalProvider>
     </React.StrictMode>
   );

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemas.azure.com/staticwebapp.config.json",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "*.{css,js,png,jpg,svg,ico,json,txt,woff,woff2}"]
+  }
+}

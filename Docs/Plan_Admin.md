@@ -15,6 +15,8 @@
 
 ## 2. Route inventory (all ~45 routes)
 
+> **Build status.** Slice 9 (PR #16) stood up the SPA foundation the rest of this inventory builds on: React Router + TanStack Query + React Hook Form/zod, a role-gated admin shell (sidebar/topbar, brand `#FF4874`, tablet-usable), and the first management screen — **Specialties CRUD** (`/admin/specialties`, route grouping under `/admin/programs` in this table but shipped as its own page since Programs reference specialties). Programs (`/admin/programs[/:slug]`) and Preceptors admin CRUD are the next slices, reusing the same list+modal+mutation patterns.
+
 ### Core
 | Route | Component | Purpose | Key APIs |
 |---|---|---|---|
@@ -102,6 +104,15 @@ Each panel = own TanStack Query hooks + own API endpoints. Same decomposition st
 4. Hardcoded protected-account emails → config/role-based safeguard.
 5. OCR report "retry" exists in UI but verify backend support; formalize a re-validation endpoint.
 6. Admin is desktop-only today; new staff area must be **tablet-usable** (responsive tables→cards), full phone support not required for admin (explicit decision; staff work on desktop/tablet).
+
+### 5b. SPA hardening backlog (deferred from slice 9 review)
+
+Tracked items from the admin-UI foundation review, to land before the staff console is exposed beyond DEV (none are blockers on DEV):
+1. **Token re-auth on expiry** — `api.ts request()` calls `acquireTokenSilent` with no fallback; on an expired session / revoked refresh token it surfaces a raw error banner instead of re-prompting. Catch `InteractionRequiredAuthError` → `acquireTokenRedirect`.
+2. **Security headers** — add CSP, `X-Frame-Options`/`frame-ancestors`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` to `staticwebapp.config.json` (admin console handling Entra tokens).
+3. **Modal focus management** — trap Tab within the dialog and restore focus to the trigger on close (the reusable `Modal`; benefits every future dialog).
+4. **Admin-page query gating** — gate list queries with `enabled: isAdmin` so non-admins don't fire a (currently harmless, StaffOnly) fetch before the forbidden notice; lets the test assert no fetch.
+5. **Route-level code-splitting** — `lazy()` routes before the customer portal (LCP < 2.5s budget); the single bundle is acceptable for the internal console now.
 
 ## 6. New features (owner-requested, 2026-06-11)
 
