@@ -75,7 +75,7 @@ export function ProgramsPage() {
     maxStudentsPerRotation: d.maxStudentsPerRotation,
     minWeeksPerRotation: d.minWeeksPerRotation,
     retailAmountPerWeek: d.retailAmountPerWeek,
-    weeklyHonorarium: d.weeklyHonorarium,
+    weeklyHonorarium: d.weeklyHonorarium ?? 0,
     preceptorId: d.preceptorId ?? "",
     description: d.description ?? ""
   });

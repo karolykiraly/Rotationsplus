@@ -1,21 +1,23 @@
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Common.Security;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Api.Modules.Marketplace;
 
 /// <summary>
-/// Marketplace program catalog endpoints. Reads are StaffOnly (until CIAM lands); writes are
-/// AdminOnly. The preceptor association arrives in a later slice. Money and capacity fields are
-/// validated strictly here — pricing is a risk area.
+/// Marketplace program catalog endpoints. Reads are open to any marketplace viewer (staff +
+/// signed-in customers); writes are AdminOnly. The preceptor's honorarium is staff-only on the
+/// detail. Money and capacity fields are validated strictly here — pricing is a risk area.
 /// </summary>
 public static class ProgramEndpoints
 {
     public static IEndpointRouteBuilder MapProgramEndpoints(this IEndpointRouteBuilder routes)
     {
+        // Reads are open to any marketplace viewer (staff + signed-in customers); writes add AdminOnly.
         var group = routes.MapGroup("/api/programs")
-            .RequireAuthorization(AuthorizationPolicies.StaffOnly)
+            .RequireAuthorization(AuthorizationPolicies.MarketplaceViewer)
             .WithTags("Marketplace");
 
         group.MapGet("/", async (
@@ -23,7 +25,7 @@ public static class ProgramEndpoints
             RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             // Catalog search/filter. All filters are optional and AND together; omitting one widens
-            // the result. Opened to students (customer directory) once CIAM lands.
+            // the result. Open to staff + signed-in customers (MarketplaceViewer).
             var query = db.Programs.AsQueryable();
 
             if (specialtyId is { } sid) query = query.Where(p => p.SpecialtyId == sid);
@@ -63,8 +65,11 @@ public static class ProgramEndpoints
         })
         .WithName("ListPrograms");
 
-        group.MapGet("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/{id:guid}", async (Guid id, ICurrentUser user, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
+            // Honorarium (preceptor pay → platform margin) is staff-only; hide it from customers.
+            var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
+
             var program = await db.Programs
                 .Where(p => p.Id == id)
                 .Select(p => new ProgramDetailResponse(
@@ -75,7 +80,7 @@ public static class ProgramEndpoints
                     p.MaxStudentsPerRotation,
                     p.MinWeeksPerRotation,
                     p.RetailAmountPerWeek,
-                    p.WeeklyHonorarium,
+                    includeHonorarium ? p.WeeklyHonorarium : null,
                     p.Description,
                     p.PreceptorId,
                     p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
@@ -85,7 +90,7 @@ public static class ProgramEndpoints
         })
         .WithName("GetProgram");
 
-        // ---- Admin writes (AdminOnly stacks on the group's StaffOnly) ----
+        // ---- Admin writes (AdminOnly stacks on the group's MarketplaceViewer) ----
 
         group.MapPost("/", async (CreateProgramRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {

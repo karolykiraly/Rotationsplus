@@ -12,20 +12,24 @@ public sealed record EndpointSpec(string Method, string Path, string[] AllowedRo
 /// </summary>
 public static class ApiAuthorizationMatrix
 {
+    /// <summary>Roles allowed to read the marketplace catalog (specialties/programs): staff + customers.</summary>
+    public static readonly string[] MarketplaceReaders = [.. RoleNames.Staff, .. RoleNames.Customer];
+
     public static readonly EndpointSpec[] Endpoints =
     [
         new("GET", "/api/me", RoleNames.Staff, "Current staff identity + provisioned profile"),
         new("GET", "/api/customer/me", RoleNames.Customer, "Current customer (Student/Preceptor) identity"),
-        new("GET", "/api/specialties", RoleNames.Staff, "List marketplace specialties"),
+        // Catalog reads are open to any marketplace viewer (staff + customers).
+        new("GET", "/api/specialties", MarketplaceReaders, "List marketplace specialties"),
         // A seeded id, so an authorized caller routes through to a real resource (not a 404).
-        new("GET", "/api/specialties/aaaaaaaa-0000-0000-0000-000000000001", RoleNames.Staff, "Get specialty by id"),
+        new("GET", "/api/specialties/aaaaaaaa-0000-0000-0000-000000000001", MarketplaceReaders, "Get specialty by id"),
         // Admin-only writes. Non-existent id / empty body → authorized callers get 404/400 (not 401/403),
         // which the authz-only matrix accepts; endpoint behaviour is covered by SpecialtyAdminEndpointTests.
         new("POST", "/api/specialties", [RoleNames.Admin], "Create specialty (admin)"),
         new("PUT", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update specialty (admin)"),
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
-        new("GET", "/api/programs", RoleNames.Staff, "List marketplace programs"),
-        new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", RoleNames.Staff, "Get program by id"),
+        new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs"),
+        new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", MarketplaceReaders, "Get program by id"),
         // Admin-only writes. Non-existent id / empty body → authorized callers get 404/400 (not 401/403),
         // which the authz-only matrix accepts; endpoint behaviour is covered by ProgramAdminEndpointTests.
         new("POST", "/api/programs", [RoleNames.Admin], "Create program (admin)"),

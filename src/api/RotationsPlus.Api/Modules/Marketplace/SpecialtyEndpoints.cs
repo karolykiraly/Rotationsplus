@@ -7,16 +7,16 @@ using RotationsPlus.Contracts.Marketplace;
 namespace RotationsPlus.Api.Modules.Marketplace;
 
 /// <summary>
-/// Marketplace specialty reference-data endpoints (read-only for now). Staff-only until the CIAM
-/// customer directory lands; then browse will be opened to students/preceptors. Admin write
-/// endpoints come in a later slice.
+/// Marketplace specialty reference-data endpoints. Reads are open to any marketplace viewer (staff +
+/// signed-in customers); writes are AdminOnly.
 /// </summary>
 public static class SpecialtyEndpoints
 {
     public static IEndpointRouteBuilder MapSpecialtyEndpoints(this IEndpointRouteBuilder routes)
     {
+        // Reads are open to any marketplace viewer (staff + signed-in customers); writes add AdminOnly.
         var group = routes.MapGroup("/api/specialties")
-            .RequireAuthorization(AuthorizationPolicies.StaffOnly)
+            .RequireAuthorization(AuthorizationPolicies.MarketplaceViewer)
             .WithTags("Marketplace");
 
         group.MapGet("/", async (RotationsDbContext db, CancellationToken cancellationToken) =>
@@ -41,7 +41,7 @@ public static class SpecialtyEndpoints
         })
         .WithName("GetSpecialty");
 
-        // ---- Admin writes (AdminOnly stacks on the group's StaffOnly) ----
+        // ---- Admin writes (AdminOnly stacks on the group's MarketplaceViewer) ----
 
         group.MapPost("/", async (CreateSpecialtyRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {

@@ -11,7 +11,9 @@ public sealed record ProgramSummaryResponse(
     decimal RetailAmountPerWeek,
     string? PreceptorName);
 
-/// <summary>Full detail for a single clinical-rotation program.</summary>
+/// <summary>Full detail for a single clinical-rotation program. <c>WeeklyHonorarium</c> (the
+/// preceptor's pay, i.e. platform margin vs. the retail price) is staff-only — it is null for
+/// customer callers so students/preceptors can't infer margin.</summary>
 public sealed record ProgramDetailResponse(
     Guid Id,
     Guid SpecialtyId,
@@ -20,7 +22,7 @@ public sealed record ProgramDetailResponse(
     int MaxStudentsPerRotation,
     int MinWeeksPerRotation,
     decimal RetailAmountPerWeek,
-    decimal WeeklyHonorarium,
+    decimal? WeeklyHonorarium,
     string? Description,
     Guid? PreceptorId,
     string? PreceptorName);

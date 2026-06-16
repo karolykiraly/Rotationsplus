@@ -8,6 +8,10 @@ public static class AuthorizationPolicies
     public const string StaffOnly = "StaffOnly";
     public const string AdminOnly = "AdminOnly";
     public const string CustomerOnly = "CustomerOnly";
+
+    /// <summary>Any authenticated marketplace user — staff OR customer. For catalog reads
+    /// (specialties, programs) that both staff and signed-in students/preceptors may browse.</summary>
+    public const string MarketplaceViewer = "MarketplaceViewer";
 }
 
 public static class AuthorizationPolicyExtensions
@@ -26,7 +30,8 @@ public static class AuthorizationPolicyExtensions
         services.AddAuthorizationBuilder()
             .AddPolicy(AuthorizationPolicies.StaffOnly, policy => policy.RequireRole(RoleNames.Staff))
             .AddPolicy(AuthorizationPolicies.AdminOnly, policy => policy.RequireRole(RoleNames.Admin))
-            .AddPolicy(AuthorizationPolicies.CustomerOnly, policy => policy.RequireRole(RoleNames.Customer));
+            .AddPolicy(AuthorizationPolicies.CustomerOnly, policy => policy.RequireRole(RoleNames.Customer))
+            .AddPolicy(AuthorizationPolicies.MarketplaceViewer, policy => policy.RequireRole([.. RoleNames.Staff, .. RoleNames.Customer]));
 
         return services;
     }

@@ -29,6 +29,36 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         return client;
     }
 
+    private HttpClient StudentClient()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Oid", "oid-student");
+        client.DefaultRequestHeaders.Add("X-Test-Roles", RoleNames.Student);
+        return client;
+    }
+
+    [Fact]
+    public async Task Customer_can_browse_the_program_catalog()
+    {
+        // The student-facing portal reads the catalog with a CIAM (Student) token.
+        var programs = await StudentClient()
+            .GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs?q=internal", JsonOptions);
+
+        programs.Should().NotBeNull();
+        programs!.Should().OnlyContain(p => p.SpecialtyName == "Internal Medicine");
+    }
+
+    [Fact]
+    public async Task Customer_program_detail_hides_the_honorarium_but_shows_retail()
+    {
+        var program = await StudentClient()
+            .GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{SeededInternalMedicineInPerson}", JsonOptions);
+
+        program.Should().NotBeNull();
+        program!.RetailAmountPerWeek.Should().Be(1500m);   // what the student pays — visible
+        program.WeeklyHonorarium.Should().BeNull();         // preceptor pay / margin — hidden from customers
+    }
+
     private Task<List<ProgramSummaryResponse>?> Search(string queryString) =>
         StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>($"/api/programs?{queryString}", JsonOptions);
 

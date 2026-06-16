@@ -48,7 +48,8 @@ export interface ProgramDetail {
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
-  weeklyHonorarium: number;
+  /** Staff-only (preceptor pay / platform margin); null for customer callers. */
+  weeklyHonorarium: number | null;
   description?: string | null;
   preceptorId?: string | null;
   preceptorName?: string | null;
