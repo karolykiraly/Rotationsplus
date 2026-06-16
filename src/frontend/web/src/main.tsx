@@ -1,34 +1,39 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { MsalProvider } from "@azure/msal-react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
-import { EventType, type AuthenticationResult } from "@azure/msal-browser";
-import { msalInstance } from "./authConfig";
+import { EventType, type AuthenticationResult, type IPublicClientApplication } from "@azure/msal-browser";
+import { customerMsalInstance, msalInstance } from "./authConfig";
 import { queryClient } from "./queryClient";
 import { router } from "./router";
 import "./styles.css";
 
-// MSAL v5 must be initialized before use.
-void msalInstance.initialize().then(() => {
-  const accounts = msalInstance.getAllAccounts();
+/** Set the active account from cache and keep it current on each successful login. Redirect
+ *  responses are processed by each route's MsalProvider (StaffMsalShell / CustomerMsalShell), which
+ *  emit LOGIN_SUCCESS — handled here. There is no root MsalProvider, so the two instances never
+ *  contend for the same auth-response hash. */
+function wireActiveAccount(instance: IPublicClientApplication) {
+  const accounts = instance.getAllAccounts();
   if (accounts.length > 0) {
-    msalInstance.setActiveAccount(accounts[0]);
+    instance.setActiveAccount(accounts[0]);
   }
-
-  msalInstance.addEventCallback((event) => {
+  instance.addEventCallback((event) => {
     if (event.eventType === EventType.LOGIN_SUCCESS && event.payload) {
-      msalInstance.setActiveAccount((event.payload as AuthenticationResult).account);
+      instance.setActiveAccount((event.payload as AuthenticationResult).account);
     }
   });
+}
+
+// MSAL v5 requires initialize() before use; do both instances before rendering.
+void Promise.all([msalInstance.initialize(), customerMsalInstance.initialize()]).then(() => {
+  wireActiveAccount(msalInstance);
+  wireActiveAccount(customerMsalInstance);
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-      <MsalProvider instance={msalInstance}>
-        <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-        </QueryClientProvider>
-      </MsalProvider>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
     </React.StrictMode>
   );
 });

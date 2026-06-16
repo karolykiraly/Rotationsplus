@@ -150,17 +150,10 @@ async function errorMessage(response: Response): Promise<string> {
   }
 }
 
-/** Acquires a workforce access token and issues a JSON request to the API. Throws {@link ApiError}
- *  on a non-2xx response; returns `undefined` for 204 No Content. */
-export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
-  if (!account) {
-    throw new Error("Not signed in");
-  }
-
-  const result = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
-
-  const headers: Record<string, string> = { Authorization: `Bearer ${result.accessToken}` };
+/** Issues a JSON request with a caller-supplied bearer token. Throws {@link ApiError} on a non-2xx
+ *  response; returns `undefined` for 204 No Content. Shared by the staff and customer token flows. */
+export async function apiFetch<T>(method: string, path: string, accessToken: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -176,6 +169,17 @@ export async function request<T>(method: string, path: string, body?: unknown): 
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+/** Acquires a workforce (staff) access token and issues the request. */
+export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (!account) {
+    throw new Error("Not signed in");
+  }
+
+  const result = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
+  return apiFetch<T>(method, path, result.accessToken, body);
 }
 
 // ---- Identity ----

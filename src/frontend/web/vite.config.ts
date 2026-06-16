@@ -21,6 +21,8 @@ export default defineConfig({
         // Pure composition/wiring (no logic) — exercised by booting the app, not unit-tested.
         "src/router.tsx",
         "src/queryClient.ts",
+        "src/components/StaffMsalShell.tsx",
+        "src/portal/CustomerMsalShell.tsx",
         "src/vite-env.d.ts",
         "src/setupTests.ts"
       ],

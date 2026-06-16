@@ -60,14 +60,22 @@ export const customerApiScope =
   import.meta.env.VITE_CIAM_API_SCOPE ??
   "api://75709454-b052-45b4-b9b4-9f3214d487c6/access_as_customer";
 
+// The customer instance redirects to /portal (NOT the staff root) so the customer + staff MSAL
+// instances never contend for the same auth-response hash — each is the sole MSAL provider on its
+// own route. This URI must be registered on rplus-web-ext (Configure-Ciam.ps1 adds it).
+const customerRedirectUri =
+  import.meta.env.VITE_CIAM_REDIRECT_URI ?? `${window.location.origin}/portal`;
+
 export const customerMsalConfig: Configuration = {
   auth: {
     clientId: customerClientId,
     authority: customerAuthority,
     // CIAM authorities aren't under login.microsoftonline.com, so MSAL needs them allow-listed.
     knownAuthorities: [`${ciamTenantId}.ciamlogin.com`],
-    redirectUri,
-    postLogoutRedirectUri: redirectUri
+    redirectUri: customerRedirectUri,
+    // MSAL's navigateToLoginRequestUrl defaults to true, so a customer who signs in from a deep-linked
+    // program is returned to that page (not just /portal) after auth.
+    postLogoutRedirectUri: customerRedirectUri
   },
   cache: {
     cacheLocation: "sessionStorage"

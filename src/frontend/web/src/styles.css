@@ -163,6 +163,34 @@ table.data { width: 100%; border-collapse: collapse; }
 .signin h1 { color: var(--brand); margin: 0 0 8px; }
 .signin p { color: var(--ink-soft); margin: 0 0 24px; }
 
+/* ---- Customer portal ---- */
+.portal { min-height: 100vh; display: flex; flex-direction: column; }
+.portal-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.portal-main { padding: 28px; max-width: 1000px; width: 100%; margin: 0 auto; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 20px; }
+.filters input, .filters select {
+  font-family: inherit; font-size: 14px; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+.filters input[type="text"], .filters input:not([type]) { flex: 1 1 220px; }
+.filters input:focus, .filters select:focus { outline: 2px solid var(--brand-tint); border-color: var(--brand); }
+
+.program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.program-card {
+  display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px; transition: border-color 0.12s, transform 0.12s;
+}
+.program-card:hover { border-color: var(--brand); transform: translateY(-2px); }
+.pc-specialty { font-weight: 700; font-size: 16px; }
+.pc-type { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--brand-dark); background: var(--brand-tint); padding: 2px 9px; border-radius: 999px; }
+.pc-meta { margin-top: 10px; color: var(--ink-soft); font-size: 13px; }
+.pc-price { margin-top: 8px; font-weight: 700; font-size: 18px; }
+.pc-preceptor { margin-top: 4px; color: var(--ink-soft); font-size: 13px; }
+
 /* ---- Responsive: tablet & down ---- */
 @media (max-width: 820px) {
   .shell { grid-template-columns: 1fr; }

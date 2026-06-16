@@ -61,8 +61,10 @@ end with the values to hand back to me.
 1. Exposes the **`access_as_customer`** delegated scope on `rplus-api-ext` and sets its App ID URI
    (`api://75709454-…`).
 2. Defines the **`Student`** and **`Preceptor`** app roles on `rplus-api-ext` (emitted as `roles` claims).
-3. Configures `rplus-web-ext`: **SPA redirect URIs** (`https://<swa-host>/` + `http://localhost:5173/`)
-   and a **delegated permission** to `access_as_customer`.
+3. Configures `rplus-web-ext`: **SPA redirect URIs** — both root and **`/portal`** per host
+   (`https://<swa-host>/portal`, `http://localhost:5173/portal`) and a **delegated permission** to
+   `access_as_customer`. The customer portal (slice 13) returns to `/portal` so its MSAL instance never
+   contends with the staff console at root — **re-run the script after that slice** to register `/portal`.
 4. Ensures **service principals** exist for both apps.
 
 ---

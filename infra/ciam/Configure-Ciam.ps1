@@ -129,7 +129,14 @@ Set-GraphObject "$graph/applications/$($api.id)" @{
 $web = Get-AppByAppId $WebAppId
 Write-Host "SPA app: $($web.displayName) ($WebAppId)" -ForegroundColor Cyan
 
-$wantRedirects = @("https://$SwaHostname/") + $DevRedirectUris
+# The customer SPA returns to /portal (its MSAL instance is the sole provider on that route, kept
+# separate from the staff console at root), so only /portal per host is registered here.
+# NOTE: $DevRedirectUris must be ORIGIN/root URIs (e.g. http://localhost:5173/), not /portal paths.
+$wantRedirects = @("https://$SwaHostname/portal")
+foreach ($d in $DevRedirectUris) {
+    $base = $d.TrimEnd('/')
+    $wantRedirects += "$base/portal"
+}
 $spaRedirects = @(); if ($web.spa -and $web.spa.redirectUris) { $spaRedirects = @($web.spa.redirectUris) }
 foreach ($u in $wantRedirects) { if ($spaRedirects -notcontains $u) { $spaRedirects += $u; Write-Host "  + SPA redirect $u" -ForegroundColor Green } }
 
