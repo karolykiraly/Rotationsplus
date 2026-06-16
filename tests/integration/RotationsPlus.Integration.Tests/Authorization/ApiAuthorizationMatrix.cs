@@ -25,6 +25,11 @@ public static class ApiAuthorizationMatrix
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
         new("GET", "/api/programs", RoleNames.Staff, "List marketplace programs"),
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", RoleNames.Staff, "Get program by id"),
+        // Admin-only writes. Non-existent id / empty body → authorized callers get 404/400 (not 401/403),
+        // which the authz-only matrix accepts; endpoint behaviour is covered by ProgramAdminEndpointTests.
+        new("POST", "/api/programs", [RoleNames.Admin], "Create program (admin)"),
+        new("PUT", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update program (admin)"),
+        new("DELETE", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete program (admin)"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>
