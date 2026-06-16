@@ -26,7 +26,7 @@ This file defines how work is done in this project. It encodes the patterns the 
 - **Tests in the same PR as the code. No "test later"** — the legacy system's 0% coverage is exactly what we're escaping. See `Plan_Testing.md`.
 - **Definition of done per PR:** code + tests together; new endpoint → integration tests + an authz-matrix row; new background job → time-boundary tests; new screen → component tests (+ e2e step if on a money path); CI green.
 - **Gates that block merge:** backend unit + integration (Testcontainers PostgreSQL + WebApplicationFactory + TestAuthHandler), frontend Vitest at **70% coverage**, dependency audit, the authz-matrix suite (every endpoint × role).
-- **Independent/adversarial review before merge:** run `/code-review` on the diff; verify findings rather than trusting them; for risk areas (pricing, state machine, auth, payments) prefer a second adversarial pass. Don't self-approve risky changes without verification.
+- **Independent/adversarial review before merge:** run `/code-review` on the diff; verify findings rather than trusting them; for risk areas (pricing, state machine, auth, payments) prefer a second adversarial pass. Don't self-approve risky changes without verification. **The full playbook — world-class expert reviewer roster (backend/security/data-concurrency/perf/frontend/tests), cross-cutting checklist, severity rubric, the verify→fix→re-review loop, and the findings/remediation writeup format — is `Docs/Review_Process.md`.** Follow it for every push-to-`develop` review.
 - **Migration-specific layers:** characterization tests (record legacy API, replay against new), the ETL verification harness (row counts/checksums/money-to-the-cent), per-dashboard parity checklists. These are gates, not nice-to-haves.
 - **Performance budgets are enforced** (API p95 < 300ms, mobile LCP < 2.5s) via k6 + Lighthouse CI, not aspirational.
 
@@ -47,7 +47,7 @@ This file defines how work is done in this project. It encodes the patterns the 
   2. Verify each finding (don't trust blindly), then fix the real ones on the feature branch.
   3. Re-run the reviewers. **Repeat the cycle until a pass yields no code changes.**
   - Throughout the loop: keep the `Docs/` planning docs up to date whenever the change affects them, and after **every** change make sure tests are updated — add new tests for new behaviour (Definition of Done, §3). CI must be green.
-- **Then merge/push to `develop` and delete the feature branch** (no longer needed). `develop` auto-deploys to DEV.
+- **Then merge to `develop` AND clean up in the same step — never a later turn.** The merge isn't done until the local repo is tidy. The moment the (auto-complete) PR shows merged: `git fetch origin --prune` → `git checkout develop` → `git merge --ff-only origin/develop` → `git branch -D <feature-branch>` (a squash-merge commit isn't an ancestor of the branch, so plain `-d` refuses — `-D` is correct once the PR is confirmed merged) → confirm `git branch` shows only `develop`/`main` (+ any explicitly-parked branch). **Never end a turn with a merged feature branch still checked out, or local `develop` behind origin.** `develop` auto-deploys to DEV.
 - **Deployment log:** every change that ships gets a row in `Docs/Deployment_Log.md` — date + time, PR number, environment, and a one-sentence summary.
 
 ## 7. Tooling notes
