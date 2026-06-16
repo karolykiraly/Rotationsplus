@@ -18,10 +18,35 @@ public static class ProgramEndpoints
             .RequireAuthorization(AuthorizationPolicies.StaffOnly)
             .WithTags("Marketplace");
 
-        group.MapGet("/", async (Guid? preceptorId, RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (
+            Guid? specialtyId, Guid? preceptorId, ProgramType? programType, decimal? maxRetailPerWeek, string? q,
+            RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            var programs = await db.Programs
-                .Where(p => preceptorId == null || p.PreceptorId == preceptorId)
+            // Catalog search/filter. All filters are optional and AND together; omitting one widens
+            // the result. Opened to students (customer directory) once CIAM lands.
+            var query = db.Programs.AsQueryable();
+
+            if (specialtyId is { } sid) query = query.Where(p => p.SpecialtyId == sid);
+            if (preceptorId is { } pid) query = query.Where(p => p.PreceptorId == pid);
+            if (programType is { } pt) query = query.Where(p => p.ProgramType == pt);
+            if (maxRetailPerWeek is { } max) query = query.Where(p => p.RetailAmountPerWeek <= max);
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var term = q.Trim();
+                if (term.Length > MaxSearchLength)
+                {
+                    return Results.BadRequest($"q must be {MaxSearchLength} characters or fewer.");
+                }
+
+                // Escape ILIKE wildcards (\ % _) so user input matches literally; case-insensitive contains.
+                var escaped = term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+                var pattern = $"%{escaped}%";
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.Specialty.Name, pattern) ||
+                    (p.Description != null && EF.Functions.ILike(p.Description, pattern)));
+            }
+
+            var programs = await query
                 .OrderBy(p => p.Specialty.Name)
                 .ThenBy(p => p.ProgramType)
                 .Select(p => new ProgramSummaryResponse(
@@ -161,6 +186,7 @@ public static class ProgramEndpoints
     }
 
     private const int MaxDescriptionLength = 4000;
+    private const int MaxSearchLength = 100; // bound the free-text search term (cheap DoS guard).
 
     // Capacity sanity caps (the columns are int; these guard against absurd input).
     private const int MaxStudentsCap = 1000;
