@@ -3,6 +3,7 @@ import { AppLayout } from "./components/AppLayout";
 import { HomePage } from "./pages/HomePage";
 import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
+import { PreceptorsPage } from "./preceptors/PreceptorsPage";
 
 /** Staff console routes. The layout owns the auth gate; children render inside it. */
 export const router = createBrowserRouter([
@@ -12,7 +13,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: "admin/specialties", element: <SpecialtiesPage /> },
-      { path: "admin/programs", element: <ProgramsPage /> }
+      { path: "admin/programs", element: <ProgramsPage /> },
+      { path: "admin/preceptors", element: <PreceptorsPage /> }
     ]
   }
 ]);

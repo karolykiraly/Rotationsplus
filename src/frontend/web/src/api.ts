@@ -66,6 +66,15 @@ export interface ProgramInput {
   preceptorId?: string | null;
 }
 
+/** Preceptor lifecycle statuses (mirrors the API's PreceptorStatus enum; serialized as these names). */
+export type PreceptorStatus =
+  | "Registered"
+  | "Pending"
+  | "MemberProfileCompleted"
+  | "MemberActivated"
+  | "MemberValidated"
+  | "MemberSigned";
+
 /** Mirror of the API's PreceptorSummaryResponse contract (enums serialized as strings). */
 export interface Preceptor {
   id: string;
@@ -74,7 +83,37 @@ export interface Preceptor {
   primarySpecialtyName: string;
   city?: string | null;
   state?: string | null;
-  status: string;
+  status: PreceptorStatus;
+}
+
+/** Mirror of the API's PreceptorDetailResponse contract — the editable shape. */
+export interface PreceptorDetail {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  primarySpecialtyId: string;
+  primarySpecialtyName: string;
+  medicalLicenseNumber?: string | null;
+  licenseState?: string | null;
+  city?: string | null;
+  state?: string | null;
+  status: PreceptorStatus;
+  bio?: string | null;
+}
+
+/** Admin create/update payload (mirrors Create/UpdatePreceptorRequest). */
+export interface PreceptorInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  primarySpecialtyId: string;
+  medicalLicenseNumber?: string | null;
+  licenseState?: string | null;
+  city?: string | null;
+  state?: string | null;
+  status: PreceptorStatus;
+  bio?: string | null;
 }
 
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
@@ -162,5 +201,13 @@ export const updateProgram = (id: string, input: ProgramInput): Promise<ProgramD
 export const deleteProgram = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/programs/${id}`);
 
-// ---- Preceptors (read) ----
+// ---- Preceptors (read: StaffOnly; writes: AdminOnly) ----
 export const getPreceptors = (): Promise<Preceptor[]> => request<Preceptor[]>("GET", "/api/preceptors");
+export const getPreceptor = (id: string): Promise<PreceptorDetail> =>
+  request<PreceptorDetail>("GET", `/api/preceptors/${id}`);
+export const createPreceptor = (input: PreceptorInput): Promise<PreceptorDetail> =>
+  request<PreceptorDetail>("POST", "/api/preceptors", input);
+export const updatePreceptor = (id: string, input: PreceptorInput): Promise<PreceptorDetail> =>
+  request<PreceptorDetail>("PUT", `/api/preceptors/${id}`, input);
+export const deletePreceptor = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/preceptors/${id}`);

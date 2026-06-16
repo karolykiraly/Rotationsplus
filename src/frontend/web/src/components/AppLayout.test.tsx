@@ -56,6 +56,7 @@ describe("AppLayout", () => {
     expect(screen.getByText("Staff console")).toBeInTheDocument();
     expect(screen.getByText("Specialties")).toBeInTheDocument();
     expect(screen.getByText("Programs")).toBeInTheDocument();
+    expect(screen.getByText("Preceptors")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(h.logoutRedirect).toHaveBeenCalled();

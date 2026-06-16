@@ -48,7 +48,12 @@ export function AppLayout() {
                 >
                   Programs
                 </NavLink>
-                <span className="nav-item disabled" title="Coming soon">Preceptors</span>
+                <NavLink
+                  to="/admin/preceptors"
+                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                >
+                  Preceptors
+                </NavLink>
               </>
             )}
           </nav>
