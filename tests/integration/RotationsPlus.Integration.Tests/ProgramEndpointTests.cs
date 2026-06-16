@@ -11,6 +11,10 @@ namespace RotationsPlus.Integration.Tests;
 public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<RotationsApiFactory>
 {
     private const string SeededInternalMedicineInPerson = "cccccccc-0000-0000-0000-000000000001";
+    // Seeded preceptors (see PreceptorConfiguration): Jane offers the two Internal Medicine
+    // programs; Omar offers the single Pediatrics program.
+    private static readonly Guid JaneCarterId = Guid.Parse("dddddddd-0000-0000-0000-000000000001");
+    private static readonly Guid OmarReyesId = Guid.Parse("dddddddd-0000-0000-0000-000000000002");
 
     // The API serializes enums as strings; match that when deserializing.
     private static readonly JsonSerializerOptions JsonOptions =
@@ -35,6 +39,9 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         programs!.Should().OnlyContain(p => p.RetailAmountPerWeek > 0);
         // Ordered by specialty name.
         programs!.Select(p => p.SpecialtyName).Should().BeInAscendingOrder();
+        // Seeded preceptor assignments surface in the list; the Family Medicine program is unassigned.
+        programs!.Should().Contain(p => p.PreceptorName == "Jane Carter");
+        programs!.Should().Contain(p => p.PreceptorName == null);
     }
 
     [Fact]
@@ -50,6 +57,40 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         program.RetailAmountPerWeek.Should().Be(1500m);
         program.WeeklyHonorarium.Should().Be(500m);
         program.Description.Should().NotBeNullOrEmpty();
+        program.PreceptorId.Should().Be(JaneCarterId);
+        program.PreceptorName.Should().Be("Jane Carter");
+    }
+
+    [Fact]
+    public async Task List_filtered_by_preceptor_returns_only_their_programs()
+    {
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
+            $"/api/programs?preceptorId={JaneCarterId}", JsonOptions);
+
+        programs.Should().NotBeNull();
+        programs!.Should().HaveCount(2); // both seeded Internal Medicine programs
+        programs!.Should().OnlyContain(p => p.PreceptorName == "Jane Carter");
+        programs!.Select(p => p.SpecialtyName).Should().OnlyContain(n => n == "Internal Medicine");
+    }
+
+    [Fact]
+    public async Task List_filtered_by_another_preceptor_returns_only_their_program()
+    {
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
+            $"/api/programs?preceptorId={OmarReyesId}", JsonOptions);
+
+        // Omar offers exactly the one seeded Pediatrics program — proves the filter discriminates.
+        programs!.Should().ContainSingle().Which.PreceptorName.Should().Be("Omar Reyes");
+    }
+
+    [Fact]
+    public async Task List_filtered_by_unknown_preceptor_returns_empty()
+    {
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
+            $"/api/programs?preceptorId={Guid.NewGuid()}", JsonOptions);
+
+        programs.Should().NotBeNull();
+        programs!.Should().BeEmpty();
     }
 
     [Fact]

@@ -13,6 +13,8 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
     // Seeded specialties (see SpecialtyConfiguration) — valid FK targets for created programs.
     private static readonly Guid InternalMedicineId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid PediatricsId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000007");
+    // Seeded preceptor (see PreceptorConfiguration) — a valid optional FK target.
+    private static readonly Guid JaneCarterId = Guid.Parse("dddddddd-0000-0000-0000-000000000001");
 
     // The API serializes/parses enums as strings; match that on the wire.
     private static readonly JsonSerializerOptions JsonOptions =
@@ -33,8 +35,9 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         int minWeeks = 4,
         decimal retail = 1500m,
         decimal honorarium = 500m,
-        string? description = "A new rotation offering.") =>
-        new(specialtyId ?? InternalMedicineId, type, maxStudents, minWeeks, retail, honorarium, description);
+        string? description = "A new rotation offering.",
+        Guid? preceptorId = null) =>
+        new(specialtyId ?? InternalMedicineId, type, maxStudents, minWeeks, retail, honorarium, description, preceptorId);
 
     private Task<HttpResponseMessage> PostAsync(HttpClient client, CreateProgramRequest body) =>
         client.PostAsJsonAsync("/api/programs", body, JsonOptions);
@@ -59,6 +62,8 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         created.RetailAmountPerWeek.Should().Be(1234.50m);
         created.WeeklyHonorarium.Should().Be(321.00m);
         created.Description.Should().Be("A new rotation offering.");
+        created.PreceptorId.Should().BeNull();   // ValidCreate assigns no preceptor
+        created.PreceptorName.Should().BeNull();
 
         // Every field round-trips through a fresh read (not just the create response).
         var fetched = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
@@ -182,6 +187,85 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task Create_with_a_preceptor_sets_the_association()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var create = await PostAsync(admin, ValidCreate(preceptorId: JaneCarterId));
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await create.Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        created!.PreceptorId.Should().Be(JaneCarterId);
+        created.PreceptorName.Should().Be("Jane Carter");
+
+        var fetched = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        fetched!.PreceptorName.Should().Be("Jane Carter");
+    }
+
+    [Fact]
+    public async Task Create_with_unknown_preceptor_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await PostAsync(admin, ValidCreate(preceptorId: Guid.NewGuid()));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_referencing_a_soft_deleted_preceptor_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A fresh preceptor we then delete — its id becomes an invalid assignment target.
+        var preceptor = await (await admin.PostAsJsonAsync("/api/preceptors",
+                new CreatePreceptorRequest("Temp", "Preceptor", $"temp.{Guid.NewGuid():N}@example.com",
+                    InternalMedicineId, null, null, null, null, PreceptorStatus.Registered, null), JsonOptions))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+        (await admin.DeleteAsync($"/api/preceptors/{preceptor!.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var response = await PostAsync(admin, ValidCreate(preceptorId: preceptor.Id));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Update_with_unknown_preceptor_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+
+        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, Guid.NewGuid());
+        var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Update_can_set_and_then_clear_the_preceptor()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        created!.PreceptorId.Should().BeNull();
+
+        // Assign a preceptor.
+        var assign = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, JaneCarterId);
+        (await admin.PutAsJsonAsync($"/api/programs/{created.Id}", assign, JsonOptions)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterAssign = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        afterAssign!.PreceptorId.Should().Be(JaneCarterId);
+        afterAssign.PreceptorName.Should().Be("Jane Carter");
+
+        // Clear it back to unassigned.
+        var clear = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null);
+        (await admin.PutAsJsonAsync($"/api/programs/{created.Id}", clear, JsonOptions)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterClear = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        afterClear!.PreceptorId.Should().BeNull();
+        afterClear.PreceptorName.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Non_admin_staff_cannot_create()
     {
         var sales = Client(RoleNames.Sales);
@@ -199,7 +283,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
 
         var update = new UpdateProgramRequest(
-            InternalMedicineId, ProgramType.Consultation, 5, 3, 2000m, 750m, "Updated offering.");
+            InternalMedicineId, ProgramType.Consultation, 5, 3, 2000m, 750m, "Updated offering.", null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -215,7 +299,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
     {
         var admin = Client(RoleNames.Admin);
 
-        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null);
+        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{Guid.NewGuid()}", update, JsonOptions);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -228,7 +312,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         var created = await (await PostAsync(admin, ValidCreate()))
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
 
-        var update = new UpdateProgramRequest(PediatricsId, ProgramType.InPerson, 2, 4, 1500m, 500m, null);
+        var update = new UpdateProgramRequest(PediatricsId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -244,7 +328,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         var created = await (await PostAsync(admin, ValidCreate()))
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
 
-        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, -5m, null);
+        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, -5m, null, null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -257,7 +341,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         var created = await (await PostAsync(admin, ValidCreate()))
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
 
-        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, new string('x', 4001));
+        var update = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, new string('x', 4001), null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -271,7 +355,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
 
         // Valid program id but a non-existent specialty — validation/FK check yields 400, not 404.
-        var update = new UpdateProgramRequest(Guid.NewGuid(), ProgramType.InPerson, 2, 4, 1500m, 500m, null);
+        var update = new UpdateProgramRequest(Guid.NewGuid(), ProgramType.InPerson, 2, 4, 1500m, 500m, null, null);
         var response = await admin.PutAsJsonAsync($"/api/programs/{created!.Id}", update, JsonOptions);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

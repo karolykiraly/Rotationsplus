@@ -16,6 +16,10 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
     private const string FamilyMedicine = "aaaaaaaa-0000-0000-0000-000000000003";
     private const string Pediatrics = "aaaaaaaa-0000-0000-0000-000000000007";
 
+    // Seeded preceptor ids (see PreceptorConfiguration).
+    private const string JaneCarter = "dddddddd-0000-0000-0000-000000000001"; // Internal Medicine
+    private const string OmarReyes = "dddddddd-0000-0000-0000-000000000002"; // Pediatrics
+
     public void Configure(EntityTypeBuilder<RotationProgram> builder)
     {
         builder.ToTable("programs", "marketplace");
@@ -40,20 +44,28 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
 
         builder.HasIndex(x => x.SpecialtyId);
 
+        builder.HasOne(x => x.Preceptor)
+            .WithMany()
+            .HasForeignKey(x => x.PreceptorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.PreceptorId);
+
         var seededAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
         builder.HasData(
-            Seed("cccccccc-0000-0000-0000-000000000001", InternalMedicine, ProgramType.InPerson, 2, 4, 1500m, 500m, "In-person internal medicine rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000002", InternalMedicine, ProgramType.TeleRotation, 4, 2, 1000m, 300m, "Remote internal medicine tele-rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000003", Pediatrics, ProgramType.InPerson, 1, 4, 1800m, 600m, "Hands-on pediatrics rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000004", FamilyMedicine, ProgramType.Consultation, 3, 2, 900m, 250m, "Family medicine consultation rotation.", seededAt));
+            Seed("cccccccc-0000-0000-0000-000000000001", InternalMedicine, JaneCarter, ProgramType.InPerson, 2, 4, 1500m, 500m, "In-person internal medicine rotation.", seededAt),
+            Seed("cccccccc-0000-0000-0000-000000000002", InternalMedicine, JaneCarter, ProgramType.TeleRotation, 4, 2, 1000m, 300m, "Remote internal medicine tele-rotation.", seededAt),
+            Seed("cccccccc-0000-0000-0000-000000000003", Pediatrics, OmarReyes, ProgramType.InPerson, 1, 4, 1800m, 600m, "Hands-on pediatrics rotation.", seededAt),
+            Seed("cccccccc-0000-0000-0000-000000000004", FamilyMedicine, null, ProgramType.Consultation, 3, 2, 900m, 250m, "Family medicine consultation rotation.", seededAt));
     }
 
     private static object Seed(
-        string id, string specialtyId, ProgramType type, int maxStudents, int minWeeks,
+        string id, string specialtyId, string? preceptorId, ProgramType type, int maxStudents, int minWeeks,
         decimal retail, decimal honorarium, string description, DateTimeOffset seededAt) => new
         {
             Id = Guid.Parse(id),
             SpecialtyId = Guid.Parse(specialtyId),
+            PreceptorId = preceptorId is null ? (Guid?)null : Guid.Parse(preceptorId),
             ProgramType = type,
             MaxStudentsPerRotation = maxStudents,
             MinWeeksPerRotation = minWeeks,

@@ -125,6 +125,7 @@ export default function App() {
             {programs.map((p) => (
               <li key={p.id}>
                 {p.specialtyName} — {p.programType} · {p.minWeeksPerRotation}+ wks · ${p.retailAmountPerWeek}/wk
+                {p.preceptorName ? ` · ${p.preceptorName}` : ""}
               </li>
             ))}
           </ul>

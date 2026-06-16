@@ -1,13 +1,15 @@
 namespace RotationsPlus.Contracts.Marketplace;
 
-/// <summary>A clinical-rotation program as shown in the catalog list.</summary>
+/// <summary>A clinical-rotation program as shown in the catalog list. <c>PreceptorName</c> is null
+/// when no preceptor is assigned yet.</summary>
 public sealed record ProgramSummaryResponse(
     Guid Id,
     string SpecialtyName,
     ProgramType ProgramType,
     int MaxStudentsPerRotation,
     int MinWeeksPerRotation,
-    decimal RetailAmountPerWeek);
+    decimal RetailAmountPerWeek,
+    string? PreceptorName);
 
 /// <summary>Full detail for a single clinical-rotation program.</summary>
 public sealed record ProgramDetailResponse(
@@ -19,4 +21,6 @@ public sealed record ProgramDetailResponse(
     int MinWeeksPerRotation,
     decimal RetailAmountPerWeek,
     decimal WeeklyHonorarium,
-    string? Description);
+    string? Description,
+    Guid? PreceptorId,
+    string? PreceptorName);

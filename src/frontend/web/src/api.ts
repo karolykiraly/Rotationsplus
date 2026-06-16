@@ -26,6 +26,7 @@ export interface Program {
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
+  preceptorName?: string | null;
 }
 
 /** Mirror of the API's PreceptorSummaryResponse contract (enums serialized as strings). */

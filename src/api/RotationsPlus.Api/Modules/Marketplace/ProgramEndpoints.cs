@@ -18,9 +18,10 @@ public static class ProgramEndpoints
             .RequireAuthorization(AuthorizationPolicies.StaffOnly)
             .WithTags("Marketplace");
 
-        group.MapGet("/", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (Guid? preceptorId, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             var programs = await db.Programs
+                .Where(p => preceptorId == null || p.PreceptorId == preceptorId)
                 .OrderBy(p => p.Specialty.Name)
                 .ThenBy(p => p.ProgramType)
                 .Select(p => new ProgramSummaryResponse(
@@ -29,7 +30,8 @@ public static class ProgramEndpoints
                     p.ProgramType,
                     p.MaxStudentsPerRotation,
                     p.MinWeeksPerRotation,
-                    p.RetailAmountPerWeek))
+                    p.RetailAmountPerWeek,
+                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(programs);
@@ -49,7 +51,9 @@ public static class ProgramEndpoints
                     p.MinWeeksPerRotation,
                     p.RetailAmountPerWeek,
                     p.WeeklyHonorarium,
-                    p.Description))
+                    p.Description,
+                    p.PreceptorId,
+                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
                 .FirstOrDefaultAsync(cancellationToken);
 
             return program is null ? Results.NotFound() : Results.Ok(program);
@@ -72,9 +76,16 @@ public static class ProgramEndpoints
                 return Results.BadRequest($"Specialty '{request.SpecialtyId}' does not exist.");
             }
 
+            var (preceptorOk, preceptorName, preceptorError) = await ResolvePreceptorAsync(db, request.PreceptorId, cancellationToken);
+            if (!preceptorOk)
+            {
+                return Results.BadRequest(preceptorError);
+            }
+
             var program = new RotationProgram
             {
                 SpecialtyId = request.SpecialtyId,
+                PreceptorId = request.PreceptorId,
                 ProgramType = request.ProgramType,
                 MaxStudentsPerRotation = request.MaxStudentsPerRotation,
                 MinWeeksPerRotation = request.MinWeeksPerRotation,
@@ -85,7 +96,7 @@ public static class ProgramEndpoints
             db.Programs.Add(program);
             await db.SaveChangesAsync(cancellationToken);
 
-            return Results.Created($"/api/programs/{program.Id}", ToDetail(program, specialtyName));
+            return Results.Created($"/api/programs/{program.Id}", ToDetail(program, specialtyName, preceptorName));
         })
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("CreateProgram");
@@ -110,7 +121,14 @@ public static class ProgramEndpoints
                 return Results.BadRequest($"Specialty '{request.SpecialtyId}' does not exist.");
             }
 
+            var (preceptorOk, preceptorName, preceptorError) = await ResolvePreceptorAsync(db, request.PreceptorId, cancellationToken);
+            if (!preceptorOk)
+            {
+                return Results.BadRequest(preceptorError);
+            }
+
             program.SpecialtyId = request.SpecialtyId;
+            program.PreceptorId = request.PreceptorId;
             program.ProgramType = request.ProgramType;
             program.MaxStudentsPerRotation = request.MaxStudentsPerRotation;
             program.MinWeeksPerRotation = request.MinWeeksPerRotation;
@@ -119,7 +137,7 @@ public static class ProgramEndpoints
             program.Description = description;
             await db.SaveChangesAsync(cancellationToken);
 
-            return Results.Ok(ToDetail(program, specialtyName));
+            return Results.Ok(ToDetail(program, specialtyName, preceptorName));
         })
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("UpdateProgram");
@@ -211,7 +229,25 @@ public static class ProgramEndpoints
     private static bool IsValidMoney(decimal value) =>
         value >= 0 && value <= MaxMoney && decimal.Round(value, 2) == value;
 
-    private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName) =>
+    /// <summary>Resolves the optional preceptor: (true, null) when none requested; (true, name) when
+    /// it exists; (false, error) when a non-existent (or soft-deleted) preceptor id was supplied.</summary>
+    private static async Task<(bool Ok, string? Name, string? Error)> ResolvePreceptorAsync(
+        RotationsDbContext db, Guid? preceptorId, CancellationToken cancellationToken)
+    {
+        if (preceptorId is not Guid id)
+        {
+            return (true, null, null);
+        }
+
+        var name = await db.Preceptors
+            .Where(p => p.Id == id)
+            .Select(p => (string?)(p.FirstName + " " + p.LastName))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return name is null ? (false, null, $"Preceptor '{id}' does not exist.") : (true, name, null);
+    }
+
+    private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName) =>
         new(p.Id, p.SpecialtyId, specialtyName, p.ProgramType, p.MaxStudentsPerRotation,
-            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description);
+            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName);
 }
