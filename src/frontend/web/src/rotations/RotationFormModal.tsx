@@ -35,6 +35,9 @@ interface Props {
   initial: RotationFormInitial;
   programs: Program[];
   students: Student[];
+  /** Statuses the dropdown may offer: every status when creating; the current + its allowed
+   *  transitions when editing (so the form can't request a move the server would reject). */
+  allowedStatuses: RotationStatus[];
   pending: boolean;
   serverError?: string | null;
   onSubmit: (input: RotationInput) => void;
@@ -49,7 +52,9 @@ function programLabel(p: Program): string {
 
 /** Create/edit form for a rotation booking. The student is chosen from the directory; client validation
  *  mirrors the server, and server-side failures (unknown program/student) surface in a banner. */
-export function RotationFormModal({ title, initial, programs, students, pending, serverError, onSubmit, onClose }: Props) {
+export function RotationFormModal({ title, initial, programs, students, allowedStatuses, pending, serverError, onSubmit, onClose }: Props) {
+  // Render in canonical lifecycle order, limited to the statuses this form may offer.
+  const statusOptions = ROTATION_STATUSES.filter((s) => allowedStatuses.includes(s.value));
   const {
     register,
     handleSubmit,
@@ -110,7 +115,7 @@ export function RotationFormModal({ title, initial, programs, students, pending,
             <div className="field">
               <label htmlFor="r-status">Status</label>
               <select id="r-status" {...register("status")}>
-                {ROTATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {statusOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
               {errors.status && <span className="err">{errors.status.message}</span>}
             </div>

@@ -48,25 +48,17 @@ public static class RotationEndpoints
 
         group.MapGet("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            var rotation = await db.Rotations
-                .Where(r => r.Id == id)
-                .Select(r => new RotationDetailResponse(
-                    r.Id,
-                    r.ProgramId,
-                    r.Program.Specialty.Name,
-                    r.Program.ProgramType,
-                    r.Program.Preceptor != null ? r.Program.Preceptor.FirstName + " " + r.Program.Preceptor.LastName : null,
-                    r.StudentId,
-                    r.StudentName,
-                    r.StudentEmail,
-                    r.StudentOid,
-                    r.StartDate,
-                    r.EndDate,
-                    r.Weeks,
-                    r.Status))
-                .FirstOrDefaultAsync(cancellationToken);
+            var rotation = await db.Rotations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+            if (rotation is null)
+            {
+                return Results.NotFound();
+            }
 
-            return rotation is null ? Results.NotFound() : Results.Ok(rotation);
+            // A live rotation always has a live program (the program-delete guard blocks orphaning, and
+            // there's no rotation un-delete). Guard with NotFound anyway rather than null-forgive, so a
+            // future invariant break can't turn into a 500. ToDetail also computes the status transitions.
+            var program = await ResolveProgramAsync(db, rotation.ProgramId, cancellationToken);
+            return program is null ? Results.NotFound() : Results.Ok(ToDetail(rotation, program));
         })
         .WithName("GetRotation");
 
@@ -119,6 +111,13 @@ public static class RotationEndpoints
             if (rotation is null)
             {
                 return Results.NotFound();
+            }
+
+            // Enforce the lifecycle state machine: the status may stay the same or move along an allowed
+            // edge, but can't jump illegally (e.g. Completed → Pending). Checked against the CURRENT status.
+            if (!RotationStatusMachine.CanTransition(rotation.Status, request.Status))
+            {
+                return Results.BadRequest($"Can't change a rotation from {rotation.Status} to {request.Status}.");
             }
 
             var program = await ResolveProgramAsync(db, request.ProgramId, cancellationToken);
@@ -205,5 +204,6 @@ public static class RotationEndpoints
 
     private static RotationDetailResponse ToDetail(Rotation r, ProgramInfo program) =>
         new(r.Id, r.ProgramId, program.SpecialtyName, program.ProgramType, program.PreceptorName,
-            r.StudentId, r.StudentName, r.StudentEmail, r.StudentOid, r.StartDate, r.EndDate, r.Weeks, r.Status);
+            r.StudentId, r.StudentName, r.StudentEmail, r.StudentOid, r.StartDate, r.EndDate, r.Weeks, r.Status,
+            RotationStatusMachine.NextFrom(r.Status));
 }

@@ -160,6 +160,9 @@ export interface RotationDetail {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** Statuses this rotation may transition to (excludes the current one); the edit form offers the
+   *  current status plus these, and the server enforces the same lifecycle state machine. */
+  allowedNextStatuses: RotationStatus[];
 }
 
 /** Admin create/update payload (mirrors Create/UpdateRotationRequest). The student is chosen from the

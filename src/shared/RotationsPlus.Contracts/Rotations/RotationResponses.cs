@@ -43,4 +43,7 @@ public sealed record RotationDetailResponse(
     DateOnly StartDate,
     DateOnly EndDate,
     int Weeks,
-    RotationStatus Status);
+    RotationStatus Status,
+    /// <summary>The statuses this rotation may transition to from its current status (excludes the
+    /// current one). The admin edit form offers the current status plus these; the server enforces it.</summary>
+    IReadOnlyList<RotationStatus> AllowedNextStatuses);

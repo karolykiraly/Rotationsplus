@@ -59,7 +59,8 @@ const ROTATION_DETAIL = {
   startDate: "2026-07-06",
   endDate: "2026-08-03",
   weeks: 4,
-  status: "Active"
+  status: "Active",
+  allowedNextStatuses: ["ToBeEvaluated", "Completed", "Abandoned", "Cancelled"]
 };
 const PROGRAM = {
   id: "prog1",
@@ -212,6 +213,22 @@ describe("RotationsPage", () => {
       status: "Active"
     });
     expect(await screen.findByText("Rotation updated.")).toBeInTheDocument();
+  });
+
+  it("limits the edit status dropdown to the current status plus allowed transitions", async () => {
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const status = within(dialog).getByLabelText("Status");
+    const options = within(status as HTMLSelectElement).getAllByRole("option").map((o) => o.textContent);
+    // Current (Active) + its allowed transitions, in canonical lifecycle order; "Pending" is NOT
+    // reachable from Active.
+    expect(options).toEqual(["Active", "To be evaluated", "Completed", "Cancelled", "Abandoned"]);
+    expect(options).not.toContain("Pending");
   });
 
   it("deletes a rotation after confirmation", async () => {

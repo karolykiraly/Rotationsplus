@@ -8,6 +8,9 @@ import { RotationFormModal, type RotationFormInitial } from "./RotationFormModal
 import { ROTATION_STATUSES, rotationStatusLabel } from "./rotationStatuses";
 import { programTypeLabel } from "../programs/programTypes";
 
+/** When creating, every status is a valid initial value (the state machine governs only transitions). */
+const ALL_STATUS_VALUES = ROTATION_STATUSES.map((s) => s.value);
+
 const DEFAULTS: RotationFormInitial = {
   programId: "",
   studentId: "",
@@ -168,6 +171,7 @@ export function RotationsPage() {
           initial={DEFAULTS}
           programs={programOpts}
           students={studentOpts}
+          allowedStatuses={ALL_STATUS_VALUES}
           pending={create.isPending}
           serverError={formError}
           onSubmit={submitForm}
@@ -181,6 +185,8 @@ export function RotationsPage() {
           initial={mapDetail(detail.data)}
           programs={programOpts}
           students={studentOpts}
+          // The current status (so it stays selectable) plus the server's allowed transitions.
+          allowedStatuses={[detail.data.status, ...detail.data.allowedNextStatuses]}
           pending={update.isPending}
           serverError={formError}
           onSubmit={submitForm}

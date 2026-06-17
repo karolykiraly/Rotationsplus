@@ -172,10 +172,11 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     public async Task Admin_can_update_a_rotation_status_dates_and_student()
     {
         var admin = Client(RoleNames.Admin);
-        var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Pending)))
+        // Start at NotStarted so NotStarted → Active is a legal transition.
+        var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.NotStarted)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
-        // Re-point to a different student + a longer range.
+        // Re-point to a different student + a longer range + a legal status move.
         var update = new UpdateRotationRequest(
             InternalMedicineProgramId, DanaColeStudentId,
             new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 19), RotationStatus.Active);   // 42 days → 6 weeks
@@ -187,6 +188,39 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         fetched.StudentId.Should().Be(DanaColeStudentId);
         fetched.StudentName.Should().Be("Dana Cole");   // re-snapshotted from the new student
         fetched.Weeks.Should().Be(6);                   // re-derived from the new range
+    }
+
+    [Fact]
+    public async Task Update_with_an_illegal_status_transition_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        // Pending may only move to NotStarted/Rejected/Cancelled — not straight to Completed.
+        var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Pending)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var update = new UpdateRotationRequest(
+            InternalMedicineProgramId, SamRiveraStudentId,
+            new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Completed);
+        var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // The rotation is unchanged — still Pending.
+        var fetched = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{created.Id}", JsonOptions);
+        fetched!.Status.Should().Be(RotationStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Detail_exposes_the_allowed_next_statuses()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Pending)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var fetched = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{created!.Id}", JsonOptions);
+
+        fetched!.AllowedNextStatuses.Should().BeEquivalentTo(
+            new[] { RotationStatus.NotStarted, RotationStatus.Rejected, RotationStatus.Cancelled });
     }
 
     [Fact]
