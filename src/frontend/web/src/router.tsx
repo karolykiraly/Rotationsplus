@@ -9,6 +9,7 @@ import { StudentsPage } from "./students/StudentsPage";
 import { CustomerMsalShell } from "./portal/CustomerMsalShell";
 import { BrowsePage } from "./portal/BrowsePage";
 import { ProgramDetailPage } from "./portal/ProgramDetailPage";
+import { MyRotationsPage } from "./portal/MyRotationsPage";
 
 /** Routes. "/" + "/admin/*" are the staff console (workforce MSAL, from main.tsx). "/portal/*" is the
  *  customer-facing portal, rooted on the CIAM MSAL instance via CustomerMsalShell. */
@@ -30,7 +31,8 @@ export const router = createBrowserRouter([
     element: <CustomerMsalShell />,
     children: [
       { index: true, element: <BrowsePage /> },
-      { path: "programs/:id", element: <ProgramDetailPage /> }
+      { path: "programs/:id", element: <ProgramDetailPage /> },
+      { path: "rotations", element: <MyRotationsPage /> }
     ]
   }
 ]);

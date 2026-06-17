@@ -183,6 +183,17 @@ table.data { width: 100%; border-collapse: collapse; }
 }
 .portal-main { padding: 28px; max-width: 1000px; width: 100%; margin: 0 auto; }
 
+/* Portal top-bar nav (Find a rotation / My rotations). */
+.portal-nav { display: flex; gap: 6px; margin-right: auto; margin-left: 28px; }
+.portal-link {
+  font-size: 14px; font-weight: 600; color: var(--ink-soft); text-decoration: none;
+  padding: 7px 12px; border-radius: 8px;
+}
+.portal-link:hover { background: var(--bg); color: var(--ink); }
+.portal-link.active { color: var(--brand-dark); background: var(--brand-tint); }
+
+.pc-status { margin-top: 12px; }
+
 .filters { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 20px; }
 .filters input, .filters select {
   font-family: inherit; font-size: 14px; padding: 9px 12px;

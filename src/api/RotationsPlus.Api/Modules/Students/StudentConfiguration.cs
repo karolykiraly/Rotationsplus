@@ -27,6 +27,13 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(x => x.City).HasMaxLength(100);
         builder.Property(x => x.State).HasMaxLength(50);
         builder.Property(x => x.StudentOid).HasMaxLength(64);
+        // A CIAM oid identifies exactly one person, so at most one LIVE student may carry it (the portal
+        // matches the signed-in caller to their student by oid — a duplicate would leak across students).
+        // Filtered to live rows so a soft-deleted student doesn't block re-linking the oid; NULLs are
+        // distinct in a Postgres unique index, so many students with no oid yet are fine.
+        builder.HasIndex(x => x.StudentOid)
+            .IsUnique()
+            .HasFilter("\"StudentOid\" IS NOT NULL AND \"IsDeleted\" = false");
 
         builder.Property(x => x.AcademicStatus)
             .HasConversion<string>()

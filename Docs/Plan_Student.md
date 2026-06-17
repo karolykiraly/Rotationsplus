@@ -41,6 +41,8 @@ Side flows: favorites, pay-to-unlock preceptor contact, WhatsApp/email onboardin
 
 **Search MVP shipped (slice 13):** `/portal` browse (specialty/type/price/text filters → program cards) + a customer program-detail view (honorarium hidden). Booking, unlocks, the onboarding wizard, and the student dashboard are later slices.
 
+**"My rotations" shipped (PR #25):** `/portal/rotations` — the student's rotation tracker. `GET /api/customer/rotations` (CustomerOnly) matches the caller to their directory `Student` by CIAM oid and returns their rotations, excluding the hidden lifecycle states (Cancelled/Refunded/Abandoned/Rejected, §7); `NotStarted` → "Approved". The rest of the dashboard (documents, outstanding payments, credits, rate-it) follows in later slices.
+
 ## 4. Search → program detail → booking
 
 - **`/programs/:slug`** (`RotationDetail.js`): header (name, prefixed program ID, specialty, hospital image, rating + review count, price/week, min weeks), description + tags, **masked preceptor identity until unlocked**, week-based DayPicker calendar (Monday weeks; disables past + `unavailable_dates` + seat-limit weeks; 1–16 week selection), consultation-hours slider for consultation type, paginated reviews, pricing box (**10% deposit for non-open programs, 100% for open; hourly for consultation_sub**), add-to-cart, favorite toggle.

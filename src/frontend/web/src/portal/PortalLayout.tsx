@@ -1,5 +1,5 @@
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/msal-react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useCustomerMe } from "./useCustomerMe";
 import { CustomerSignIn } from "./CustomerSignIn";
 
@@ -21,6 +21,14 @@ export function PortalLayout() {
               <span className="brand-dot" />
               Rotations Plus
             </Link>
+            <nav className="portal-nav">
+              <NavLink to="/portal" end className={({ isActive }) => `portal-link${isActive ? " active" : ""}`}>
+                Find a rotation
+              </NavLink>
+              <NavLink to="/portal/rotations" className={({ isActive }) => `portal-link${isActive ? " active" : ""}`}>
+                My rotations
+              </NavLink>
+            </nav>
             <div className="user-chip">
               <span>{customer?.name ?? customer?.username ?? "…"}</span>
               <button className="btn btn-ghost" onClick={() => void instance.logoutRedirect()}>Sign out</button>

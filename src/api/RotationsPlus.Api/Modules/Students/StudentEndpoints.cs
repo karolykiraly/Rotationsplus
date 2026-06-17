@@ -80,6 +80,13 @@ public static class StudentEndpoints
                 return Results.Conflict($"A student with email '{norm.Email}' already exists.");
             }
 
+            // A CIAM oid links to exactly one live student (the portal matches the caller to their
+            // student by oid). Exclude the row we're about to restore, if any.
+            if (await OidTakenAsync(db, norm.StudentOid, existing?.Id ?? Guid.Empty, cancellationToken))
+            {
+                return Results.Conflict($"A student with CIAM object id '{norm.StudentOid}' is already linked.");
+            }
+
             if (existing is { IsDeleted: true })
             {
                 existing.IsDeleted = false;
@@ -102,10 +109,12 @@ public static class StudentEndpoints
             {
                 await db.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505" })
+            catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505" } pg)
             {
-                // Lost a concurrent create race for the same email; the unique index rejected the insert.
-                return Results.Conflict($"A student with email '{norm.Email}' already exists.");
+                // Lost a concurrent create race; report which unique index (email or oid) rejected it.
+                return Results.Conflict(pg.ConstraintName?.Contains("StudentOid", StringComparison.Ordinal) == true
+                    ? $"A student with CIAM object id '{norm.StudentOid}' is already linked."
+                    : $"A student with email '{norm.Email}' already exists.");
             }
 
             return Results.Created($"/api/students/{student.Id}", ToDetail(student));
@@ -136,6 +145,12 @@ public static class StudentEndpoints
             if (emailTaken)
             {
                 return Results.Conflict($"A student with email '{norm.Email}' already exists.");
+            }
+
+            // A CIAM oid links to exactly one live student (excluding this row).
+            if (await OidTakenAsync(db, norm.StudentOid, id, cancellationToken))
+            {
+                return Results.Conflict($"A student with CIAM object id '{norm.StudentOid}' is already linked.");
             }
 
             Apply(student, norm);
@@ -169,6 +184,13 @@ public static class StudentEndpoints
 
         return routes;
     }
+
+    /// <summary>True if another LIVE student (excluding <paramref name="selfId"/>) already carries this
+    /// CIAM oid. Uses the global soft-delete filter, matching the live-only unique index on the column.</summary>
+    private static Task<bool> OidTakenAsync(RotationsDbContext db, string? oid, Guid selfId, CancellationToken cancellationToken) =>
+        string.IsNullOrEmpty(oid)
+            ? Task.FromResult(false)
+            : db.Students.AnyAsync(s => s.StudentOid == oid && s.Id != selfId, cancellationToken);
 
     private const int NameMaxLength = 100;
     private const int EmailMaxLength = 256;

@@ -19,6 +19,8 @@ public static class ApiAuthorizationMatrix
     [
         new("GET", "/api/me", RoleNames.Staff, "Current staff identity + provisioned profile"),
         new("GET", "/api/customer/me", RoleNames.Customer, "Current customer (Student/Preceptor) identity"),
+        // Returns the caller's own rotations (empty for a customer with none) → 200 for customers, 403 for staff.
+        new("GET", "/api/customer/rotations", RoleNames.Customer, "The signed-in customer's rotations"),
         // Catalog reads are open to any marketplace viewer (staff + customers).
         new("GET", "/api/specialties", MarketplaceReaders, "List marketplace specialties"),
         // A seeded id, so an authorized caller routes through to a real resource (not a 404).

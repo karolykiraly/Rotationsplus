@@ -224,6 +224,36 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
+    public async Task Create_with_an_oid_already_linked_to_a_live_student_returns_409()
+    {
+        var admin = Client(RoleNames.Admin);
+        var oid = $"ciam-{Guid.NewGuid():N}";
+        await PostAsync(admin, ValidCreate(oid: oid));
+
+        // A second, distinct student (different email) can't take the same CIAM oid.
+        var response = await PostAsync(admin, ValidCreate(oid: oid));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Update_to_an_oid_already_linked_to_a_live_student_returns_409()
+    {
+        var admin = Client(RoleNames.Admin);
+        var oid = $"ciam-{Guid.NewGuid():N}";
+        await PostAsync(admin, ValidCreate(oid: oid));
+        var other = await (await PostAsync(admin, ValidCreate(oid: null)))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var update = new UpdateStudentRequest(
+            other!.FirstName, other.LastName, other.Email, null, AcademicStatus.MdStudent, null,
+            null, null, null, null, StudentStatus.Registered, oid);   // tries to take the linked oid
+        var response = await admin.PutAsJsonAsync($"/api/students/{other.Id}", update, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task Recreating_a_soft_deleted_student_restores_and_refreshes_it()
     {
         var admin = Client(RoleNames.Admin);

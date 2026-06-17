@@ -1,5 +1,12 @@
 import { customerLoginRequest, customerMsalInstance } from "../authConfig";
-import { apiFetch, type Program, type ProgramDetail, type Specialty } from "../api";
+import {
+  apiFetch,
+  type Program,
+  type ProgramDetail,
+  type ProgramType,
+  type RotationStatus,
+  type Specialty
+} from "../api";
 
 /** Mirror of the API's CustomerMeResponse contract. */
 export interface CustomerMe {
@@ -9,6 +16,18 @@ export interface CustomerMe {
   roles: string[];
   isStudent: boolean;
   isPreceptor: boolean;
+}
+
+/** Mirror of the API's CustomerRotationResponse contract — the student's own rotation, as tracked. */
+export interface CustomerRotation {
+  id: string;
+  specialtyName: string;
+  programType: ProgramType;
+  preceptorName?: string | null;
+  startDate: string;
+  endDate: string;
+  weeks: number;
+  status: RotationStatus;
 }
 
 /** Acquires a CIAM (customer) access token and issues the request. Mirrors the staff `request`,
@@ -37,3 +56,7 @@ export const getCustomerProgram = (id: string): Promise<ProgramDetail> =>
 /** Specialties, for the browse filter dropdown. */
 export const getCustomerSpecialties = (): Promise<Specialty[]> =>
   customerRequest<Specialty[]>("GET", "/api/specialties");
+
+/** The signed-in student's own rotations (GET /api/customer/rotations). */
+export const getCustomerRotations = (): Promise<CustomerRotation[]> =>
+  customerRequest<CustomerRotation[]>("GET", "/api/customer/rotations");

@@ -80,6 +80,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapMeEndpoints();
 app.MapCustomerMeEndpoints();
+app.MapCustomerRotationEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPreceptorEndpoints();
