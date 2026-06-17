@@ -4,11 +4,13 @@ import {
   deleteRotation,
   getPrograms,
   getRotations,
+  getStudents,
   updateRotation,
   type Program,
   type Rotation,
   type RotationInput,
-  type RotationStatus
+  type RotationStatus,
+  type Student
 } from "../api";
 
 /** List query (optionally filtered by status) + create/update/delete mutations for rotations. */
@@ -51,4 +53,9 @@ export function useRotations(status: RotationStatus | "") {
 /** Program option list for the rotation form's program dropdown. */
 export function useRotationPrograms() {
   return useQuery<Program[]>({ queryKey: ["programs"], queryFn: getPrograms });
+}
+
+/** Student option list for the rotation form's student picker. */
+export function useRotationStudents() {
+  return useQuery<Student[]>({ queryKey: ["students", { status: null }], queryFn: () => getStudents() });
 }

@@ -10,7 +10,8 @@ const h = vi.hoisted(() => ({
   createRotation: vi.fn(),
   updateRotation: vi.fn(),
   deleteRotation: vi.fn(),
-  getPrograms: vi.fn()
+  getPrograms: vi.fn(),
+  getStudents: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -21,6 +22,7 @@ vi.mock("../api", () => ({
   updateRotation: (id: string, input: unknown) => h.updateRotation(id, input),
   deleteRotation: (id: string) => h.deleteRotation(id),
   getPrograms: () => h.getPrograms(),
+  getStudents: (params: unknown) => h.getStudents(params),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -50,6 +52,7 @@ const ROTATION_DETAIL = {
   specialtyName: "Internal Medicine",
   programType: "InPerson",
   preceptorName: "Jane Carter",
+  studentId: "stud1",
   studentName: "Sam Rivera",
   studentEmail: "sam@x.com",
   studentOid: "ciam-oid-1",
@@ -67,6 +70,10 @@ const PROGRAM = {
   retailAmountPerWeek: 1500,
   preceptorName: "Jane Carter"
 };
+const STUDENTS = [
+  { id: "stud1", fullName: "Sam Rivera", email: "sam@x.com", academicStatus: "InternationalMedicalGraduate", status: "MemberActivated" },
+  { id: "stud2", fullName: "Dana Cole", email: "dana@x.com", academicStatus: "MdStudent", status: "Registered" }
+];
 
 function newClient() {
   return new QueryClient({
@@ -89,6 +96,7 @@ describe("RotationsPage", () => {
     h.getRotations.mockResolvedValue([ROTATION_ROW]);
     h.getRotation.mockResolvedValue(ROTATION_DETAIL);
     h.getPrograms.mockResolvedValue([PROGRAM]);
+    h.getStudents.mockResolvedValue(STUDENTS);
   });
 
   it("lists rotations with student, type label, weeks and status", async () => {
@@ -108,7 +116,7 @@ describe("RotationsPage", () => {
     expect(screen.queryByRole("button", { name: "Add rotation" })).not.toBeInTheDocument();
   });
 
-  it("creates a rotation from the form", async () => {
+  it("creates a rotation by picking a program and a directory student", async () => {
     h.createRotation.mockResolvedValue({ ...ROTATION_DETAIL, id: "r2" });
     renderPage();
     await screen.findByText("Sam Rivera");
@@ -116,39 +124,33 @@ describe("RotationsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
-    await userEvent.type(within(dialog).getByLabelText("Student name"), "Pat Morgan");
-    await userEvent.type(within(dialog).getByLabelText("Student email"), "pat@x.com");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
     await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
     await userEvent.type(within(dialog).getByLabelText("End date"), "2026-10-05");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(h.createRotation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        programId: "prog1",
-        studentName: "Pat Morgan",
-        studentEmail: "pat@x.com",
-        studentOid: null,
-        startDate: "2026-09-07",
-        endDate: "2026-10-05",
-        status: "Pending"
-      })
-    );
-    expect(await screen.findByText("Booked Pat Morgan.")).toBeInTheDocument();
+    expect(h.createRotation).toHaveBeenCalledWith({
+      programId: "prog1",
+      studentId: "stud2",
+      startDate: "2026-09-07",
+      endDate: "2026-10-05",
+      status: "Pending"
+    });
+    expect(await screen.findByText(/Booked/)).toBeInTheDocument();
   });
 
-  it("requires a program before calling the API", async () => {
+  it("requires a program and a student before calling the API", async () => {
     renderPage();
     await screen.findByText("Sam Rivera");
 
     await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.type(within(dialog).getByLabelText("Student name"), "Pat Morgan");
-    await userEvent.type(within(dialog).getByLabelText("Student email"), "pat@x.com");
     await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
     await userEvent.type(within(dialog).getByLabelText("End date"), "2026-10-05");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(await within(dialog).findByText("Select a program.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Select a student.")).toBeInTheDocument();
     expect(h.createRotation).not.toHaveBeenCalled();
   });
 
@@ -159,8 +161,7 @@ describe("RotationsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
-    await userEvent.type(within(dialog).getByLabelText("Student name"), "Pat Morgan");
-    await userEvent.type(within(dialog).getByLabelText("Student email"), "pat@x.com");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
     await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
     await userEvent.type(within(dialog).getByLabelText("End date"), "2026-09-07");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -170,23 +171,22 @@ describe("RotationsPage", () => {
   });
 
   it("surfaces a server validation error in the form", async () => {
-    h.createRotation.mockRejectedValue(new ApiError(400, "Program does not exist."));
+    h.createRotation.mockRejectedValue(new ApiError(400, "Student does not exist."));
     renderPage();
     await screen.findByText("Sam Rivera");
 
     await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
-    await userEvent.type(within(dialog).getByLabelText("Student name"), "Pat Morgan");
-    await userEvent.type(within(dialog).getByLabelText("Student email"), "pat@x.com");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
     await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
     await userEvent.type(within(dialog).getByLabelText("End date"), "2026-10-05");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    expect(await within(dialog).findByText("Program does not exist.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Student does not exist.")).toBeInTheDocument();
   });
 
-  it("loads detail and pre-fills the edit form, then updates", async () => {
+  it("loads detail and pre-fills the edit form (incl. the student link), then updates", async () => {
     h.updateRotation.mockResolvedValue(ROTATION_DETAIL);
     renderPage();
     await screen.findByText("Sam Rivera");
@@ -196,17 +196,21 @@ describe("RotationsPage", () => {
 
     expect(await screen.findByLabelText("Program")).toHaveValue("prog1");
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByLabelText("Student name")).toHaveValue("Sam Rivera");
+    expect(within(dialog).getByLabelText("Student")).toHaveValue("stud1");
     expect(within(dialog).getByLabelText("Start date")).toHaveValue("2026-07-06");
     expect(within(dialog).getByLabelText("Status")).toHaveValue("Active");
-    expect(within(dialog).getByLabelText(/object id/i)).toHaveValue("ciam-oid-1");
     expect(h.getRotation).toHaveBeenCalledWith("r1");
 
+    // Re-point to a different student and save.
+    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(h.updateRotation).toHaveBeenCalledWith(
-      "r1",
-      expect.objectContaining({ programId: "prog1", studentName: "Sam Rivera", status: "Active", studentOid: "ciam-oid-1" })
-    );
+    expect(h.updateRotation).toHaveBeenCalledWith("r1", {
+      programId: "prog1",
+      studentId: "stud2",
+      startDate: "2026-07-06",
+      endDate: "2026-08-03",
+      status: "Active"
+    });
     expect(await screen.findByText("Rotation updated.")).toBeInTheDocument();
   });
 
@@ -225,8 +229,6 @@ describe("RotationsPage", () => {
   });
 
   it("filters the list by status and re-renders the filtered rows", async () => {
-    // The Completed filter returns a different student, so we assert the rendered list actually swaps
-    // (not just that the request carried the right status).
     h.getRotations.mockImplementation((params?: { status?: string }) =>
       Promise.resolve(
         params?.status === "Completed"

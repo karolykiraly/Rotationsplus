@@ -153,6 +153,13 @@ public static class StudentEndpoints
                 return Results.NotFound();
             }
 
+            // Block deletion while live rotations are booked against this student (the rotation FK is
+            // Restrict; this guards the soft-delete path too). Soft-deleted rotations don't count.
+            if (await db.Rotations.AnyAsync(r => r.StudentId == id, cancellationToken))
+            {
+                return Results.Conflict("This student has rotations booked and can't be deleted.");
+            }
+
             db.Students.Remove(student); // interceptor converts the delete into a soft-delete
             await db.SaveChangesAsync(cancellationToken);
             return Results.NoContent();

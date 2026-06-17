@@ -15,13 +15,15 @@ public sealed record RotationSummaryResponse(
     int Weeks,
     RotationStatus Status);
 
-/// <summary>Full detail for a single rotation.</summary>
+/// <summary>Full detail for a single rotation. <c>StudentId</c> links to the directory record
+/// (null only for legacy rows); the name/email/oid are the snapshot taken at write time.</summary>
 public sealed record RotationDetailResponse(
     Guid Id,
     Guid ProgramId,
     string SpecialtyName,
     ProgramType ProgramType,
     string? PreceptorName,
+    Guid? StudentId,
     string StudentName,
     string StudentEmail,
     string? StudentOid,

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Rotations;
 using RotationsPlus.Contracts.Students;
 
 namespace RotationsPlus.Integration.Tests;
@@ -338,6 +339,40 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         var response = await admin.PutAsJsonAsync($"/api/students/{Guid.NewGuid()}", update, JsonOptions);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Deleting_a_student_with_a_booked_rotation_is_blocked()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // The seeded Sam Rivera student is booked into the seeded rotation, so deletion is blocked.
+        var response = await admin.DeleteAsync($"/api/students/{SamRiveraId}");
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // And the record is still there.
+        (await admin.GetAsync($"/api/students/{SamRiveraId}")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_student_whose_only_rotation_is_soft_deleted_becomes_deletable()
+    {
+        var admin = Client(RoleNames.Admin);
+        var internalMedicineProgram = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
+
+        var student = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+        var rotation = await (await admin.PostAsJsonAsync("/api/rotations",
+                new CreateRotationRequest(internalMedicineProgram, student!.Id,
+                    new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending), JsonOptions))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        // While the rotation is live, the student can't be deleted.
+        (await admin.DeleteAsync($"/api/students/{student.Id}")).StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // Soft-delete the rotation → the student becomes deletable (soft-deleted rotations don't count).
+        (await admin.DeleteAsync($"/api/rotations/{rotation!.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await admin.DeleteAsync($"/api/students/{student.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]

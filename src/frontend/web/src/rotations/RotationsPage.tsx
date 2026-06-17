@@ -3,16 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
 import { useMe } from "../useMe";
 import { getRotation, type Rotation, type RotationInput, type RotationStatus } from "../api";
-import { useRotations, useRotationPrograms } from "./useRotations";
+import { useRotations, useRotationPrograms, useRotationStudents } from "./useRotations";
 import { RotationFormModal, type RotationFormInitial } from "./RotationFormModal";
 import { ROTATION_STATUSES, rotationStatusLabel } from "./rotationStatuses";
 import { programTypeLabel } from "../programs/programTypes";
 
 const DEFAULTS: RotationFormInitial = {
   programId: "",
-  studentName: "",
-  studentEmail: "",
-  studentOid: "",
+  studentId: "",
   startDate: "",
   endDate: "",
   status: "Pending"
@@ -33,6 +31,7 @@ export function RotationsPage() {
   const [statusFilter, setStatusFilter] = useState<RotationStatus | "">("");
   const { list, create, update, remove } = useRotations(statusFilter);
   const programs = useRotationPrograms();
+  const students = useRotationStudents();
 
   const [editId, setEditId] = useState<EditId>(null);
   const [deleting, setDeleting] = useState<Rotation | null>(null);
@@ -56,8 +55,9 @@ export function RotationsPage() {
     setFormError(null);
     const onError = (e: unknown) => setFormError((e as Error).message);
     if (editId === "new") {
+      const name = studentOpts.find((s) => s.id === input.studentId)?.fullName ?? "student";
       create.mutate(input, {
-        onSuccess: () => { closeForm(); setBanner({ type: "ok", text: `Booked ${input.studentName}.` }); },
+        onSuccess: () => { closeForm(); setBanner({ type: "ok", text: `Booked ${name}.` }); },
         onError
       });
     } else if (editId) {
@@ -79,9 +79,7 @@ export function RotationsPage() {
 
   const mapDetail = (d: NonNullable<typeof detail.data>): RotationFormInitial => ({
     programId: d.programId,
-    studentName: d.studentName,
-    studentEmail: d.studentEmail,
-    studentOid: d.studentOid ?? "",
+    studentId: d.studentId ?? "",
     startDate: d.startDate,
     endDate: d.endDate,
     status: d.status
@@ -89,6 +87,7 @@ export function RotationsPage() {
 
   const rotations = list.data ?? [];
   const programOpts = programs.data ?? [];
+  const studentOpts = students.data ?? [];
 
   return (
     <>
@@ -168,6 +167,7 @@ export function RotationsPage() {
           title="Add rotation"
           initial={DEFAULTS}
           programs={programOpts}
+          students={studentOpts}
           pending={create.isPending}
           serverError={formError}
           onSubmit={submitForm}
@@ -180,6 +180,7 @@ export function RotationsPage() {
           title="Edit rotation"
           initial={mapDetail(detail.data)}
           programs={programOpts}
+          students={studentOpts}
           pending={update.isPending}
           serverError={formError}
           onSubmit={submitForm}

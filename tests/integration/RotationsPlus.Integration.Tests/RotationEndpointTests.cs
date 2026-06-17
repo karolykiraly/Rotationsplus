@@ -6,6 +6,7 @@ using FluentAssertions;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Marketplace;
 using RotationsPlus.Contracts.Rotations;
+using RotationsPlus.Contracts.Students;
 
 namespace RotationsPlus.Integration.Tests;
 
@@ -15,8 +16,11 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     private static readonly Guid InternalMedicineProgramId = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
     // Seeded specialty (see SpecialtyConfiguration) — a valid FK target for a freshly created program.
     private static readonly Guid InternalMedicineSpecialtyId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
-    // Seeded rotation (see RotationConfiguration) — "Sam Rivera", Active.
+    // Seeded rotation (see RotationConfiguration) — "Sam Rivera", Active, linked to the Sam Rivera student.
     private static readonly Guid SeededRotationId = Guid.Parse("eeeeeeee-0000-0000-0000-000000000001");
+    // Seeded students (see StudentConfiguration).
+    private static readonly Guid SamRiveraStudentId = Guid.Parse("ffffffff-0000-0000-0000-000000000001");
+    private static readonly Guid DanaColeStudentId = Guid.Parse("ffffffff-0000-0000-0000-000000000002");
 
     // The API serializes/parses enums (RotationStatus, ProgramType) and DateOnly as the seeded format.
     private static readonly JsonSerializerOptions JsonOptions =
@@ -32,17 +36,13 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
 
     private static CreateRotationRequest ValidCreate(
         Guid? programId = null,
-        string name = "Pat Morgan",
-        string email = "pat.morgan@example.com",
-        string? oid = null,
+        Guid? studentId = null,
         DateOnly? start = null,
         DateOnly? end = null,
         RotationStatus status = RotationStatus.Pending) =>
         new(
             programId ?? InternalMedicineProgramId,
-            name,
-            email,
-            oid,
+            studentId ?? SamRiveraStudentId,
             start ?? new DateOnly(2026, 9, 7),
             end ?? new DateOnly(2026, 10, 5),   // 28 days → 4 weeks
             status);
@@ -67,7 +67,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
-    public async Task Admin_can_get_the_seeded_rotation_by_id()
+    public async Task Admin_can_get_the_seeded_rotation_by_id_with_its_student_link()
     {
         var admin = Client(RoleNames.Admin);
 
@@ -75,6 +75,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
 
         rotation!.Id.Should().Be(SeededRotationId);
         rotation.ProgramId.Should().Be(InternalMedicineProgramId);
+        rotation.StudentId.Should().Be(SamRiveraStudentId);   // linked to the directory record
         rotation.StudentName.Should().Be("Sam Rivera");
         rotation.SpecialtyName.Should().Be("Internal Medicine");
         rotation.PreceptorName.Should().Be("Jane Carter");
@@ -92,12 +93,12 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
-    public async Task Admin_can_create_a_rotation_and_weeks_is_derived_from_the_date_range()
+    public async Task Admin_can_create_a_rotation_snapshotting_the_student_and_deriving_weeks()
     {
         var admin = Client(RoleNames.Admin);
 
         var create = await PostAsync(admin, ValidCreate(
-            name: "  Jordan Lee  ", email: "  jordan.lee@example.com  ", oid: "  ciam-oid-123  ",
+            studentId: DanaColeStudentId,
             start: new DateOnly(2026, 11, 2), end: new DateOnly(2026, 11, 30), status: RotationStatus.NotStarted));
         create.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -105,29 +106,35 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         created.Should().NotBeNull();
         created!.ProgramId.Should().Be(InternalMedicineProgramId);
         created.SpecialtyName.Should().Be("Internal Medicine");
-        created.ProgramType.Should().Be(ProgramType.InPerson);
         created.PreceptorName.Should().Be("Jane Carter");
-        created.StudentName.Should().Be("Jordan Lee");        // trimmed
-        created.StudentEmail.Should().Be("jordan.lee@example.com");
-        created.StudentOid.Should().Be("ciam-oid-123");
-        created.Weeks.Should().Be(4);                         // 28 days, derived server-side
+        created.StudentId.Should().Be(DanaColeStudentId);
+        created.StudentName.Should().Be("Dana Cole");                 // snapshotted from the directory student
+        created.StudentEmail.Should().Be("dana.cole@example.com");
+        created.Weeks.Should().Be(4);                                 // 28 days, derived server-side
         created.Status.Should().Be(RotationStatus.NotStarted);
 
         // Round-trips through a fresh read.
         var fetched = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{created.Id}", JsonOptions);
-        fetched!.StudentName.Should().Be("Jordan Lee");
-        fetched.Weeks.Should().Be(4);
+        fetched!.StudentName.Should().Be("Dana Cole");
+        fetched.StudentId.Should().Be(DanaColeStudentId);
     }
 
     [Fact]
-    public async Task Create_omitting_the_oid_leaves_it_null()
+    public async Task Create_snapshots_the_student_oid_when_the_directory_record_has_one()
     {
         var admin = Client(RoleNames.Admin);
 
-        var created = await (await PostAsync(admin, ValidCreate(oid: null)))
+        // A fresh student carrying a CIAM oid; the rotation must snapshot it.
+        var student = await (await admin.PostAsJsonAsync("/api/students",
+                new CreateStudentRequest("Linked", "Learner", $"linked.{Guid.NewGuid():N}@example.com", null,
+                    AcademicStatus.MdStudent, null, null, null, null, null, StudentStatus.MemberActivated, "ciam-oid-xyz"),
+                JsonOptions))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var created = await (await PostAsync(admin, ValidCreate(studentId: student!.Id)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
-        created!.StudentOid.Should().BeNull();
+        created!.StudentOid.Should().Be("ciam-oid-xyz");
     }
 
     [Fact]
@@ -136,6 +143,16 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var admin = Client(RoleNames.Admin);
 
         var response = await PostAsync(admin, ValidCreate(programId: Guid.NewGuid()));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_with_unknown_student_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await PostAsync(admin, ValidCreate(studentId: Guid.NewGuid()));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -152,42 +169,24 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
-    public async Task Create_with_invalid_email_returns_400()
-    {
-        var admin = Client(RoleNames.Admin);
-
-        var response = await PostAsync(admin, ValidCreate(email: "not-an-email"));
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task Create_with_blank_name_returns_400()
-    {
-        var admin = Client(RoleNames.Admin);
-
-        var response = await PostAsync(admin, ValidCreate(name: "   "));
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task Admin_can_update_a_rotation_status_and_dates()
+    public async Task Admin_can_update_a_rotation_status_dates_and_student()
     {
         var admin = Client(RoleNames.Admin);
         var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Pending)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
+        // Re-point to a different student + a longer range.
         var update = new UpdateRotationRequest(
-            InternalMedicineProgramId, "Pat Morgan", "pat.morgan@example.com", "linked-oid",
+            InternalMedicineProgramId, DanaColeStudentId,
             new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 19), RotationStatus.Active);   // 42 days → 6 weeks
         var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var fetched = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{created.Id}", JsonOptions);
         fetched!.Status.Should().Be(RotationStatus.Active);
-        fetched.StudentOid.Should().Be("linked-oid");
-        fetched.Weeks.Should().Be(6);   // re-derived from the new range
+        fetched.StudentId.Should().Be(DanaColeStudentId);
+        fetched.StudentName.Should().Be("Dana Cole");   // re-snapshotted from the new student
+        fetched.Weeks.Should().Be(6);                   // re-derived from the new range
     }
 
     [Fact]
@@ -196,7 +195,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var admin = Client(RoleNames.Admin);
 
         var update = new UpdateRotationRequest(
-            InternalMedicineProgramId, "Pat Morgan", "pat.morgan@example.com", null,
+            InternalMedicineProgramId, SamRiveraStudentId,
             new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending);
         var response = await admin.PutAsJsonAsync($"/api/rotations/{Guid.NewGuid()}", update, JsonOptions);
 
@@ -204,10 +203,53 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task Update_with_unknown_student_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var update = new UpdateRotationRequest(
+            InternalMedicineProgramId, Guid.NewGuid(),
+            new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending);
+        var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Update_with_unknown_program_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var update = new UpdateRotationRequest(
+            Guid.NewGuid(), SamRiveraStudentId,
+            new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending);
+        var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Create_rounds_a_partial_week_up()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // 30 days (Sep 7 → Oct 7) is 4 whole weeks + 2 days → must report 5, not truncate to 4.
+        var created = await (await PostAsync(admin, ValidCreate(
+                start: new DateOnly(2026, 9, 7), end: new DateOnly(2026, 10, 7))))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        created!.Weeks.Should().Be(5);
+    }
+
+    [Fact]
     public async Task Admin_can_soft_delete_a_rotation_and_it_disappears_from_the_list()
     {
         var admin = Client(RoleNames.Admin);
-        var created = await (await PostAsync(admin, ValidCreate(name: "Soon Deleted")))
+        var created = await (await PostAsync(admin, ValidCreate(studentId: DanaColeStudentId)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
         var delete = await admin.DeleteAsync($"/api/rotations/{created!.Id}");
@@ -225,8 +267,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     {
         var admin = Client(RoleNames.Admin);
 
-        // A fresh Rejected rotation, isolated from the seeded Active one.
-        var created = await (await PostAsync(admin, ValidCreate(name: "Filter Me", status: RotationStatus.Rejected)))
+        var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Rejected)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
         var rejected = await admin.GetFromJsonAsync<List<RotationSummaryResponse>>(
@@ -244,51 +285,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
             $"/api/rotations?programId={InternalMedicineProgramId}", JsonOptions);
 
         byProgram!.Should().Contain(r => r.Id == SeededRotationId);
-        // Every returned row belongs to that program (the seeded rotation does).
         byProgram.Should().OnlyContain(r => r.SpecialtyName == "Internal Medicine");
-    }
-
-    [Fact]
-    public async Task Create_rounds_a_partial_week_up()
-    {
-        var admin = Client(RoleNames.Admin);
-
-        // 30 days (Sep 7 → Oct 7) is 4 whole weeks + 2 days → must report 5, not truncate to 4.
-        var created = await (await PostAsync(admin, ValidCreate(
-                start: new DateOnly(2026, 9, 7), end: new DateOnly(2026, 10, 7))))
-            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
-
-        created!.Weeks.Should().Be(5);
-    }
-
-    [Fact]
-    public async Task Update_with_invalid_email_returns_400()
-    {
-        var admin = Client(RoleNames.Admin);
-        var created = await (await PostAsync(admin, ValidCreate()))
-            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
-
-        var update = new UpdateRotationRequest(
-            InternalMedicineProgramId, "Pat Morgan", "not-an-email", null,
-            new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending);
-        var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task Update_with_unknown_program_returns_400()
-    {
-        var admin = Client(RoleNames.Admin);
-        var created = await (await PostAsync(admin, ValidCreate()))
-            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
-
-        var update = new UpdateRotationRequest(
-            Guid.NewGuid(), "Pat Morgan", "pat.morgan@example.com", null,
-            new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending);
-        var response = await admin.PutAsJsonAsync($"/api/rotations/{created!.Id}", update, JsonOptions);
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -300,21 +297,17 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var program = await (await admin.PostAsJsonAsync("/api/programs",
                 new CreateProgramRequest(InternalMedicineSpecialtyId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Deletable?", null), JsonOptions))
             .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
-        var rotation = await (await PostAsync(admin, ValidCreate(programId: program!.Id, name: "Orphan Risk")))
+        var rotation = await (await PostAsync(admin, ValidCreate(programId: program!.Id)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
-        // The program can't be deleted out from under its rotation.
         var delete = await admin.DeleteAsync($"/api/programs/{program.Id}");
         delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        // And the admin rotations list still loads (the regression this guard prevents: a soft-deleted
-        // program would make the list project a NULL ProgramType through the navigation and 500).
         var list = await admin.GetAsync("/api/rotations");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var rows = await list.Content.ReadFromJsonAsync<List<RotationSummaryResponse>>(JsonOptions);
         rows!.Should().Contain(r => r.Id == rotation!.Id);
 
-        // Once the rotation is gone, the program is deletable again.
         (await admin.DeleteAsync($"/api/rotations/{rotation!.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await admin.DeleteAsync($"/api/programs/{program.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
     }

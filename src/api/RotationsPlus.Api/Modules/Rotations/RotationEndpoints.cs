@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
@@ -57,6 +56,7 @@ public static class RotationEndpoints
                     r.Program.Specialty.Name,
                     r.Program.ProgramType,
                     r.Program.Preceptor != null ? r.Program.Preceptor.FirstName + " " + r.Program.Preceptor.LastName : null,
+                    r.StudentId,
                     r.StudentName,
                     r.StudentEmail,
                     r.StudentOid,
@@ -72,8 +72,7 @@ public static class RotationEndpoints
 
         group.MapPost("/", async (CreateRotationRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            if (!TryValidate(request.StudentName, request.StudentEmail, request.StudentOid,
-                    request.StartDate, request.EndDate, request.Status, out var norm, out var error))
+            if (!TryValidateDates(request.StartDate, request.EndDate, request.Status, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -84,12 +83,19 @@ public static class RotationEndpoints
                 return Results.BadRequest($"Program '{request.ProgramId}' does not exist.");
             }
 
+            var student = await ResolveStudentAsync(db, request.StudentId, cancellationToken);
+            if (student is null)
+            {
+                return Results.BadRequest($"Student '{request.StudentId}' does not exist.");
+            }
+
             var rotation = new Rotation
             {
                 ProgramId = request.ProgramId,
-                StudentName = norm.Name,
-                StudentEmail = norm.Email,
-                StudentOid = norm.Oid,
+                StudentId = request.StudentId,
+                StudentName = student.Name,   // snapshot the directory student's identity at write time
+                StudentEmail = student.Email,
+                StudentOid = student.Oid,
                 StartDate = request.StartDate,
                 EndDate = request.EndDate,
                 Weeks = WeeksBetween(request.StartDate, request.EndDate),
@@ -104,8 +110,7 @@ public static class RotationEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateRotationRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            if (!TryValidate(request.StudentName, request.StudentEmail, request.StudentOid,
-                    request.StartDate, request.EndDate, request.Status, out var norm, out var error))
+            if (!TryValidateDates(request.StartDate, request.EndDate, request.Status, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -122,10 +127,17 @@ public static class RotationEndpoints
                 return Results.BadRequest($"Program '{request.ProgramId}' does not exist.");
             }
 
+            var student = await ResolveStudentAsync(db, request.StudentId, cancellationToken);
+            if (student is null)
+            {
+                return Results.BadRequest($"Student '{request.StudentId}' does not exist.");
+            }
+
             rotation.ProgramId = request.ProgramId;
-            rotation.StudentName = norm.Name;
-            rotation.StudentEmail = norm.Email;
-            rotation.StudentOid = norm.Oid;
+            rotation.StudentId = request.StudentId;
+            rotation.StudentName = student.Name;   // re-snapshot from the (possibly changed) directory student
+            rotation.StudentEmail = student.Email;
+            rotation.StudentOid = student.Oid;
             rotation.StartDate = request.StartDate;
             rotation.EndDate = request.EndDate;
             rotation.Weeks = WeeksBetween(request.StartDate, request.EndDate);
@@ -153,12 +165,11 @@ public static class RotationEndpoints
         return routes;
     }
 
-    private const int NameMaxLength = 200;
-    private const int EmailMaxLength = 256;
-    private const int OidMaxLength = 64;
-
     /// <summary>Program facts needed to flatten a rotation into its response.</summary>
     private sealed record ProgramInfo(string SpecialtyName, ProgramType ProgramType, string? PreceptorName);
+
+    /// <summary>The directory student's identity, snapshotted onto the rotation on write.</summary>
+    private sealed record StudentInfo(string Name, string Email, string? Oid);
 
     private static Task<ProgramInfo?> ResolveProgramAsync(RotationsDbContext db, Guid programId, CancellationToken cancellationToken) =>
         db.Programs
@@ -169,6 +180,12 @@ public static class RotationEndpoints
                 p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
             .FirstOrDefaultAsync(cancellationToken);
 
+    private static Task<StudentInfo?> ResolveStudentAsync(RotationsDbContext db, Guid studentId, CancellationToken cancellationToken) =>
+        db.Students
+            .Where(s => s.Id == studentId)
+            .Select(s => new StudentInfo(s.FirstName + " " + s.LastName, s.Email, s.StudentOid))
+            .FirstOrDefaultAsync(cancellationToken);
+
     /// <summary>Weeks spanned by the date range, rounding a partial week UP, at least 1 (the range is
     /// already validated end &gt; start). Rounding up is deliberate: <c>Weeks</c> will feed per-week
     /// pricing later, so a partial week must bill as a full week rather than be silently dropped.
@@ -176,35 +193,17 @@ public static class RotationEndpoints
     private static int WeeksBetween(DateOnly start, DateOnly end) =>
         Math.Max(1, (end.DayNumber - start.DayNumber + 6) / 7);
 
-    private static bool TryValidate(
-        string? studentName, string? studentEmail, string? studentOid,
-        DateOnly startDate, DateOnly endDate, RotationStatus status,
-        out (string Name, string Email, string? Oid) norm, out string error)
+    private static bool TryValidateDates(DateOnly startDate, DateOnly endDate, RotationStatus status, out string error)
     {
-        norm = default;
         error = string.Empty;
 
-        var name = studentName?.Trim() ?? string.Empty;
-        if (name.Length == 0) { error = "StudentName is required."; return false; }
-        if (name.Length > NameMaxLength) { error = $"StudentName must be {NameMaxLength} characters or fewer."; return false; }
-
-        var email = studentEmail?.Trim() ?? string.Empty;
-        if (email.Length == 0) { error = "StudentEmail is required."; return false; }
-        if (email.Length > EmailMaxLength) { error = $"StudentEmail must be {EmailMaxLength} characters or fewer."; return false; }
-        if (!MailAddress.TryCreate(email, out _)) { error = "StudentEmail is not a valid address."; return false; }
-
-        var oid = string.IsNullOrWhiteSpace(studentOid) ? null : studentOid.Trim();
-        if (oid is { Length: > OidMaxLength }) { error = $"StudentOid must be {OidMaxLength} characters or fewer."; return false; }
-
         if (!Enum.IsDefined(status)) { error = "Status is invalid."; return false; }
-
         if (endDate <= startDate) { error = "EndDate must be after StartDate."; return false; }
 
-        norm = (name, email, oid);
         return true;
     }
 
     private static RotationDetailResponse ToDetail(Rotation r, ProgramInfo program) =>
         new(r.Id, r.ProgramId, program.SpecialtyName, program.ProgramType, program.PreceptorName,
-            r.StudentName, r.StudentEmail, r.StudentOid, r.StartDate, r.EndDate, r.Weeks, r.Status);
+            r.StudentId, r.StudentName, r.StudentEmail, r.StudentOid, r.StartDate, r.EndDate, r.Weeks, r.Status);
 }

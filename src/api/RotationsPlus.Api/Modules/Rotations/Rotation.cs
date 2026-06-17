@@ -15,9 +15,11 @@ public sealed class Rotation : AuditableEntity
     public required Guid ProgramId { get; set; }
     public RotationProgram Program { get; set; } = null!;
 
-    // Denormalized student identity. A Student directory/profile (linked by CIAM oid) is a later
-    // slice; for now an admin records the student's name/email when creating the rotation, and
-    // StudentOid links to the CIAM account once known.
+    // The booked student. <see cref="StudentId"/> links to the directory record (nullable only for
+    // legacy rows created before the directory existed); admins now pick a directory student. The
+    // name/email/oid are a SNAPSHOT taken from that student at write time, so the rotation stays
+    // self-contained for display even if the student is later edited or soft-deleted.
+    public Guid? StudentId { get; set; }
     public required string StudentName { get; set; }
     public required string StudentEmail { get; set; }
     public string? StudentOid { get; set; }

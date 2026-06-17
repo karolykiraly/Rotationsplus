@@ -143,13 +143,16 @@ export interface Rotation {
   status: RotationStatus;
 }
 
-/** Mirror of the API's RotationDetailResponse contract — the editable shape. */
+/** Mirror of the API's RotationDetailResponse contract — the editable shape. The student name/email/oid
+ *  are a snapshot taken at write time; `studentId` links to the directory record (null only for legacy
+ *  rows) and is what the form's picker binds to. */
 export interface RotationDetail {
   id: string;
   programId: string;
   specialtyName: string;
   programType: ProgramType;
   preceptorName?: string | null;
+  studentId?: string | null;
   studentName: string;
   studentEmail: string;
   studentOid?: string | null;
@@ -159,12 +162,11 @@ export interface RotationDetail {
   status: RotationStatus;
 }
 
-/** Admin create/update payload (mirrors Create/UpdateRotationRequest). Weeks is derived server-side. */
+/** Admin create/update payload (mirrors Create/UpdateRotationRequest). The student is chosen from the
+ *  directory by `studentId`; the server snapshots their identity. Weeks is derived server-side. */
 export interface RotationInput {
   programId: string;
-  studentName: string;
-  studentEmail: string;
-  studentOid?: string | null;
+  studentId: string;
   startDate: string;
   endDate: string;
   status: RotationStatus;

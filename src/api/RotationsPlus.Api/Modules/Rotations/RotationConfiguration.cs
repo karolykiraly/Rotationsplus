@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RotationsPlus.Api.Modules.Students;
 using RotationsPlus.Contracts.Rotations;
 
 namespace RotationsPlus.Api.Modules.Rotations;
@@ -13,13 +14,17 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
 {
     // Seeded program (see RotationProgramConfiguration): Internal Medicine, in-person, Jane Carter.
     private const string InternalMedicineInPerson = "cccccccc-0000-0000-0000-000000000001";
+    // Seeded student (see StudentConfiguration): Sam Rivera — the booked student for the seed rotation.
+    private const string SamRivera = "ffffffff-0000-0000-0000-000000000001";
 
     public void Configure(EntityTypeBuilder<Rotation> builder)
     {
         builder.ToTable("rotations", "operations");
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.StudentName).HasMaxLength(200).IsRequired();
+        // 256 (not 200) so the snapshot can always hold "FirstName LastName" — each is varchar(100) on
+        // the student, so the composed name is up to 201 chars.
+        builder.Property(x => x.StudentName).HasMaxLength(256).IsRequired();
         builder.Property(x => x.StudentEmail).HasMaxLength(256).IsRequired();
         builder.Property(x => x.StudentOid).HasMaxLength(64);
 
@@ -37,7 +42,16 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
             .HasForeignKey(x => x.ProgramId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Optional link to the directory student (no navigation property — the rotation snapshots the
+        // student's identity on write). Restrict so a student with rotations can't be hard-deleted;
+        // StudentEndpoints also blocks the soft-delete with a 409.
+        builder.HasOne<Student>()
+            .WithMany()
+            .HasForeignKey(x => x.StudentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.ProgramId);
+        builder.HasIndex(x => x.StudentId);
         builder.HasIndex(x => x.Status);
 
         var seededAt = new DateTimeOffset(2026, 6, 16, 0, 0, 0, TimeSpan.Zero);
@@ -45,6 +59,7 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
         {
             Id = Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"),
             ProgramId = Guid.Parse(InternalMedicineInPerson),
+            StudentId = Guid.Parse(SamRivera),
             StudentName = "Sam Rivera",
             StudentEmail = "sam.rivera@example.com",
             StartDate = new DateOnly(2026, 7, 6),
