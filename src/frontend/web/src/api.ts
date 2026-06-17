@@ -238,6 +238,32 @@ export interface StudentInput {
   studentOid?: string | null;
 }
 
+/** Mirror of the API's RotationStatusCount contract. */
+export interface RotationStatusCount {
+  status: RotationStatus;
+  count: number;
+}
+
+/** Mirror of the API's UpcomingRotation contract. */
+export interface UpcomingRotation {
+  id: string;
+  studentName: string;
+  specialtyName: string;
+  startDate: string;
+  status: RotationStatus;
+}
+
+/** Mirror of the API's DashboardResponse contract — the admin hub aggregate. */
+export interface Dashboard {
+  students: number;
+  programs: number;
+  preceptors: number;
+  specialties: number;
+  rotations: number;
+  rotationsByStatus: RotationStatusCount[];
+  upcomingStarts: UpcomingRotation[];
+}
+
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
 export class ApiError extends Error {
   constructor(
@@ -354,6 +380,9 @@ export const updateRotation = (id: string, input: RotationInput): Promise<Rotati
   request<RotationDetail>("PUT", `/api/rotations/${id}`, input);
 export const deleteRotation = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/rotations/${id}`);
+
+// ---- Dashboard (AdminOnly) ----
+export const getDashboard = (): Promise<Dashboard> => request<Dashboard>("GET", "/api/dashboard");
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {

@@ -119,6 +119,22 @@ table.data { width: 100%; border-collapse: collapse; }
 /* Secondary line under a primary cell value (e.g. a student's email under their name). */
 .muted { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
 
+/* ---- Dashboard ---- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px 20px;
+}
+.stat-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+.stat-label { margin-top: 4px; color: var(--ink-soft); font-size: 13px; }
+.dash-cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; }
+.dash-panel { padding: 18px 20px; }
+.dash-panel h3 { margin: 0 0 14px; font-size: 15px; font-weight: 700; }
+.status-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.status-list li { display: flex; align-items: center; justify-content: space-between; }
+.status-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 820px) { .dash-cols { grid-template-columns: 1fr; } }
+
 /* Filter row above a table (e.g. the rotation status filter). */
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .toolbar label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }

@@ -54,6 +54,7 @@ describe("AppLayout", () => {
     renderLayout();
     expect(await screen.findByText("Ada Admin")).toBeInTheDocument();
     expect(screen.getByText("Staff console")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Specialties")).toBeInTheDocument();
     expect(screen.getByText("Programs")).toBeInTheDocument();
     expect(screen.getByText("Preceptors")).toBeInTheDocument();
@@ -68,6 +69,7 @@ describe("AppLayout", () => {
     h.getMe.mockResolvedValue({ ...ADMIN, name: "Cody Coordinator", roles: ["Coordinator"] });
     renderLayout();
     expect(await screen.findByText("Cody Coordinator")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("Specialties")).not.toBeInTheDocument();
     expect(screen.queryByText("Rotations")).not.toBeInTheDocument();
     expect(screen.queryByText("Students")).not.toBeInTheDocument();

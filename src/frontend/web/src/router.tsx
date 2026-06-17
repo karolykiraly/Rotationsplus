@@ -3,6 +3,7 @@ import { StaffMsalShell } from "./components/StaffMsalShell";
 import { HomePage } from "./pages/HomePage";
 import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
+import { DashboardPage } from "./dashboard/DashboardPage";
 import { PreceptorsPage } from "./preceptors/PreceptorsPage";
 import { RotationsPage } from "./rotations/RotationsPage";
 import { StudentsPage } from "./students/StudentsPage";
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
     element: <StaffMsalShell />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: "admin/dashboard", element: <DashboardPage /> },
       { path: "admin/specialties", element: <SpecialtiesPage /> },
       { path: "admin/programs", element: <ProgramsPage /> },
       { path: "admin/preceptors", element: <PreceptorsPage /> },

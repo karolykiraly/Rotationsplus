@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Dashboard;
 using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Api.Modules.Marketplace;
 using RotationsPlus.Api.Modules.Rotations;
@@ -86,6 +87,7 @@ app.MapProgramEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
 app.MapStudentEndpoints();
+app.MapDashboardEndpoints();
 
 app.Run();
 

@@ -35,6 +35,13 @@ export function AppLayout() {
 
             {user?.isAdmin && (
               <>
+                <NavLink
+                  to="/admin/dashboard"
+                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                >
+                  Dashboard
+                </NavLink>
+
                 <div className="nav-label">Marketplace</div>
                 <NavLink
                   to="/admin/specialties"

@@ -48,6 +48,8 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
         new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),
+        // Admin hub aggregate (totals + rotation pipeline + upcoming starts).
+        new("GET", "/api/dashboard", [RoleNames.Admin], "Admin dashboard aggregate"),
         // Student directory: reads StaffOnly (sales/SDR/coordinator work the directory for CRM), writes AdminOnly.
         new("GET", "/api/students", RoleNames.Staff, "List students (staff)"),
         new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001", RoleNames.Staff, "Get student by id (staff)"),
