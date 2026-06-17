@@ -17,7 +17,7 @@
 
 > **Build status.** Slice 9 (PR #16) stood up the SPA foundation the rest of this inventory builds on: React Router + TanStack Query + React Hook Form/zod, a role-gated admin shell (sidebar/topbar, brand `#FF4874`, tablet-usable). Management screens shipped on those patterns — the marketplace admin trio is complete: **Specialties CRUD** (`/admin/specialties`, slice 9), **Programs CRUD** (`/admin/programs`, slice 10 / PR #17), and **Preceptors CRUD** (`/admin/preceptors`, slice 11 / PR #18 — identity/professional fields, valid-email + duplicate-409 handling, status lifecycle dropdown, edit pre-fills from detail). The richer legacy routes (rotations, leads/CRM, honorarium, reports, contacts) come after, along with the SPA hardening backlog (§5b).
 
-> **Build progress (new admin console):** `/admin/specialties`, `/admin/programs`, `/admin/preceptors` (marketplace CRUD) shipped slices 9–11. **`/admin/rotations`** shipped slice 14 (2026-06-16, PR #21) — admin CRUD over the `Rotation` booking with the full legacy status filter, create/edit/delete; the edit modal's payment/docs/change-date sub-flows and the dashboard/CRM/analytics routes remain to be built on these patterns.
+> **Build progress (new admin console):** `/admin/specialties`, `/admin/programs`, `/admin/preceptors` (marketplace CRUD) shipped slices 9–11. **`/admin/rotations`** shipped slice 14 (2026-06-16, PR #21) — admin CRUD over the `Rotation` booking with the full legacy status filter. **`/admin/students`** shipped slice 15 (2026-06-16, PR #22) — the student directory (identity + academic/visa classification + lifecycle status, StaffOnly reads / AdminOnly writes); the deep student profile (exam scores, documents, payments), the rotation→student picker, and the dashboard/CRM/analytics routes remain to be built on these patterns.
 
 ### Core
 | Route | Component | Purpose | Key APIs |
@@ -115,6 +115,7 @@ Tracked items from the admin-UI foundation review, to land before the staff cons
 3. **Modal focus management** — trap Tab within the dialog and restore focus to the trigger on close (the reusable `Modal`; benefits every future dialog).
 4. **Admin-page query gating** — gate list queries with `enabled: isAdmin` so non-admins don't fire a (currently harmless, StaffOnly) fetch before the forbidden notice; lets the test assert no fetch.
 5. **Route-level code-splitting** — `lazy()` routes before the customer portal (LCP < 2.5s budget); the single bundle is acceptable for the internal console now.
+6. **Directory read-authz vs UI gate (cross-cutting)** — the Preceptor + Student directory APIs are **StaffOnly read / AdminOnly write**, but every management page (and its nav link) is gated to `isAdmin`, so non-admin staff (Sales/SDR/Coordinator) can't see the directories in the UI despite being authorized to read. Decide the model once for all directories: either (a) render a **read-only** directory for non-admin staff (hide Add/Edit/Delete), honouring the "CRM works the directory" intent, or (b) tighten the reads to **AdminOnly** so API and UI agree. Apply uniformly to specialties/programs/preceptors/students. Fail-closed today (non-admins see less, not more), so not a DEV blocker.
 
 ## 6. New features (owner-requested, 2026-06-11)
 

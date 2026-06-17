@@ -170,6 +170,69 @@ export interface RotationInput {
   status: RotationStatus;
 }
 
+/** Student academic track (mirrors the API's AcademicStatus enum; serialized as these names). */
+export type AcademicStatus =
+  | "UsPreMed"
+  | "MdStudent"
+  | "DoStudent"
+  | "DentalStudent"
+  | "InternationalMedicalStudent"
+  | "InternationalMedicalGraduate"
+  | "PhysicianAssistantStudent"
+  | "NursePractitionerStudent";
+
+/** Student work-authorization status (mirrors the API's VisaStatus enum; serialized as these names). */
+export type VisaStatus = "CitizenOrGreenCard" | "ValidVisa" | "InterviewScheduled" | "NeedsVisaHelp";
+
+/** Student lifecycle status (mirrors the API's StudentStatus enum; serialized as these names). */
+export type StudentStatus = "Registered" | "MemberProfileCompleted" | "MemberActivated" | "TurnedIntoContact";
+
+/** Mirror of the API's StudentSummaryResponse contract (enums serialized as strings). */
+export interface Student {
+  id: string;
+  fullName: string;
+  email: string;
+  mobilePhone?: string | null;
+  academicStatus: AcademicStatus;
+  visaStatus?: VisaStatus | null;
+  city?: string | null;
+  state?: string | null;
+  status: StudentStatus;
+}
+
+/** Mirror of the API's StudentDetailResponse contract — the editable shape. */
+export interface StudentDetail {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobilePhone?: string | null;
+  academicStatus: AcademicStatus;
+  visaStatus?: VisaStatus | null;
+  medicalSchool?: string | null;
+  medicalSchoolCountry?: string | null;
+  city?: string | null;
+  state?: string | null;
+  status: StudentStatus;
+  studentOid?: string | null;
+}
+
+/** Admin create/update payload (mirrors Create/UpdateStudentRequest). */
+export interface StudentInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobilePhone?: string | null;
+  academicStatus: AcademicStatus;
+  visaStatus?: VisaStatus | null;
+  medicalSchool?: string | null;
+  medicalSchoolCountry?: string | null;
+  city?: string | null;
+  state?: string | null;
+  status: StudentStatus;
+  studentOid?: string | null;
+}
+
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
 export class ApiError extends Error {
   constructor(
@@ -286,3 +349,20 @@ export const updateRotation = (id: string, input: RotationInput): Promise<Rotati
   request<RotationDetail>("PUT", `/api/rotations/${id}`, input);
 export const deleteRotation = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/rotations/${id}`);
+
+// ---- Students (read: StaffOnly; writes: AdminOnly) ----
+export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.academicStatus) q.set("academicStatus", params.academicStatus);
+  const suffix = q.toString();
+  return request<Student[]>("GET", `/api/students${suffix ? `?${suffix}` : ""}`);
+};
+export const getStudent = (id: string): Promise<StudentDetail> =>
+  request<StudentDetail>("GET", `/api/students/${id}`);
+export const createStudent = (input: StudentInput): Promise<StudentDetail> =>
+  request<StudentDetail>("POST", "/api/students", input);
+export const updateStudent = (id: string, input: StudentInput): Promise<StudentDetail> =>
+  request<StudentDetail>("PUT", `/api/students/${id}`, input);
+export const deleteStudent = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/students/${id}`);

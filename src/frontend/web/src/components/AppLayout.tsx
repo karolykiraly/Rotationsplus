@@ -62,6 +62,12 @@ export function AppLayout() {
                 >
                   Rotations
                 </NavLink>
+                <NavLink
+                  to="/admin/students"
+                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                >
+                  Students
+                </NavLink>
               </>
             )}
           </nav>

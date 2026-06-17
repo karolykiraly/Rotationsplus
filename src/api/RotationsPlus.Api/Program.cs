@@ -6,6 +6,7 @@ using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Api.Modules.Marketplace;
 using RotationsPlus.Api.Modules.Rotations;
+using RotationsPlus.Api.Modules.Students;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Common.Data;
 using RotationsPlus.Common.Security;
@@ -83,6 +84,7 @@ app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
+app.MapStudentEndpoints();
 
 app.Run();
 
