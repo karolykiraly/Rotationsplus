@@ -47,6 +47,11 @@ public static class ApiAuthorizationMatrix
         // Rotation management is AdminOnly (reads too — students see their own via the portal later).
         new("GET", "/api/rotations", [RoleNames.Admin], "List rotations (admin)"),
         new("GET", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001", [RoleNames.Admin], "Get rotation by id (admin)"),
+        // Opening a deposit is CustomerOnly (the student pays for their own rotation). A customer who
+        // doesn't own this seeded rotation gets 404 — authorized-through, which the matrix accepts;
+        // ownership + fulfilment are covered by PaymentCheckoutEndpointTests. The Stripe webhook is
+        // intentionally anonymous (signature-verified) so it is NOT a matrix endpoint.
+        new("POST", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001/payment-intent", RoleNames.Customer, "Open rotation deposit (customer)"),
         new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
         new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),

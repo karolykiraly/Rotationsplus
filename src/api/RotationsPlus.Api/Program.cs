@@ -45,6 +45,11 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<StaffProfileProvisioner>();
 
+// --- Payments: the provider is behind IPaymentGateway. DEV/test run on a deterministic fake (no live
+//     keys); the real Stripe adapter + Key Vault signing secret slot in at PROD cutover (Plan_Migration §3). ---
+builder.Services.Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName));
+builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
+
 // --- Data: single Postgres DB / single DbContext (connection name "rotationsdb"). ---
 // The audit interceptor stamps audit columns + soft-deletes. HttpContextAccessor's backing store
 // is a static AsyncLocal, so a directly-constructed instance still resolves the current request's
@@ -86,6 +91,7 @@ app.MapCustomerRotationEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPaymentEndpoints();
+app.MapPaymentWebhookEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
 app.MapStudentEndpoints();

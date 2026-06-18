@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Api.Modules.Marketplace;
+using RotationsPlus.Api.Modules.Payments;
 using RotationsPlus.Api.Modules.Rotations;
 using RotationsPlus.Api.Modules.Students;
 using RotationsPlus.Common.Data;
@@ -20,6 +21,8 @@ public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : 
     public DbSet<Preceptor> Preceptors => Set<Preceptor>();
     public DbSet<Rotation> Rotations => Set<Rotation>();
     public DbSet<Student> Students => Set<Student>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
