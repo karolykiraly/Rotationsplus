@@ -52,6 +52,10 @@ public static class ApiAuthorizationMatrix
         // ownership + fulfilment are covered by PaymentCheckoutEndpointTests. The Stripe webhook is
         // intentionally anonymous (signature-verified) so it is NOT a matrix endpoint.
         new("POST", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001/payment-intent", RoleNames.Customer, "Open rotation deposit (customer)"),
+        // DEV/test-only simulate endpoint (mapped on non-Production; see Program.cs). CustomerOnly; an
+        // empty body / non-owned payment → authorized callers get 400/404 (not 401/403), which the
+        // authz-only matrix accepts. Behaviour is covered by PaymentCheckoutEndpointTests.
+        new("POST", "/api/dev/payments/eeeeeeee-0000-0000-0000-000000000001/simulate", RoleNames.Customer, "DEV: simulate deposit outcome (customer)"),
         new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
         new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),

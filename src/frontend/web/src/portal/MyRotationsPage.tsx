@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useCustomerRotations } from "./useCustomerRotations";
+import { PaymentModal } from "./PaymentModal";
 import { programTypeLabel } from "../programs/programTypes";
 import { rotationStatusLabel } from "../rotations/rotationStatuses";
 
@@ -13,6 +15,10 @@ function formatDate(iso: string): string {
 export function MyRotationsPage() {
   const rotations = useCustomerRotations();
   const rows = rotations.data ?? [];
+  // The rotation whose deposit dialog is open, if any.
+  const [payingRotationId, setPayingRotationId] = useState<string | null>(null);
+  // A rotation whose deposit just succeeded, so we can show a brief confirmation.
+  const [paidRotationId, setPaidRotationId] = useState<string | null>(null);
 
   return (
     <>
@@ -40,9 +46,30 @@ export function MyRotationsPage() {
               <div className="pc-meta">{formatDate(r.startDate)} – {formatDate(r.endDate)} · {r.weeks} wks</div>
               {r.preceptorName && <div className="pc-preceptor">with {r.preceptorName}</div>}
               <div className="pc-status"><span className="badge">{rotationStatusLabel(r.status)}</span></div>
+              {r.status === "Pending" && (
+                <div className="pc-action">
+                  <button type="button" className="btn btn-primary" onClick={() => setPayingRotationId(r.id)}>
+                    Pay deposit
+                  </button>
+                </div>
+              )}
+              {paidRotationId === r.id && (
+                <div className="pc-paid" role="status">Deposit paid — your rotation is approved.</div>
+              )}
             </div>
           ))}
         </div>
+      )}
+
+      {payingRotationId && (
+        <PaymentModal
+          rotationId={payingRotationId}
+          onClose={() => setPayingRotationId(null)}
+          onPaid={() => {
+            setPaidRotationId(payingRotationId);
+            setPayingRotationId(null);
+          }}
+        />
       )}
     </>
   );

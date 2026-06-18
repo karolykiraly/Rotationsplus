@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const h = vi.hoisted(() => ({ getCustomerRotations: vi.fn() }));
-vi.mock("./customerApi", () => ({ getCustomerRotations: () => h.getCustomerRotations() }));
+const h = vi.hoisted(() => ({
+  getCustomerRotations: vi.fn(),
+  openDepositIntent: vi.fn(),
+  simulateDeposit: vi.fn()
+}));
+vi.mock("./customerApi", () => ({
+  getCustomerRotations: () => h.getCustomerRotations(),
+  openDepositIntent: (id: string) => h.openDepositIntent(id),
+  simulateDeposit: (paymentId: string, outcome: string) => h.simulateDeposit(paymentId, outcome)
+}));
 
 import { MyRotationsPage } from "./MyRotationsPage";
 
@@ -44,8 +52,27 @@ describe("MyRotationsPage", () => {
         endDate: "2026-09-29",
         weeks: 4,
         status: "NotStarted"
+      },
+      {
+        id: "r3",
+        specialtyName: "Cardiology",
+        programType: "InPerson",
+        preceptorName: null,
+        startDate: "2026-10-05",
+        endDate: "2026-11-02",
+        weeks: 4,
+        status: "Pending"
       }
     ]);
+    h.openDepositIntent.mockResolvedValue({
+      paymentId: "p1",
+      clientSecret: "cs",
+      amount: 600,
+      totalAmount: 6000,
+      outstandingAmount: 5400,
+      currency: "USD",
+      status: "Pending"
+    });
   });
 
   it("renders the student's rotation cards with preceptor and status", async () => {
@@ -55,6 +82,19 @@ describe("MyRotationsPage", () => {
     expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();
     // NotStarted is surfaced to the student as "Approved".
     expect(screen.getByText("Approved", { selector: ".badge" })).toBeInTheDocument();
+  });
+
+  it("offers Pay deposit only on a Pending rotation and opens the payment dialog", async () => {
+    renderPage();
+    // One Pay-deposit button: only the Pending (Cardiology) rotation, not Active/Approved ones.
+    const payButtons = await screen.findAllByRole("button", { name: "Pay deposit" });
+    expect(payButtons).toHaveLength(1);
+
+    fireEvent.click(payButtons[0]);
+
+    // The dialog opens and pulls the deposit intent for that rotation.
+    expect(await screen.findByRole("dialog", { name: "Pay your deposit" })).toBeInTheDocument();
+    expect(h.openDepositIntent).toHaveBeenCalledWith("r3");
   });
 
   it("shows an empty state when the student has no rotations", async () => {

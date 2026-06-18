@@ -20,6 +20,11 @@ export const apiScope =
 /** Base URL of rplus-api. Local dev defaults to the API on :5099. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5099";
 
+/** Stripe publishable key (non-secret). Empty until a Stripe sandbox is provisioned — see
+ *  Docs/Vendor_Sandboxes.md. When empty the checkout runs in TEST mode (the DEV simulate path drives
+ *  the fake gateway round-trip); when set, the real Stripe Elements card flow is used. */
+export const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
+
 export const msalConfig: Configuration = {
   auth: {
     clientId,

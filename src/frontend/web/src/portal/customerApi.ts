@@ -2,6 +2,8 @@ import { customerLoginRequest, customerMsalInstance } from "../authConfig";
 import {
   acquireTokenOrRedirect,
   apiFetch,
+  type PaymentIntentResponse,
+  type PaymentSimulationResponse,
   type Program,
   type ProgramDetail,
   type ProgramType,
@@ -61,3 +63,16 @@ export const getCustomerSpecialties = (): Promise<Specialty[]> =>
 /** The signed-in student's own rotations (GET /api/customer/rotations). */
 export const getCustomerRotations = (): Promise<CustomerRotation[]> =>
   customerRequest<CustomerRotation[]>("GET", "/api/customer/rotations");
+
+/** Opens (or re-offers) the deposit for the student's own rotation, returning the intent + amount
+ *  breakdown. Idempotent server-side: a second call on a pending deposit returns the same intent. */
+export const openDepositIntent = (rotationId: string): Promise<PaymentIntentResponse> =>
+  customerRequest<PaymentIntentResponse>("POST", `/api/rotations/${rotationId}/payment-intent`);
+
+/** DEV/test only: drive the fake gateway to a terminal outcome (the Stripe-CLI analog), so the deposit
+ *  round-trip completes from the browser without real Stripe.js. Absent on PREPROD/PROD. */
+export const simulateDeposit = (
+  paymentId: string,
+  outcome: "succeeded" | "failed"
+): Promise<PaymentSimulationResponse> =>
+  customerRequest<PaymentSimulationResponse>("POST", `/api/dev/payments/${paymentId}/simulate`, { outcome });

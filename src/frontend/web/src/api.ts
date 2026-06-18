@@ -273,6 +273,28 @@ export interface Dashboard {
   upcomingStarts: UpcomingRotation[];
 }
 
+/** Payment lifecycle status (mirrors the API's PaymentStatus enum; serialized as these names). */
+export type PaymentStatus = "Pending" | "Succeeded" | "Failed" | "Refunded";
+
+/** Mirror of the API's PaymentIntentResponse — the opened deposit and the client secret the SPA confirms
+ *  the card against. `amount` is the deposit due now; `totalAmount`/`outstandingAmount` are the full price
+ *  and the remainder billed later. All amounts are major units (dollars), already rounded to the cent. */
+export interface PaymentIntentResponse {
+  paymentId: string;
+  clientSecret: string;
+  amount: number;
+  totalAmount: number;
+  outstandingAmount: number;
+  currency: string;
+  status: PaymentStatus;
+}
+
+/** Mirror of the API's DEV-only PaymentSimulationResponse — the payment's status after a simulated outcome. */
+export interface PaymentSimulationResponse {
+  paymentId: string;
+  status: PaymentStatus;
+}
+
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
 export class ApiError extends Error {
   constructor(

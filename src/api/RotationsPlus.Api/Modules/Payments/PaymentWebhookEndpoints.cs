@@ -2,9 +2,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RotationsPlus.Api.Infrastructure;
-using RotationsPlus.Api.Modules.Rotations;
 using RotationsPlus.Contracts.Payments;
-using RotationsPlus.Contracts.Rotations;
 
 namespace RotationsPlus.Api.Modules.Payments;
 
@@ -52,7 +50,7 @@ public static class PaymentWebhookEndpoints
                 return Results.Ok();
             }
 
-            await FulfillAsync(db, webhookEvent, cancellationToken);
+            await PaymentFulfillment.FulfillAsync(db, webhookEvent, cancellationToken);
 
             db.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
             {
@@ -84,50 +82,6 @@ public static class PaymentWebhookEndpoints
         .WithTags("Payments");
 
         return routes;
-    }
-
-    private static async Task FulfillAsync(RotationsDbContext db, PaymentWebhookEvent webhookEvent, CancellationToken cancellationToken)
-    {
-        // IgnoreQueryFilters so a payment that's been soft-deleted is still found and fulfilled rather
-        // than silently slipping past the global filter — money has changed hands, so we must reconcile
-        // the row, not black-hole it. The status guards below still gate what we actually do with it.
-        // (No code path soft-deletes a payment today; if one is added, give Payment an optimistic-
-        // concurrency token so a delete racing this fulfilment is detected rather than silently merged.)
-        var payment = await db.Payments
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.ProviderPaymentIntentId == webhookEvent.PaymentIntentId, cancellationToken);
-
-        // Unknown intent (or one not ours) → nothing to fulfil; we still record the event and 200 so the
-        // provider stops retrying.
-        if (payment is null)
-        {
-            return;
-        }
-
-        switch (webhookEvent.Type)
-        {
-            case PaymentWebhookEventTypes.PaymentSucceeded when payment.Status == PaymentStatus.Pending:
-                payment.Status = PaymentStatus.Succeeded;
-                await ApproveRotationAsync(db, payment.RotationId, cancellationToken);
-                break;
-
-            case PaymentWebhookEventTypes.PaymentFailed when payment.Status == PaymentStatus.Pending:
-                payment.Status = PaymentStatus.Failed;
-                break;
-
-            // Any other event type, or a payment already in a terminal state, is a no-op.
-        }
-    }
-
-    /// <summary>On a successful deposit, move the booking from Pending to NotStarted ("Approved") — but
-    /// only if that's a legal transition, so a rotation an admin has since cancelled/rejected is left alone.</summary>
-    private static async Task ApproveRotationAsync(RotationsDbContext db, Guid rotationId, CancellationToken cancellationToken)
-    {
-        var rotation = await db.Rotations.FirstOrDefaultAsync(r => r.Id == rotationId, cancellationToken);
-        if (rotation is not null && RotationStatusMachine.CanTransition(rotation.Status, RotationStatus.NotStarted))
-        {
-            rotation.Status = RotationStatus.NotStarted;
-        }
     }
 
     private static Task<bool> EventAlreadyRecordedAsync(RotationsDbContext db, string eventId, CancellationToken cancellationToken) =>

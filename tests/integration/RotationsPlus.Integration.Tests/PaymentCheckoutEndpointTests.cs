@@ -114,6 +114,9 @@ public class PaymentCheckoutEndpointTests(RotationsApiFactory factory) : IClassF
         return await factory.CreateClient().SendAsync(request);
     }
 
+    private async Task<HttpResponseMessage> SimulateAsync(HttpClient client, Guid paymentId, string outcome) =>
+        await client.PostAsJsonAsync($"/api/dev/payments/{paymentId}/simulate", new { outcome }, JsonOptions);
+
     // ---- payment-intent ----
 
     [Fact]
@@ -340,5 +343,65 @@ public class PaymentCheckoutEndpointTests(RotationsApiFactory factory) : IClassF
         webhook.StatusCode.Should().Be(HttpStatusCode.OK);
         (await GetPaymentAsync(rotationId))!.Status.Should().Be(PaymentStatus.Succeeded);
         (await GetRotationStatusAsync(rotationId)).Should().Be(RotationStatus.Cancelled);
+    }
+
+    // ---- DEV simulate endpoint (the SPA's fake-gateway round-trip; mapped on non-Production) ----
+
+    [Fact]
+    public async Task Simulating_a_succeeded_deposit_marks_it_paid_and_approves_the_rotation()
+    {
+        var (oid, rotationId) = await BookAsync(RotationStatus.Pending);
+        var customer = Customer(oid);
+        var paymentId = (await (await customer.PostAsync($"/api/rotations/{rotationId}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+
+        var sim = await SimulateAsync(customer, paymentId, "succeeded");
+
+        sim.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await sim.Content.ReadFromJsonAsync<PaymentSimulationResponse>(JsonOptions))!.Status.Should().Be(PaymentStatus.Succeeded);
+        (await GetPaymentAsync(rotationId))!.Status.Should().Be(PaymentStatus.Succeeded);
+        (await GetRotationStatusAsync(rotationId)).Should().Be(RotationStatus.NotStarted); // "Approved"
+    }
+
+    [Fact]
+    public async Task Simulating_a_failed_deposit_marks_it_failed_and_leaves_the_rotation_pending()
+    {
+        var (oid, rotationId) = await BookAsync(RotationStatus.Pending);
+        var customer = Customer(oid);
+        var paymentId = (await (await customer.PostAsync($"/api/rotations/{rotationId}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+
+        var sim = await SimulateAsync(customer, paymentId, "failed");
+
+        sim.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await GetPaymentAsync(rotationId))!.Status.Should().Be(PaymentStatus.Failed);
+        (await GetRotationStatusAsync(rotationId)).Should().Be(RotationStatus.Pending);
+    }
+
+    [Fact]
+    public async Task A_customer_cannot_simulate_someone_elses_payment()
+    {
+        var (oid, rotationId) = await BookAsync(RotationStatus.Pending);
+        var paymentId = (await (await Customer(oid).PostAsync($"/api/rotations/{rotationId}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+
+        // A different signed-in student → indistinguishable from a missing payment.
+        var sim = await SimulateAsync(Customer(UniqueOid()), paymentId, "succeeded");
+
+        sim.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await GetPaymentAsync(rotationId))!.Status.Should().Be(PaymentStatus.Pending); // untouched
+    }
+
+    [Fact]
+    public async Task Simulating_an_unknown_outcome_is_rejected()
+    {
+        var (oid, rotationId) = await BookAsync(RotationStatus.Pending);
+        var paymentId = (await (await Customer(oid).PostAsync($"/api/rotations/{rotationId}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+
+        var sim = await SimulateAsync(Customer(oid), paymentId, "refunded");
+
+        sim.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPaymentAsync(rotationId))!.Status.Should().Be(PaymentStatus.Pending); // untouched
     }
 }

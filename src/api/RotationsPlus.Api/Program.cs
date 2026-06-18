@@ -85,6 +85,15 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+// The Stripe-CLI analog that lets the SPA complete the deposit round-trip against the fake gateway.
+// Gated on non-Production so it exists on DEV (env "Development") and in the integration-test host (env
+// "Testing") but NEVER on PREPROD/PROD — both of which run as ASPNETCORE_ENVIRONMENT=Production (see
+// infra/bicep/main.bicep), where a real provider webhook drives fulfilment.
+if (!app.Environment.IsProduction())
+{
+    app.MapPaymentDevEndpoints();
+}
+
 app.MapMeEndpoints();
 app.MapCustomerMeEndpoints();
 app.MapCustomerRotationEndpoints();
