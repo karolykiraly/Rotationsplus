@@ -7,6 +7,7 @@ import {
   type Program,
   type ProgramDetail,
   type ProgramType,
+  type RotationQuote,
   type RotationStatus,
   type Specialty
 } from "../api";
@@ -63,6 +64,15 @@ export const getCustomerSpecialties = (): Promise<Specialty[]> =>
 /** The signed-in student's own rotations (GET /api/customer/rotations). */
 export const getCustomerRotations = (): Promise<CustomerRotation[]> =>
   customerRequest<CustomerRotation[]>("GET", "/api/customer/rotations");
+
+/** Server-computed price for booking a program for N weeks (GET /api/programs/{id}/quote?weeks=N). */
+export const getProgramQuote = (programId: string, weeks: number): Promise<RotationQuote> =>
+  customerRequest<RotationQuote>("GET", `/api/programs/${programId}/quote?weeks=${weeks}`);
+
+/** Books a rotation for the signed-in student (POST /api/customer/rotations) — created Pending; the
+ *  deposit is paid from the rotations tracker afterwards. */
+export const bookRotation = (programId: string, startDate: string, weeks: number): Promise<CustomerRotation> =>
+  customerRequest<CustomerRotation>("POST", "/api/customer/rotations", { programId, startDate, weeks });
 
 /** Opens (or re-offers) the deposit for the student's own rotation, returning the intent + amount
  *  breakdown. Idempotent server-side: a second call on a pending deposit returns the same intent. */

@@ -273,6 +273,21 @@ export interface Dashboard {
   upcomingStarts: UpcomingRotation[];
 }
 
+/** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.
+ *  `depositAmount` is due now; `outstandingAmount` is billed later; `depositPercent` is 0.10 (or 1.00 for
+ *  an open/instant-approval program). Pricing is server-authoritative — never recompute it client-side. */
+export interface RotationQuote {
+  programId: string;
+  weeks: number;
+  currency: string;
+  retailAmountPerWeek: number;
+  totalAmount: number;
+  depositAmount: number;
+  outstandingAmount: number;
+  depositPercent: number;
+  isOpen: boolean;
+}
+
 /** Payment lifecycle status (mirrors the API's PaymentStatus enum; serialized as these names). */
 export type PaymentStatus = "Pending" | "Succeeded" | "Failed" | "Refunded";
 
