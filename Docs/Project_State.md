@@ -1,9 +1,9 @@
 # Project_State — Start Here
 
-**Updated:** 2026-06-14 · Read this first in a new session, then `../CLAUDE.md` and the `Plan_*.md` docs.
+**Updated:** 2026-06-18 · Read this first in a new session, then `../CLAUDE.md` and the `Plan_*.md` docs.
 
 ## Where we are
-**Azure foundation complete; P1 in progress.** Full discovery + planning done (all decisions locked with the owner). The owner has created the Azure tenants, subscription, app registrations, resource groups, ACR, Azure DevOps org/project/repo, ARM service connection (workload identity), variable groups, environments, and RBAC — recorded in **`Azure_Foundation.md`** (IDs in `memory/azure_ids.md`). **P1 (foundation/infra) is now being implemented**: solution scaffold (clone SkyLimit layout), Bicep for DEV, build-all + deploy-dev pipelines, skeleton api/worker/SPA to DEV, staff Entra login round-trip. Approved P1 plan is the working spec.
+**P1 complete; P2 largely shipped; P3 (Money & documents) underway.** Azure foundation + P1 (solution scaffold, DEV Bicep, build-all + deploy-dev pipelines, api/worker/SPA skeleton, staff Entra round-trip) are done and live on DEV — see `Azure_Foundation.md` (IDs in `memory/azure_ids.md`). **P2 core domain** shipped across PRs #1–#29 (Deployment_Log): identity spine, the marketplace admin trio (Specialties/Programs/Preceptors), Rotations + Students admin, admin Dashboard, the rotation status state machine, the customer portal MVP (browse + My-rotations) and CIAM customer auth (live 2026-06-16), and an SPA-hardening sweep. `develop` auto-deploys to DEV and was promoted to `main` (release line) on 2026-06-17. **P3 has begun** with the payments **pricing foundation**: a tested server-side `PricingService` (10% deposit for non-open programs / 100% for open) + a `GET /api/programs/{id}/quote` endpoint and an `IsOpen` program flag. Next P3 slices: Payment entity + Stripe PaymentIntent + webhook fulfillment (test-mode behind an `IPaymentGateway` abstraction), promo/credits/unlocks, then the Documents/Notifications/Hangfire sub-phases.
 
 A second standing workstream is now active: **weekly legacy delta ingestion** (the outgoing dev team keeps changing the legacy code until cutover) — working-files-only snapshots dropped under `Live_Code/<date>/`, diffed and re-implemented into the new stack, tracked in `Delta_Ledger.md`. See the approved plan, Part D.
 

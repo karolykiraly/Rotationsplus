@@ -27,5 +27,10 @@ public sealed class RotationProgram : AuditableEntity
     public decimal RetailAmountPerWeek { get; set; }
     public decimal WeeklyHonorarium { get; set; }
 
+    /// <summary>Whether this is an "open" (instant-approval) program. Open programs are charged in
+    /// full (100%) at checkout; non-open programs take a deposit (see <c>PricingService</c>) with the
+    /// balance billed as an outstanding payment. Mirrors the legacy open-vs-manual availability mode.</summary>
+    public bool IsOpen { get; set; }
+
     public string? Description { get; set; }
 }

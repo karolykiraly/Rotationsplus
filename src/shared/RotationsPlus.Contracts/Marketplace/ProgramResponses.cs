@@ -25,4 +25,5 @@ public sealed record ProgramDetailResponse(
     decimal? WeeklyHonorarium,
     string? Description,
     Guid? PreceptorId,
-    string? PreceptorName);
+    string? PreceptorName,
+    bool IsOpen);

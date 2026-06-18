@@ -32,6 +32,8 @@ public static class ApiAuthorizationMatrix
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
         new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs"),
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", MarketplaceReaders, "Get program by id"),
+        // Server-computed price quote — open to marketplace viewers (students need pricing to book).
+        new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001/quote?weeks=4", MarketplaceReaders, "Program price quote"),
         // Admin-only writes. Non-existent id / empty body → authorized callers get 404/400 (not 401/403),
         // which the authz-only matrix accepts; endpoint behaviour is covered by ProgramAdminEndpointTests.
         new("POST", "/api/programs", [RoleNames.Admin], "Create program (admin)"),

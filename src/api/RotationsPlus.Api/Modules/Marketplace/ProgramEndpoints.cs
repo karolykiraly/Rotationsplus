@@ -83,7 +83,8 @@ public static class ProgramEndpoints
                     includeHonorarium ? p.WeeklyHonorarium : null,
                     p.Description,
                     p.PreceptorId,
-                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
+                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
+                    p.IsOpen))
                 .FirstOrDefaultAsync(cancellationToken);
 
             return program is null ? Results.NotFound() : Results.Ok(program);
@@ -121,6 +122,7 @@ public static class ProgramEndpoints
                 MinWeeksPerRotation = request.MinWeeksPerRotation,
                 RetailAmountPerWeek = request.RetailAmountPerWeek,
                 WeeklyHonorarium = request.WeeklyHonorarium,
+                IsOpen = request.IsOpen,
                 Description = description,
             };
             db.Programs.Add(program);
@@ -164,6 +166,7 @@ public static class ProgramEndpoints
             program.MinWeeksPerRotation = request.MinWeeksPerRotation;
             program.RetailAmountPerWeek = request.RetailAmountPerWeek;
             program.WeeklyHonorarium = request.WeeklyHonorarium;
+            program.IsOpen = request.IsOpen;
             program.Description = description;
             await db.SaveChangesAsync(cancellationToken);
 
@@ -290,5 +293,5 @@ public static class ProgramEndpoints
 
     private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName) =>
         new(p.Id, p.SpecialtyId, specialtyName, p.ProgramType, p.MaxStudentsPerRotation,
-            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName);
+            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName, p.IsOpen);
 }

@@ -53,15 +53,17 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
 
         var seededAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
         builder.HasData(
-            Seed("cccccccc-0000-0000-0000-000000000001", InternalMedicine, JaneCarter, ProgramType.InPerson, 2, 4, 1500m, 500m, "In-person internal medicine rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000002", InternalMedicine, JaneCarter, ProgramType.TeleRotation, 4, 2, 1000m, 300m, "Remote internal medicine tele-rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000003", Pediatrics, OmarReyes, ProgramType.InPerson, 1, 4, 1800m, 600m, "Hands-on pediatrics rotation.", seededAt),
-            Seed("cccccccc-0000-0000-0000-000000000004", FamilyMedicine, null, ProgramType.Consultation, 3, 2, 900m, 250m, "Family medicine consultation rotation.", seededAt));
+            Seed("cccccccc-0000-0000-0000-000000000001", InternalMedicine, JaneCarter, ProgramType.InPerson, 2, 4, 1500m, 500m, false, "In-person internal medicine rotation.", seededAt),
+            // This tele-rotation is seeded "open" (instant-approval, charged in full) so DEV exercises
+            // both the 100%-open and the 10%-deposit pricing paths against seed data.
+            Seed("cccccccc-0000-0000-0000-000000000002", InternalMedicine, JaneCarter, ProgramType.TeleRotation, 4, 2, 1000m, 300m, true, "Remote internal medicine tele-rotation.", seededAt),
+            Seed("cccccccc-0000-0000-0000-000000000003", Pediatrics, OmarReyes, ProgramType.InPerson, 1, 4, 1800m, 600m, false, "Hands-on pediatrics rotation.", seededAt),
+            Seed("cccccccc-0000-0000-0000-000000000004", FamilyMedicine, null, ProgramType.Consultation, 3, 2, 900m, 250m, false, "Family medicine consultation rotation.", seededAt));
     }
 
     private static object Seed(
         string id, string specialtyId, string? preceptorId, ProgramType type, int maxStudents, int minWeeks,
-        decimal retail, decimal honorarium, string description, DateTimeOffset seededAt) => new
+        decimal retail, decimal honorarium, bool isOpen, string description, DateTimeOffset seededAt) => new
         {
             Id = Guid.Parse(id),
             SpecialtyId = Guid.Parse(specialtyId),
@@ -71,6 +73,7 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
             MinWeeksPerRotation = minWeeks,
             RetailAmountPerWeek = retail,
             WeeklyHonorarium = honorarium,
+            IsOpen = isOpen,
             Description = description,
             CreatedAtUtc = seededAt,
             CreatedBy = "seed",
