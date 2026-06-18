@@ -1,5 +1,6 @@
 import { customerLoginRequest, customerMsalInstance } from "../authConfig";
 import {
+  acquireTokenOrRedirect,
   apiFetch,
   type Program,
   type ProgramDetail,
@@ -38,7 +39,7 @@ async function customerRequest<T>(method: string, path: string, body?: unknown):
     throw new Error("Not signed in");
   }
 
-  const result = await customerMsalInstance.acquireTokenSilent({ ...customerLoginRequest, account });
+  const result = await acquireTokenOrRedirect(customerMsalInstance, customerLoginRequest, account);
   return apiFetch<T>(method, path, result.accessToken, body);
 }
 

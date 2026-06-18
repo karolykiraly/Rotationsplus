@@ -1,3 +1,12 @@
+import {
+  BrowserAuthError,
+  InteractionRequiredAuthError,
+  type AccountInfo,
+  type AuthenticationResult,
+  type IPublicClientApplication,
+  type RedirectRequest,
+  type SilentRequest
+} from "@azure/msal-browser";
 import { apiBaseUrl, loginRequest, msalInstance } from "./authConfig";
 
 /** Mirror of the API's MeResponse contract (System.Text.Json camelCases by default). */
@@ -325,8 +334,42 @@ export async function request<T>(method: string, path: string, body?: unknown): 
     throw new Error("Not signed in");
   }
 
-  const result = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
+  const result = await acquireTokenOrRedirect(msalInstance, loginRequest, account);
   return apiFetch<T>(method, path, result.accessToken, body);
+}
+
+/** True when a failed silent token acquisition can only be resolved by interactive sign-in — i.e. a
+ *  full-page redirect. Besides the explicit `InteractionRequiredAuthError`, the *common* expired-session
+ *  path in msal-browser v5 is a hidden-iframe renewal that fails with a `BrowserAuthError` (timeout, empty
+ *  hash, blocked third-party cookies, …). We treat any such `BrowserAuthError` as redirectable EXCEPT
+ *  `interaction_in_progress`, which means another request already kicked off the redirect. */
+function needsInteractiveRedirect(e: unknown): boolean {
+  if (e instanceof InteractionRequiredAuthError) return true;
+  return e instanceof BrowserAuthError && e.errorCode !== "interaction_in_progress";
+}
+
+/** Acquires an access token silently for the given account; on an expired/renewal-failed session, falls
+ *  back to a full redirect to re-authenticate rather than surfacing a raw MSAL error. The redirect
+ *  navigates away, so this never returns in that path — it throws a friendly sentinel so the caller's
+ *  request doesn't proceed with an undefined token. Shared by the staff and customer token flows. */
+export async function acquireTokenOrRedirect(
+  instance: IPublicClientApplication,
+  loginParams: SilentRequest & RedirectRequest,
+  account: AccountInfo
+): Promise<AuthenticationResult> {
+  try {
+    return await instance.acquireTokenSilent({ ...loginParams, account });
+  } catch (e) {
+    // A redirect is already in flight (concurrent failing requests) — the page is navigating away.
+    if (e instanceof BrowserAuthError && e.errorCode === "interaction_in_progress") {
+      throw new Error("Redirecting to sign in…");
+    }
+    if (needsInteractiveRedirect(e)) {
+      await instance.acquireTokenRedirect({ ...loginParams, account });
+      throw new Error("Redirecting to sign in…");
+    }
+    throw e;
+  }
 }
 
 // ---- Identity ----

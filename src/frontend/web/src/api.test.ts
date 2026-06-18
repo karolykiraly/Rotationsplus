@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { BrowserAuthError, InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const h = vi.hoisted(() => ({
   acquireTokenSilent: vi.fn(),
+  acquireTokenRedirect: vi.fn(),
   getActiveAccount: vi.fn(),
   getAllAccounts: vi.fn()
 }));
@@ -12,7 +14,8 @@ vi.mock("./authConfig", () => ({
   msalInstance: {
     getActiveAccount: h.getActiveAccount,
     getAllAccounts: h.getAllAccounts,
-    acquireTokenSilent: h.acquireTokenSilent
+    acquireTokenSilent: h.acquireTokenSilent,
+    acquireTokenRedirect: h.acquireTokenRedirect
   }
 }));
 
@@ -26,9 +29,52 @@ function signedIn() {
 describe("api request layer", () => {
   beforeEach(() => {
     h.acquireTokenSilent.mockReset();
+    h.acquireTokenRedirect.mockReset();
     h.getActiveAccount.mockReset();
     h.getAllAccounts.mockReset();
     h.getAllAccounts.mockReturnValue([]);
+  });
+
+  it("redirects to re-authenticate when silent token acquisition needs interaction", async () => {
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new InteractionRequiredAuthError("interaction_required", "login required"));
+    h.acquireTokenRedirect.mockResolvedValue(undefined);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    // The expired session falls back to a full redirect rather than surfacing a raw error.
+    await expect(getMe()).rejects.toThrow("Redirecting to sign in…");
+    expect(h.acquireTokenRedirect).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled(); // never proceeds to the request with no token
+  });
+
+  it("redirects when silent renewal fails in the hidden iframe (BrowserAuthError)", async () => {
+    // The common expired-session path: the renewal iframe times out / returns no hash (e.g. blocked
+    // third-party cookies) — a BrowserAuthError, not InteractionRequiredAuthError. Must still redirect.
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new BrowserAuthError("monitor_window_timeout"));
+    h.acquireTokenRedirect.mockResolvedValue(undefined);
+
+    await expect(getMe()).rejects.toThrow("Redirecting to sign in…");
+    expect(h.acquireTokenRedirect).toHaveBeenCalledOnce();
+  });
+
+  it("does not start a second redirect when one is already in progress", async () => {
+    // A concurrent failing request: MSAL reports interaction_in_progress. We surface the friendly
+    // message but must NOT kick off another acquireTokenRedirect.
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new BrowserAuthError("interaction_in_progress"));
+
+    await expect(getMe()).rejects.toThrow("Redirecting to sign in…");
+    expect(h.acquireTokenRedirect).not.toHaveBeenCalled();
+  });
+
+  it("propagates a non-interaction token error without redirecting", async () => {
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new Error("network down"));
+
+    await expect(getMe()).rejects.toThrow("network down");
+    expect(h.acquireTokenRedirect).not.toHaveBeenCalled();
   });
 
   it("throws when not signed in", async () => {

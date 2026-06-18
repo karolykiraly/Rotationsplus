@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { BrowserAuthError, InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const h = vi.hoisted(() => ({
   acquireTokenSilent: vi.fn(),
+  acquireTokenRedirect: vi.fn(),
   getActiveAccount: vi.fn(),
   getAllAccounts: vi.fn(),
   apiFetch: vi.fn()
@@ -11,11 +13,17 @@ vi.mock("../authConfig", () => ({
   customerMsalInstance: {
     getActiveAccount: h.getActiveAccount,
     getAllAccounts: h.getAllAccounts,
-    acquireTokenSilent: h.acquireTokenSilent
+    acquireTokenSilent: h.acquireTokenSilent,
+    acquireTokenRedirect: h.acquireTokenRedirect
   },
   customerLoginRequest: { scopes: ["api://x/access_as_customer"] }
 }));
-vi.mock("../api", () => ({ apiFetch: (m: string, p: string, t: string, b?: unknown) => h.apiFetch(m, p, t, b) }));
+// Keep the real acquireTokenOrRedirect (it runs against the customer MSAL instance passed in) and
+// stub only the low-level apiFetch so we assert on the request call.
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+  return { ...actual, apiFetch: (m: string, p: string, t: string, b?: unknown) => h.apiFetch(m, p, t, b) };
+});
 
 import { getCustomerMe, browsePrograms, getCustomerProgram } from "./customerApi";
 
@@ -50,6 +58,26 @@ describe("customerApi", () => {
     await browsePrograms("?q=internal&specialtyId=s1");
 
     expect(h.apiFetch).toHaveBeenCalledWith("GET", "/api/programs?q=internal&specialtyId=s1", "ctok", undefined);
+  });
+
+  it("redirects to re-authenticate when the customer's silent token needs interaction", async () => {
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new InteractionRequiredAuthError("interaction_required", "login required"));
+    h.acquireTokenRedirect.mockResolvedValue(undefined);
+
+    await expect(getCustomerMe()).rejects.toThrow("Redirecting to sign in…");
+    expect(h.acquireTokenRedirect).toHaveBeenCalledOnce();
+    expect(h.apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("redirects when the customer's silent renewal fails in the hidden iframe (BrowserAuthError)", async () => {
+    h.getActiveAccount.mockReturnValue({ homeAccountId: "a" });
+    h.acquireTokenSilent.mockRejectedValue(new BrowserAuthError("monitor_window_timeout"));
+    h.acquireTokenRedirect.mockResolvedValue(undefined);
+
+    await expect(getCustomerMe()).rejects.toThrow("Redirecting to sign in…");
+    expect(h.acquireTokenRedirect).toHaveBeenCalledOnce();
+    expect(h.apiFetch).not.toHaveBeenCalled();
   });
 
   it("fetches a single program detail", async () => {
