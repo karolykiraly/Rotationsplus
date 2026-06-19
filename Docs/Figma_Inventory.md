@@ -1,7 +1,7 @@
 # Figma_Inventory — RotationsPlus Design File Map
 
 **Date:** 2026-06-11 · **File:** `figma.com/design/pqMajeWlbrVBsj4AMbMXi7/RotationsPlus` (read-only PAT via `figma-developer-mcp`)
-**Purpose:** index of the owner's mockups (~90% accurate to current site). **Role: functional/content reference only — NOT the visual target** (owner decision 2026-06-11: design is 6–7 years dated; the rewrite gets a fresh design system, see `Plan_Architecture.md §3.12`). Use node IDs with `get_figma_data(fileKey, nodeId)` for screen/field/state inventories and notification template content. Source-of-truth order on conflict: **legacy code/live behavior → Figma (content/flows) → docs**.
+**Purpose:** index of the owner's mockups (~90% accurate to current site). **Role: the VISUAL TARGET for forms and screens** — **owner decision 2026-06-19, reversing the 2026-06-11 "fresh redesign" decision**: forms and screens are built to **match their Figma frames** (layout, spacing, components, styling), using the Figma design system (Colors `317:929`, Typography `317:1286`, Buttons `317:925`/`317:927`); brand (`#FF4874`) stays; areas with **no** frame are designed fresh. See `Plan_Architecture.md §3.12`. Use node IDs with `get_figma_data(fileKey, nodeId)` for screen/field/state inventories, the design system, and notification template content. Source-of-truth order on conflict: **behavior** = legacy code/live behavior → Figma → docs; **visuals** = Figma → docs.
 
 ## Pages
 

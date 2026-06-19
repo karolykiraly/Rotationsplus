@@ -6,6 +6,12 @@ import { EventType, type AuthenticationResult, type IPublicClientApplication } f
 import { customerMsalInstance, msalInstance } from "./authConfig";
 import { queryClient } from "./queryClient";
 import { router } from "./router";
+// Figma design-system fonts, self-hosted (the CSP forbids external Google Fonts).
+// PT Serif (headings) + PT Sans (body/buttons), latin subset + only the weights we use.
+import "@fontsource/pt-serif/latin-400.css";
+import "@fontsource/pt-serif/latin-700.css";
+import "@fontsource/pt-sans/latin-400.css";
+import "@fontsource/pt-sans/latin-700.css";
 import "./styles.css";
 
 /** Set the active account from cache and keep it current on each successful login. Redirect

@@ -51,5 +51,5 @@ This file defines how work is done in this project. It encodes the patterns the 
 - **Deployment log:** every change that ships gets a row in `Docs/Deployment_Log.md` — date + time, PR number, environment, and a one-sentence summary.
 
 ## 7. Tooling notes
-- Figma (read-only MCP) is the **content/flow reference, not the visual target** — the UI is a fresh modern redesign; brand (logo + `#FF4874`) stays. Frame map: `Docs/Figma_Inventory.md`.
+- Figma (read-only MCP) is the **visual target for forms and screens** — **owner decision 2026-06-19, reversing the 2026-06-11 "fresh redesign" call**. Build data-entry forms and screens to **match their Figma frames** (layout, spacing, components, styling), using the Figma design system (Colors `317:929`, Typography `317:1286`, Buttons `317:925`/`317:927`); brand (logo + `#FF4874`) stays. Areas with **no** Figma frame (Stripe payment states, OCR statuses, impersonation, program-documents upload) are designed fresh. Already-built fresh-styled screens are being reworked to match. Frame map: `Docs/Figma_Inventory.md`.
 - Windows/PowerShell environment; prefer the dedicated file/search tools over shell where one fits.
