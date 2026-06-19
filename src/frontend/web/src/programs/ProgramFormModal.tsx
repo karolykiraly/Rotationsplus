@@ -44,11 +44,13 @@ interface Props {
   serverError?: string | null;
   onSubmit: (input: ProgramInput) => void;
   onClose: () => void;
+  /** When provided (edit mode), a Delete action appears in the footer. */
+  onDelete?: () => void;
 }
 
 /** Create/edit form for a marketplace program. Client validation mirrors the server; server-side
  *  failures (bad specialty/preceptor, money precision) surface in a banner. */
-export function ProgramFormModal({ title, initial, specialties, preceptors, pending, serverError, onSubmit, onClose }: Props) {
+export function ProgramFormModal({ title, initial, specialties, preceptors, pending, serverError, onSubmit, onClose, onDelete }: Props) {
   const {
     register,
     handleSubmit,
@@ -134,6 +136,11 @@ export function ProgramFormModal({ title, initial, specialties, preceptors, pend
           </div>
         </div>
         <div className="modal-foot">
+          {onDelete && (
+            <button type="button" className="btn-link danger" style={{ marginRight: "auto" }} onClick={onDelete} disabled={pending}>
+              Delete
+            </button>
+          )}
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={pending}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save"}</button>
         </div>

@@ -85,11 +85,25 @@ describe("ProgramsPage", () => {
     h.getPreceptors.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
   });
 
-  it("lists programs with type label and preceptor", async () => {
+  it("lists programs in the active type tab with the retail amount", async () => {
     renderPage();
-    expect(await screen.findByText("Internal Medicine")).toBeInTheDocument();
-    expect(screen.getByText("In person")).toBeInTheDocument();
-    expect(screen.getByText("Jane Carter")).toBeInTheDocument();
+    // Default tab is InPerson; the row's labelled fields + retail render (name/ID/location are placeholders).
+    expect(await screen.findByText("Program ID")).toBeInTheDocument();
+    expect(screen.getByText("$1,500")).toBeInTheDocument();
+    expect(screen.getAllByText("Internal Medicine").length).toBeGreaterThan(0);
+  });
+
+  it("filters to an empty tab and by search text", async () => {
+    renderPage();
+    await screen.findByText("Program ID");
+    // Consultation tab has no matching program -> empty state.
+    await userEvent.click(screen.getByRole("tab", { name: "Consultation" }));
+    expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
+    // Back to InPerson; a non-matching search clears the row.
+    await userEvent.click(screen.getByRole("tab", { name: "InPerson" }));
+    await screen.findByText("Program ID");
+    await userEvent.type(screen.getByLabelText("Search for programs"), "zzzzz");
+    expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
   });
 
   it("blocks non-admins", async () => {
@@ -102,7 +116,7 @@ describe("ProgramsPage", () => {
   it("creates a program from the form defaults plus a chosen specialty", async () => {
     h.createProgram.mockResolvedValue({ ...PROGRAM_DETAIL, id: "p2" });
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
     await userEvent.click(screen.getByRole("button", { name: "Add program" }));
     const dialog = await screen.findByRole("dialog");
@@ -126,7 +140,7 @@ describe("ProgramsPage", () => {
 
   it("requires a specialty before calling the API", async () => {
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
     await userEvent.click(screen.getByRole("button", { name: "Add program" }));
     const dialog = await screen.findByRole("dialog");
@@ -139,7 +153,7 @@ describe("ProgramsPage", () => {
   it("surfaces a server validation error in the form", async () => {
     h.createProgram.mockRejectedValue(new ApiError(400, "Specialty does not exist."));
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
     await userEvent.click(screen.getByRole("button", { name: "Add program" }));
     const dialog = await screen.findByRole("dialog");
@@ -153,10 +167,10 @@ describe("ProgramsPage", () => {
   it("loads detail and pre-fills the edit form, then updates", async () => {
     h.updateProgram.mockResolvedValue(PROGRAM_DETAIL);
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
-    const row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row);
 
     // Detail is fetched and every field pre-fills (incl. the null-coalesced preceptor + description).
     expect(await screen.findByLabelText("Specialty")).toHaveValue("s1");
@@ -178,12 +192,13 @@ describe("ProgramsPage", () => {
   it("deletes a program after confirmation", async () => {
     h.deleteProgram.mockResolvedValue(undefined);
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
-    const row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    const row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row); // row opens the edit modal
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+    // The edit modal's Delete hands off to the confirm dialog.
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
 
     expect(h.deleteProgram).toHaveBeenCalledWith("p1");
     expect(await screen.findByText(/Deleted/)).toBeInTheDocument();
@@ -191,7 +206,7 @@ describe("ProgramsPage", () => {
 
   it("rejects a sub-cent money amount with the zod message (no API call)", async () => {
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
     await userEvent.click(screen.getByRole("button", { name: "Add program" }));
     const dialog = await screen.findByRole("dialog");
@@ -208,10 +223,10 @@ describe("ProgramsPage", () => {
   it("shows an error modal when the program detail fails to load", async () => {
     h.getProgram.mockRejectedValue(new ApiError(500, "boom"));
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
-    const row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    const row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row);
 
     expect(await screen.findByText(/Couldn.t load program: boom/)).toBeInTheDocument();
   });
@@ -219,12 +234,12 @@ describe("ProgramsPage", () => {
   it("shows a page banner when a delete fails", async () => {
     h.deleteProgram.mockRejectedValue(new ApiError(409, "Program is in use."));
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
-    const row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    const row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row); // row opens the edit modal
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
 
     expect(await screen.findByText("Program is in use.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -233,18 +248,18 @@ describe("ProgramsPage", () => {
   it("re-edits with fresh detail after an update (no stale cache)", async () => {
     h.updateProgram.mockResolvedValue({ ...PROGRAM_DETAIL, maxStudentsPerRotation: 9 });
     renderPage();
-    await screen.findByText("Internal Medicine");
+    await screen.findByText("Program ID");
 
     // First edit + save.
-    let row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    let row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row);
     expect(await screen.findByLabelText("Max students / rotation")).toHaveValue(2);
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
     await screen.findByText("Program updated.");
 
     // Re-open edit — must show the server's updated value (9), not the cached pre-save 2.
-    row = screen.getByText("Internal Medicine").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    row = screen.getAllByText("Internal Medicine")[0].closest("tr")!;
+    await userEvent.click(row);
     expect(await screen.findByLabelText("Max students / rotation")).toHaveValue(9);
   });
 });
