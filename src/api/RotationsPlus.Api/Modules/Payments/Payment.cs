@@ -31,4 +31,9 @@ public sealed class Payment : AuditableEntity
     /// <summary>The idempotency key sent to the gateway when creating the intent, derived from the
     /// payment id, so a retried create returns the same intent instead of charging twice.</summary>
     public required string IdempotencyKey { get; set; }
+
+    /// <summary>The provider's refund id once this payment has been refunded (set alongside
+    /// <see cref="PaymentStatus.Refunded"/>); null while the payment is live. Kept for reconciliation
+    /// against the provider's refund records.</summary>
+    public string? ProviderRefundId { get; set; }
 }

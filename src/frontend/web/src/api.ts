@@ -310,6 +310,13 @@ export interface PaymentSimulationResponse {
   status: PaymentStatus;
 }
 
+/** Mirror of the API's RefundResponse — the rotation's new status after a refund + how many payments were refunded. */
+export interface RefundResult {
+  rotationId: string;
+  status: RotationStatus;
+  paymentsRefunded: number;
+}
+
 /** An unsuccessful API response. Carries the HTTP status so callers can branch (e.g. 409 → duplicate). */
 export class ApiError extends Error {
   constructor(
@@ -460,6 +467,10 @@ export const updateRotation = (id: string, input: RotationInput): Promise<Rotati
   request<RotationDetail>("PUT", `/api/rotations/${id}`, input);
 export const deleteRotation = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/rotations/${id}`);
+/** Refunds a rotation's captured payments and moves it to Refunded (admin; rotation must be
+ *  Cancelled/Completed with a captured payment). */
+export const refundRotation = (id: string): Promise<RefundResult> =>
+  request<RefundResult>("POST", `/api/rotations/${id}/refund`);
 
 // ---- Dashboard (AdminOnly) ----
 export const getDashboard = (): Promise<Dashboard> => request<Dashboard>("GET", "/api/dashboard");

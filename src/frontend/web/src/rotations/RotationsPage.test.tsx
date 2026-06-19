@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   createRotation: vi.fn(),
   updateRotation: vi.fn(),
   deleteRotation: vi.fn(),
+  refundRotation: vi.fn(),
   getPrograms: vi.fn(),
   getStudents: vi.fn()
 }));
@@ -21,6 +22,7 @@ vi.mock("../api", () => ({
   createRotation: (input: unknown) => h.createRotation(input),
   updateRotation: (id: string, input: unknown) => h.updateRotation(id, input),
   deleteRotation: (id: string) => h.deleteRotation(id),
+  refundRotation: (id: string) => h.refundRotation(id),
   getPrograms: () => h.getPrograms(),
   getStudents: (params: unknown) => h.getStudents(params),
   ApiError: class ApiError extends Error {
@@ -243,6 +245,71 @@ describe("RotationsPage", () => {
 
     expect(h.deleteRotation).toHaveBeenCalledWith("r1");
     expect(await screen.findByText(/Deleted/)).toBeInTheDocument();
+  });
+
+  it("offers Refund only on a refundable rotation and refunds after confirmation", async () => {
+    // A Cancelled rotation is refundable; the default Active row is not.
+    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.refundRotation.mockResolvedValue({ rotationId: "r1", status: "Refunded", paymentsRefunded: 1 });
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Refund" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Refund" }));
+
+    expect(h.refundRotation).toHaveBeenCalledWith("r1");
+    expect(await screen.findByText(/Refunded Sam Rivera.s deposit \(1 payment\)/)).toBeInTheDocument();
+  });
+
+  it("does not offer Refund on a non-refundable rotation", async () => {
+    // The default row is Active → no refund action (only Cancelled/Completed are refundable).
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    expect(within(row).queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer Refund on an already-refunded rotation", async () => {
+    // Refunded is terminal — no further refund action (guards the off-by-one).
+    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Refunded" }]);
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    expect(within(row).queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
+  });
+
+  it("shows a page banner when a refund fails", async () => {
+    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.refundRotation.mockRejectedValue(new ApiError(409, "This rotation has already been refunded."));
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Refund" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Refund" }));
+
+    expect(await screen.findByText("This rotation has already been refunded.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); // dialog closed
+  });
+
+  it("omits Refunded from the edit-form transitions (it's a money action, not a status edit)", async () => {
+    // A Cancelled rotation's only forward edge is Refunded — which the form must NOT offer.
+    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.getRotation.mockResolvedValue({ ...ROTATION_DETAIL, status: "Cancelled", allowedNextStatuses: ["Refunded"] });
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const status = within(dialog).getByLabelText("Status");
+    const options = within(status as HTMLSelectElement).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["Cancelled"]); // current only; Refunded stripped
+    expect(options).not.toContain("Refunded");
   });
 
   it("filters the list by status and re-renders the filtered rows", async () => {

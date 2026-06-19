@@ -5,6 +5,7 @@ import {
   getPrograms,
   getRotations,
   getStudents,
+  refundRotation,
   updateRotation,
   type Program,
   type Rotation,
@@ -47,7 +48,15 @@ export function useRotations(status: RotationStatus | "") {
     }
   });
 
-  return { list, create, update, remove };
+  const refund = useMutation({
+    mutationFn: (id: string) => refundRotation(id),
+    onSuccess: (_data, id) => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["rotation", id] });
+    }
+  });
+
+  return { list, create, update, remove, refund };
 }
 
 /** Program option list for the rotation form's program dropdown. */

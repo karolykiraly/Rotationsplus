@@ -28,6 +28,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.Property(x => x.ProviderPaymentIntentId).HasMaxLength(255);
         builder.Property(x => x.IdempotencyKey).HasMaxLength(255).IsRequired();
+        builder.Property(x => x.ProviderRefundId).HasMaxLength(255);
 
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.ModifiedBy).HasMaxLength(64);

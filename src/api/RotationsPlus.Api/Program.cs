@@ -101,6 +101,7 @@ app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapPaymentEndpoints();
 app.MapPaymentWebhookEndpoints();
+app.MapPaymentRefundEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
 app.MapStudentEndpoints();

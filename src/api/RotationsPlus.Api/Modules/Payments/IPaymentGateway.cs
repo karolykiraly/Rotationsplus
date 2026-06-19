@@ -35,10 +35,21 @@ public interface IPaymentGateway
     /// </para>
     /// </summary>
     PaymentWebhookEvent? ParseWebhookEvent(string payload, string? signatureHeader);
+
+    /// <summary>
+    /// Refunds the full captured amount of a previously-succeeded payment intent and returns the
+    /// provider's refund id (for audit/reconciliation). <paramref name="idempotencyKey"/> makes a retried
+    /// refund return the same refund rather than refunding twice. The real Stripe adapter creates a Refund
+    /// against the PaymentIntent's charge.
+    /// </summary>
+    Task<RefundResult> RefundAsync(string paymentIntentId, string idempotencyKey, CancellationToken cancellationToken);
 }
 
 /// <summary>The provider's intent id and the client secret the SPA uses to confirm payment.</summary>
 public readonly record struct PaymentIntentResult(string PaymentIntentId, string ClientSecret);
+
+/// <summary>The provider's refund id, recorded on the payment for reconciliation.</summary>
+public readonly record struct RefundResult(string RefundId);
 
 /// <summary>A verified webhook event. <see cref="Type"/> is the provider event type (e.g.
 /// <c>payment_intent.succeeded</c>); <see cref="PaymentIntentId"/> ties it back to a <see cref="Payment"/>.</summary>

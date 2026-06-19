@@ -113,6 +113,14 @@ public static class RotationEndpoints
                 return Results.NotFound();
             }
 
+            // Refunding is a money action, not a plain status edit — it must move money via the gateway.
+            // Block a direct edit to Refunded (even though the state machine permits the transition) and
+            // route the admin to POST /api/rotations/{id}/refund instead.
+            if (request.Status == RotationStatus.Refunded && rotation.Status != RotationStatus.Refunded)
+            {
+                return Results.BadRequest("Use the refund action to refund a rotation's deposit.");
+            }
+
             // Enforce the lifecycle state machine: the status may stay the same or move along an allowed
             // edge, but can't jump illegally (e.g. Completed → Pending). Checked against the CURRENT status.
             if (!RotationStatusMachine.CanTransition(rotation.Status, request.Status))

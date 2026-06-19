@@ -32,12 +32,13 @@ function formatDate(iso: string): string {
 export function RotationsPage() {
   const { user } = useMe();
   const [statusFilter, setStatusFilter] = useState<RotationStatus | "">("");
-  const { list, create, update, remove } = useRotations(statusFilter);
+  const { list, create, update, remove, refund } = useRotations(statusFilter);
   const programs = useRotationPrograms();
   const students = useRotationStudents();
 
   const [editId, setEditId] = useState<EditId>(null);
   const [deleting, setDeleting] = useState<Rotation | null>(null);
+  const [refunding, setRefunding] = useState<Rotation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
@@ -77,6 +78,19 @@ export function RotationsPage() {
     remove.mutate(deleting.id, {
       onSuccess: () => { setDeleting(null); setBanner({ type: "ok", text: `Deleted ${name}'s rotation.` }); },
       onError: (e) => { setDeleting(null); setBanner({ type: "error", text: (e as Error).message }); }
+    });
+  };
+
+  const confirmRefund = () => {
+    if (!refunding) return;
+    const name = refunding.studentName;
+    refund.mutate(refunding.id, {
+      onSuccess: (res) => {
+        setRefunding(null);
+        const n = res.paymentsRefunded;
+        setBanner({ type: "ok", text: `Refunded ${name}'s deposit (${n} payment${n === 1 ? "" : "s"}).` });
+      },
+      onError: (e) => { setRefunding(null); setBanner({ type: "error", text: (e as Error).message }); }
     });
   };
 
@@ -155,6 +169,9 @@ export function RotationsPage() {
                   <td>
                     <div className="row-actions">
                       <button className="btn-link" onClick={() => { setFormError(null); setEditId(r.id); }}>Edit</button>
+                      {(r.status === "Cancelled" || r.status === "Completed") && (
+                        <button className="btn-link" onClick={() => setRefunding(r)}>Refund</button>
+                      )}
                       <button className="btn-link danger" onClick={() => setDeleting(r)}>Delete</button>
                     </div>
                   </td>
@@ -185,8 +202,9 @@ export function RotationsPage() {
           initial={mapDetail(detail.data)}
           programs={programOpts}
           students={studentOpts}
-          // The current status (so it stays selectable) plus the server's allowed transitions.
-          allowedStatuses={[detail.data.status, ...detail.data.allowedNextStatuses]}
+          // The current status (so it stays selectable) plus the server's allowed transitions, minus
+          // Refunded — refunding is a money action done via the Refund button, not a plain status edit.
+          allowedStatuses={[detail.data.status, ...detail.data.allowedNextStatuses.filter((s) => s !== "Refunded")]}
           pending={update.isPending}
           serverError={formError}
           onSubmit={submitForm}
@@ -198,6 +216,21 @@ export function RotationsPage() {
         <Modal title="Edit rotation" onClose={closeForm}>
           <div className="modal-body state">
             {detail.isError ? `Couldn’t load rotation: ${(detail.error as Error).message}` : "Loading…"}
+          </div>
+        </Modal>
+      )}
+
+      {refunding && (
+        <Modal title="Refund rotation" onClose={() => setRefunding(null)}>
+          <div className="modal-body">
+            Refund {refunding.studentName}’s deposit for {refunding.specialtyName}? This returns the captured
+            payment to the student and marks the rotation Refunded.
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-ghost" onClick={() => setRefunding(null)} disabled={refund.isPending}>Cancel</button>
+            <button className="btn btn-danger" onClick={confirmRefund} disabled={refund.isPending}>
+              {refund.isPending ? "Refunding…" : "Refund"}
+            </button>
           </div>
         </Modal>
       )}

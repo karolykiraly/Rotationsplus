@@ -42,6 +42,20 @@ public class FakePaymentGatewayTests
     }
 
     [Fact]
+    public async Task Same_refund_key_yields_the_same_refund_id()
+    {
+        var gateway = Gateway();
+
+        var first = await gateway.RefundAsync("pi_123", "refund-1", default);
+        var second = await gateway.RefundAsync("pi_123", "refund-1", default);
+        var different = await gateway.RefundAsync("pi_123", "refund-2", default);
+
+        first.RefundId.Should().StartWith("re_fake_");
+        second.RefundId.Should().Be(first.RefundId);       // idempotent: no double refund
+        different.RefundId.Should().NotBe(first.RefundId);
+    }
+
+    [Fact]
     public void Parses_a_correctly_signed_event()
     {
         var gateway = Gateway();

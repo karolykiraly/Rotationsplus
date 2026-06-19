@@ -57,6 +57,12 @@ public sealed class FakePaymentGateway(IOptions<PaymentsOptions> options) : IPay
         }
     }
 
+    public Task<RefundResult> RefundAsync(string paymentIntentId, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        // Deterministic in the idempotency key: a retried refund yields the same refund id (no double refund).
+        return Task.FromResult(new RefundResult($"re_fake_{Hash(idempotencyKey)}"));
+    }
+
     /// <summary>The signature the caller must send: lowercase hex HMAC-SHA256 of the raw body under the
     /// shared secret. Exposed so tests (and the SPA's mock) can sign payloads the same way.</summary>
     public static string Sign(string payload, string secret)

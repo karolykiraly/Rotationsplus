@@ -60,6 +60,9 @@ public static class ApiAuthorizationMatrix
         // empty body / non-owned payment → authorized callers get 400/404 (not 401/403), which the
         // authz-only matrix accepts. Behaviour is covered by PaymentCheckoutEndpointTests.
         new("POST", "/api/dev/payments/eeeeeeee-0000-0000-0000-000000000001/simulate", RoleNames.Customer, "DEV: simulate deposit outcome (customer)"),
+        // Refunding is AdminOnly. The seeded rotation isn't in a refundable state, so an authorized admin
+        // gets 409 (not 401/403), which the authz-only matrix accepts; behaviour is in PaymentRefundEndpointTests.
+        new("POST", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001/refund", [RoleNames.Admin], "Refund a rotation (admin)"),
         new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
         new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),
