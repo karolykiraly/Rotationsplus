@@ -76,7 +76,9 @@ describe("ProgramDetailPage", () => {
     renderDetail();
 
     expect(await screen.findByRole("heading", { name: "Internal Medicine" })).toBeInTheDocument();
-    expect(screen.getByText("$1,500.00 / week")).toBeInTheDocument();
+    // Header price is the whole minimum stay ($1,500/wk × 4 wks), shown in the title row.
+    expect(screen.getByText("$6,000.00", { selector: ".pd-price" })).toBeInTheDocument();
+    expect(screen.getByText("For 4 weeks minimum")).toBeInTheDocument();
     expect(screen.getByText("Jane Carter")).toBeInTheDocument();
     expect(screen.getByText("Hands-on inpatient rotation.")).toBeInTheDocument();
     expect(h.getCustomerProgram).toHaveBeenCalledWith("p1");
@@ -139,6 +141,15 @@ describe("ProgramDetailPage", () => {
 
     expect(await screen.findByText(/no longer available/)).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("prices a ConsultationSub program hourly (no '/ week', no seats pill)", async () => {
+    h.getCustomerProgram.mockResolvedValue({ ...program, programType: "ConsultationSub", retailAmountPerWeek: 250 });
+    renderDetail();
+    // Hourly programs show the rate as-is, not a per-week price, and omit the seats pill.
+    expect(await screen.findByText("$250.00")).toBeInTheDocument();
+    expect(screen.queryByText("$250.00 / week")).not.toBeInTheDocument();
+    expect(screen.queryByText(/seats available/)).not.toBeInTheDocument();
   });
 
   it("shows an error when the program can't be loaded", async () => {
