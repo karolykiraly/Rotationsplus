@@ -387,6 +387,14 @@ table.data { width: 100%; border-collapse: collapse; }
 }
 .search-form2 input:focus { outline: 2px solid var(--brand-tint); border-color: var(--brand); }
 .search-form2 img { position: absolute; height: 16px; width: 16px; top: 16px; left: 16px; opacity: 0.7; }
+/* Inline status filter (Rotations toolbar) */
+.program-toolbar label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.program-toolbar select {
+  font-family: var(--font); font-size: 14px; height: 48px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-btn); background: #fff; color: var(--ink);
+}
+.program-toolbar select:focus { outline: 2px solid var(--brand-tint); border-color: var(--brand); }
+.rot-row .row-actions { flex-direction: column; align-items: flex-end; gap: 6px; }
 
 /* ---- Program rows (image cards) ---- */
 .program-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }

@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { getRotation, type Rotation, type RotationInput, type RotationStatus } from "../api";
+import searchIcon from "../assets/icons/search.png";
 import { useRotations, useRotationPrograms, useRotationStudents } from "./useRotations";
 import { RotationFormModal, type RotationFormInitial } from "./RotationFormModal";
 import { ROTATION_STATUSES, rotationStatusLabel } from "./rotationStatuses";
@@ -21,6 +23,8 @@ const DEFAULTS: RotationFormInitial = {
 
 /** "new" = create; a guid = edit that rotation; null = no modal. */
 type EditId = string | "new" | null;
+
+const PAGE_SIZE = 10;
 
 /** Format a YYYY-MM-DD wire date for display without a timezone shift (parse the parts directly). */
 function formatDate(iso: string): string {
@@ -41,6 +45,11 @@ export function RotationsPage() {
   const [refunding, setRefunding] = useState<Rotation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  // First page whenever the status filter or search changes.
+  useEffect(() => setPage(1), [statusFilter, search]);
 
   // For edit, load the full detail (the list row lacks programId/oid).
   const detail = useQuery({
@@ -106,80 +115,105 @@ export function RotationsPage() {
   const programOpts = programs.data ?? [];
   const studentOpts = students.data ?? [];
 
+  // Client-side search + pagination over the (server status-filtered) list.
+  const q = search.trim().toLowerCase();
+  const filtered = rotations.filter(
+    (r) => !q || `${r.studentName} ${r.studentEmail} ${r.preceptorName ?? ""} ${r.specialtyName}`.toLowerCase().includes(q)
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Rotations</h2>
-          <p>Student bookings into programs, with their lifecycle status.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => { setFormError(null); setEditId("new"); }}>
-          Add rotation
-        </button>
-      </div>
-
       {banner && <div className={`banner ${banner.type}`} role="alert">{banner.text}</div>}
 
-      <div className="toolbar">
-        <label htmlFor="r-filter">Status</label>
-        <select
-          id="r-filter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as RotationStatus | "")}
-        >
-          <option value="">All statuses</option>
-          {ROTATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </div>
+      <div className="lead-page">
+        <div className="program-toolbar">
+          <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setEditId("new"); }}>
+            Add rotation
+          </button>
+          <label htmlFor="r-filter">Status</label>
+          <select
+            id="r-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as RotationStatus | "")}
+          >
+            <option value="">All statuses</option>
+            {ROTATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <div className="search-form2">
+            <img src={searchIcon} alt="" />
+            <input
+              placeholder="Search for Number/Preceptor/Student"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search for rotations"
+            />
+          </div>
+        </div>
 
-      <div className="card">
         {list.isLoading && <div className="state">Loading rotations…</div>}
         {list.isError && <div className="state">Couldn’t load rotations: {(list.error as Error).message}</div>}
-        {!list.isLoading && !list.isError && rotations.length === 0 && (
-          <div className="state">No rotations{statusFilter ? " with this status" : " yet"}.</div>
+
+        {!list.isLoading && !list.isError && (
+          rows.length === 0 ? (
+            <div className="state">There is no data available.</div>
+          ) : (
+            <table className="program-table">
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="rot-row">
+                    <td className="first-td">
+                      <div className="place-holder">Rotation Number</div>
+                      <div className="heading-xxxs">—</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Student Name</div>
+                      <div className="heading-xxxs-normal">{r.studentName}</div>
+                      <div className="muted">{r.studentEmail}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Preceptor Name</div>
+                      <div className="heading-xxxs-normal">{r.preceptorName ?? "—"}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Specialty</div>
+                      <div className="heading-xxxs-normal">{r.specialtyName}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Type</div>
+                      <div className="heading-xxxs-normal">{programTypeLabel(r.programType)}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Start and End Date</div>
+                      <div className="heading-xxxs-normal">{formatDate(r.startDate)} – {formatDate(r.endDate)}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Weeks</div>
+                      <div className="heading-xxxs-normal">{r.weeks}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Status</div>
+                      <div><span className="badge">{rotationStatusLabel(r.status)}</span></div>
+                    </td>
+                    <td className="last-td">
+                      <div className="row-actions">
+                        <button className="btn-link" onClick={() => { setFormError(null); setEditId(r.id); }}>Edit</button>
+                        {(r.status === "Cancelled" || r.status === "Completed") && (
+                          <button className="btn-link" onClick={() => setRefunding(r)}>Refund</button>
+                        )}
+                        <button className="btn-link danger" onClick={() => setDeleting(r)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         )}
 
-        {rotations.length > 0 && (
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Specialty</th>
-                <th>Type</th>
-                <th>Preceptor</th>
-                <th>Dates</th>
-                <th>Weeks</th>
-                <th>Status</th>
-                <th style={{ width: 150, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rotations.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <div>{r.studentName}</div>
-                    <div className="muted">{r.studentEmail}</div>
-                  </td>
-                  <td>{r.specialtyName}</td>
-                  <td>{programTypeLabel(r.programType)}</td>
-                  <td>{r.preceptorName ?? "—"}</td>
-                  <td>{formatDate(r.startDate)} – {formatDate(r.endDate)}</td>
-                  <td>{r.weeks}</td>
-                  <td><span className="badge">{rotationStatusLabel(r.status)}</span></td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-link" onClick={() => { setFormError(null); setEditId(r.id); }}>Edit</button>
-                      {(r.status === "Cancelled" || r.status === "Completed") && (
-                        <button className="btn-link" onClick={() => setRefunding(r)}>Refund</button>
-                      )}
-                      <button className="btn-link danger" onClick={() => setDeleting(r)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
       </div>
 
       {editId === "new" && (
