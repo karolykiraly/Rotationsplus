@@ -31,13 +31,6 @@ export function DashboardPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Dashboard</h2>
-          <p>An overview of the marketplace and the rotation pipeline.</p>
-        </div>
-      </div>
-
       {dash.isLoading && <div className="card state">Loading the dashboard…</div>}
       {dash.isError && <div className="card state">Couldn’t load the dashboard: {(dash.error as Error).message}</div>}
 

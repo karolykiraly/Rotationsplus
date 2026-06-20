@@ -6,13 +6,6 @@ export function HomePage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Overview</h2>
-          <p>Your Rotations Plus staff identity.</p>
-        </div>
-      </div>
-
       {isLoading && <div className="card state">Loading your profile…</div>}
       {isError && <div className="banner error" role="alert">{(error as Error).message}</div>}
 
