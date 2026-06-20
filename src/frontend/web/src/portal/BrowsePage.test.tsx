@@ -47,11 +47,32 @@ describe("BrowsePage", () => {
 
   it("renders program cards from the catalog", async () => {
     renderBrowse();
-    // "with Jane Carter" + the price are card-only (the specialty/type also appear in the filters).
+    // "with Jane Carter" + the total price are card-only (the specialty/type also appear in the filters).
     expect(await screen.findByText("with Jane Carter")).toBeInTheDocument();
-    expect(screen.getByText("$1,500.00/wk")).toBeInTheDocument();
-    expect(screen.getByText("Internal Medicine", { selector: ".pc-specialty" })).toBeInTheDocument();
-    expect(screen.getByText("In person", { selector: ".pc-type" })).toBeInTheDocument();
+    // Card price is the whole minimum stay: $1,500/wk × 4 wks = $6,000.
+    expect(screen.getByText("$6,000")).toBeInTheDocument();
+    expect(screen.getByText("4 weeks minimum")).toBeInTheDocument();
+    expect(screen.getByText("Internal Medicine", { selector: ".rcard-link" })).toBeInTheDocument();
+    expect(screen.getByText("In person", { selector: ".tag-pill" })).toBeInTheDocument();
+  });
+
+  it("prices a ConsultationSub program hourly (per-week, not × weeks)", async () => {
+    h.browsePrograms.mockResolvedValue([
+      {
+        id: "p2",
+        specialtyName: "Cardiology",
+        programType: "ConsultationSub",
+        maxStudentsPerRotation: 1,
+        minWeeksPerRotation: 4,
+        retailAmountPerWeek: 200,
+        preceptorName: null
+      }
+    ]);
+    renderBrowse();
+    // Hourly programs show the per-week amount as-is ($200), never × 4, and the duration reads "Hourly".
+    expect(await screen.findByText("$200")).toBeInTheDocument();
+    expect(screen.getByText("Hourly")).toBeInTheDocument();
+    expect(screen.queryByText("4 weeks minimum")).not.toBeInTheDocument();
   });
 
   it("re-queries with the selected specialty filter", async () => {
