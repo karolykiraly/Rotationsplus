@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { getPreceptor, type Preceptor, type PreceptorInput } from "../api";
+import searchIcon from "../assets/icons/search.png";
 import { usePreceptors, usePreceptorSpecialties } from "./usePreceptors";
 import { PreceptorFormModal, type PreceptorFormInitial } from "./PreceptorFormModal";
 import { preceptorStatusLabel } from "./preceptorStatuses";
@@ -22,6 +24,8 @@ const DEFAULTS: PreceptorFormInitial = {
 
 type EditId = string | "new" | null;
 
+const PAGE_SIZE = 10;
+
 export function PreceptorsPage() {
   const { user } = useMe();
   const { list, create, update, remove } = usePreceptors();
@@ -31,6 +35,10 @@ export function PreceptorsPage() {
   const [deleting, setDeleting] = useState<Preceptor | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => setPage(1), [search]);
 
   const detail = useQuery({
     queryKey: ["preceptor", editId],
@@ -85,58 +93,80 @@ export function PreceptorsPage() {
   const preceptors = list.data ?? [];
   const opts = specialties.data ?? [];
 
+  // Client-side search + pagination.
+  const q = search.trim().toLowerCase();
+  const filtered = preceptors.filter(
+    (p) => !q || `${p.fullName} ${p.email} ${p.primarySpecialtyName} ${[p.city, p.state].filter(Boolean).join(", ")}`.toLowerCase().includes(q)
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Preceptors</h2>
-          <p>The directory of supervising preceptors.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => { setFormError(null); setEditId("new"); }}>
-          Add preceptor
-        </button>
-      </div>
-
       {banner && <div className={`banner ${banner.type}`} role="alert">{banner.text}</div>}
 
-      <div className="card">
+      <div className="lead-page">
+        <div className="program-toolbar">
+          <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setEditId("new"); }}>
+            Add preceptor
+          </button>
+          <div className="search-form2">
+            <img src={searchIcon} alt="" />
+            <input
+              placeholder="Search for Name/Email/Specialty"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search for preceptors"
+            />
+          </div>
+        </div>
+
         {list.isLoading && <div className="state">Loading preceptors…</div>}
         {list.isError && <div className="state">Couldn’t load preceptors: {(list.error as Error).message}</div>}
-        {!list.isLoading && !list.isError && preceptors.length === 0 && (
-          <div className="state">No preceptors yet. Add the first one.</div>
+
+        {!list.isLoading && !list.isError && (
+          rows.length === 0 ? (
+            <div className="state">There is no data available.</div>
+          ) : (
+            <table className="program-table">
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.id} className="rot-row">
+                    <td className="first-td">
+                      <div className="place-holder">Name</div>
+                      <div className="heading-xxxs">{p.fullName}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Email</div>
+                      <div className="heading-xxxs-normal">{p.email}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Specialty</div>
+                      <div className="heading-xxxs-normal">{p.primarySpecialtyName}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Location</div>
+                      <div className="heading-xxxs-normal">{[p.city, p.state].filter(Boolean).join(", ") || "—"}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Status</div>
+                      <div><span className="badge">{preceptorStatusLabel(p.status)}</span></div>
+                    </td>
+                    <td className="last-td">
+                      <div className="row-actions">
+                        <button className="btn-link" onClick={() => { setFormError(null); setEditId(p.id); }}>Edit</button>
+                        <button className="btn-link danger" onClick={() => setDeleting(p)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         )}
 
-        {preceptors.length > 0 && (
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Specialty</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th style={{ width: 150, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {preceptors.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.fullName}</td>
-                  <td>{p.email}</td>
-                  <td>{p.primarySpecialtyName}</td>
-                  <td>{[p.city, p.state].filter(Boolean).join(", ") || "—"}</td>
-                  <td><span className="badge">{preceptorStatusLabel(p.status)}</span></td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-link" onClick={() => { setFormError(null); setEditId(p.id); }}>Edit</button>
-                      <button className="btn-link danger" onClick={() => setDeleting(p)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
       </div>
 
       {editId === "new" && (

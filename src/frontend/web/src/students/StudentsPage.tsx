@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { getStudent, type Student, type StudentInput, type StudentStatus } from "../api";
+import searchIcon from "../assets/icons/search.png";
 import { useStudents } from "./useStudents";
 import { StudentFormModal, type StudentFormInitial } from "./StudentFormModal";
 import { STUDENT_STATUSES, academicStatusLabel, studentStatusLabel, visaStatusLabel } from "./studentStatuses";
@@ -25,6 +27,8 @@ const DEFAULTS: StudentFormInitial = {
 /** "new" = create; a guid = edit that student; null = no modal. */
 type EditId = string | "new" | null;
 
+const PAGE_SIZE = 10;
+
 export function StudentsPage() {
   const { user } = useMe();
   const [statusFilter, setStatusFilter] = useState<StudentStatus | "">("");
@@ -34,6 +38,10 @@ export function StudentsPage() {
   const [deleting, setDeleting] = useState<Student | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => setPage(1), [statusFilter, search]);
 
   // For edit, load the full detail (the list row lacks school/country/oid).
   const detail = useQuery({
@@ -90,72 +98,93 @@ export function StudentsPage() {
 
   const students = list.data ?? [];
 
+  // Client-side search + pagination over the (server status-filtered) list.
+  const q = search.trim().toLowerCase();
+  const filtered = students.filter(
+    (s) => !q || `${s.fullName} ${s.email} ${[s.city, s.state].filter(Boolean).join(", ")}`.toLowerCase().includes(q)
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Students</h2>
-          <p>The directory of students (the demand side of the marketplace).</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => { setFormError(null); setEditId("new"); }}>
-          Add student
-        </button>
-      </div>
-
       {banner && <div className={`banner ${banner.type}`} role="alert">{banner.text}</div>}
 
-      <div className="toolbar">
-        <label htmlFor="s-filter">Status</label>
-        <select
-          id="s-filter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StudentStatus | "")}
-        >
-          <option value="">All statuses</option>
-          {STUDENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </div>
+      <div className="lead-page">
+        <div className="program-toolbar">
+          <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setEditId("new"); }}>
+            Add student
+          </button>
+          <label htmlFor="s-filter">Status</label>
+          <select
+            id="s-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StudentStatus | "")}
+          >
+            <option value="">All statuses</option>
+            {STUDENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <div className="search-form2">
+            <img src={searchIcon} alt="" />
+            <input
+              placeholder="Search for Name/Email/Location"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search for students"
+            />
+          </div>
+        </div>
 
-      <div className="card">
         {list.isLoading && <div className="state">Loading students…</div>}
         {list.isError && <div className="state">Couldn’t load students: {(list.error as Error).message}</div>}
-        {!list.isLoading && !list.isError && students.length === 0 && (
-          <div className="state">No students{statusFilter ? " with this status" : " yet"}.</div>
+
+        {!list.isLoading && !list.isError && (
+          rows.length === 0 ? (
+            <div className="state">There is no data available.</div>
+          ) : (
+            <table className="program-table">
+              <tbody>
+                {rows.map((s) => (
+                  <tr key={s.id} className="rot-row">
+                    <td className="first-td">
+                      <div className="place-holder">Name</div>
+                      <div className="heading-xxxs">{s.fullName}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Email</div>
+                      <div className="heading-xxxs-normal">{s.email}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Academic Status</div>
+                      <div className="heading-xxxs-normal">{academicStatusLabel(s.academicStatus)}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Visa</div>
+                      <div className="heading-xxxs-normal">{visaStatusLabel(s.visaStatus)}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Location</div>
+                      <div className="heading-xxxs-normal">{[s.city, s.state].filter(Boolean).join(", ") || "—"}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Status</div>
+                      <div><span className="badge">{studentStatusLabel(s.status)}</span></div>
+                    </td>
+                    <td className="last-td">
+                      <div className="row-actions">
+                        <button className="btn-link" onClick={() => { setFormError(null); setEditId(s.id); }}>Edit</button>
+                        <button className="btn-link danger" onClick={() => setDeleting(s)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         )}
 
-        {students.length > 0 && (
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Academic status</th>
-                <th>Visa</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th style={{ width: 150, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.fullName}</td>
-                  <td>{s.email}</td>
-                  <td>{academicStatusLabel(s.academicStatus)}</td>
-                  <td>{visaStatusLabel(s.visaStatus)}</td>
-                  <td>{[s.city, s.state].filter(Boolean).join(", ") || "—"}</td>
-                  <td><span className="badge">{studentStatusLabel(s.status)}</span></td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-link" onClick={() => { setFormError(null); setEditId(s.id); }}>Edit</button>
-                      <button className="btn-link danger" onClick={() => setDeleting(s)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
       </div>
 
       {editId === "new" && (

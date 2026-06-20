@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { type Specialty } from "../api";
 import { useSpecialties } from "./useSpecialties";
 import { SpecialtyFormModal } from "./SpecialtyFormModal";
+import searchIcon from "../assets/icons/search.png";
 
 type Editing = { kind: "create" } | { kind: "edit"; specialty: Specialty } | null;
+
+const PAGE_SIZE = 10;
 
 /** Admin management of marketplace specialties: list + create/edit/delete against the AdminOnly
  *  API. Non-admins see a forbidden notice (the API enforces it too). */
@@ -17,6 +21,10 @@ export function SpecialtiesPage() {
   const [deleting, setDeleting] = useState<Specialty | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => setPage(1), [search]);
 
   if (user && !user.isAdmin) {
     return <div className="card state">You need the Admin role to manage specialties.</div>;
@@ -62,48 +70,60 @@ export function SpecialtiesPage() {
 
   const specialties = list.data ?? [];
 
+  // Client-side search + pagination.
+  const q = search.trim().toLowerCase();
+  const filtered = specialties.filter((s) => !q || s.name.toLowerCase().includes(q));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Specialties</h2>
-          <p>Clinical specialties available across the marketplace.</p>
-        </div>
-        <button className="btn btn-primary" onClick={openCreate}>Add specialty</button>
-      </div>
-
       {banner && <div className={`banner ${banner.type}`} role="alert">{banner.text}</div>}
 
-      <div className="card">
+      <div className="lead-page">
+        <div className="program-toolbar">
+          <button className="btn btn-primary spacer" onClick={openCreate}>Add specialty</button>
+          <div className="search-form2">
+            <img src={searchIcon} alt="" />
+            <input
+              placeholder="Search for a specialty"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search for specialties"
+            />
+          </div>
+        </div>
+
         {list.isLoading && <div className="state">Loading specialties…</div>}
         {list.isError && <div className="state">Couldn’t load specialties: {(list.error as Error).message}</div>}
-        {!list.isLoading && !list.isError && specialties.length === 0 && (
-          <div className="state">No specialties yet. Add the first one.</div>
+
+        {!list.isLoading && !list.isError && (
+          rows.length === 0 ? (
+            <div className="state">There is no data available.</div>
+          ) : (
+            <table className="program-table">
+              <tbody>
+                {rows.map((s) => (
+                  <tr key={s.id} className="rot-row">
+                    <td className="first-td">
+                      <div className="place-holder">Specialty</div>
+                      <div className="heading-xxxs">{s.name}</div>
+                    </td>
+                    <td className="last-td">
+                      <div className="row-actions">
+                        <button className="btn-link" onClick={() => openEdit(s)}>Edit</button>
+                        <button className="btn-link danger" onClick={() => setDeleting(s)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         )}
 
-        {specialties.length > 0 && (
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th style={{ width: 160, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {specialties.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-link" onClick={() => openEdit(s)}>Edit</button>
-                      <button className="btn-link danger" onClick={() => setDeleting(s)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
       </div>
 
       {editing && (
