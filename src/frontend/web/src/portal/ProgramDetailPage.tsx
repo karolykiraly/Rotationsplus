@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { bookRotation, getCustomerProgram, getProgramQuote } from "./customerApi";
+import { ProgramImage } from "./ProgramImage";
 import { programCode, programTypeLabel } from "../programs/programTypes";
 import type { ProgramDetail } from "../api";
 
@@ -179,7 +180,9 @@ export function ProgramDetailPage() {
 
             <div className="pd-cols">
               <div className="pd-left">
-                <div className="pd-img" aria-hidden />
+                <div className="pd-img">
+                  <ProgramImage url={p.imageUrl} className="pd-photo" alt={`${p.specialtyName} program`} />
+                </div>
                 <div className="pd-preceptor">
                   <h3 className="pd-section">Preceptor</h3>
                   <div className="pd-label">Name</div>

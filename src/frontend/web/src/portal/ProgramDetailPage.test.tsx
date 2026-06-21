@@ -38,7 +38,8 @@ const program = {
   programNumber: 1001,
   city: "Los Angeles",
   state: "CA",
-  tags: ["Hospital Letterhead LOR"]
+  tags: ["Hospital Letterhead LOR"],
+  imageUrl: "https://blob/hospital.jpg?sas"
 };
 
 const quote = {
@@ -91,6 +92,8 @@ describe("ProgramDetailPage", () => {
     expect(screen.getByText("2 seats available")).toBeInTheDocument();
     expect(screen.getByText("Hospital Letterhead LOR", { selector: ".tag-chip" })).toBeInTheDocument();
     expect(screen.getByText("Hands-on inpatient rotation.")).toBeInTheDocument();
+    // The hospital image renders from the program's read URL.
+    expect(screen.getByRole("img", { name: "Internal Medicine program" })).toHaveAttribute("src", "https://blob/hospital.jpg?sas");
     expect(h.getCustomerProgram).toHaveBeenCalledWith("p1");
     // Honorarium must never appear on the customer view.
     expect(screen.queryByText(/honorarium/i)).not.toBeInTheDocument();

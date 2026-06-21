@@ -51,6 +51,8 @@ export interface Program {
   state?: string | null;
   isOpen: boolean;
   tags: string[];
+  /** Short-lived read URL for the hospital image, or null/absent when none (client shows a placeholder). */
+  imageUrl?: string | null;
 }
 
 /** Mirror of the API's ProgramDetailResponse contract — the editable shape. */
@@ -72,6 +74,8 @@ export interface ProgramDetail {
   city?: string | null;
   state?: string | null;
   tags: string[];
+  /** Short-lived read URL for the hospital image, or null/absent when none (client shows a placeholder). */
+  imageUrl?: string | null;
 }
 
 /** Admin create/update payload (mirrors Create/UpdateProgramRequest). */

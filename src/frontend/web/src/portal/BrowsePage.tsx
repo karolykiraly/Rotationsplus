@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCustomerPrograms, usePortalSpecialties } from "./usePortalCatalog";
+import { ProgramImage } from "./ProgramImage";
 import { PROGRAM_TYPES, programCode, programTypeLabel } from "../programs/programTypes";
 import type { Program } from "../api";
 
@@ -41,6 +42,8 @@ function RotationCard({ program }: { program: Program }) {
   return (
     <article className="rcard">
       <div className="rcard-img">
+        {/* Decorative: the card is labelled by its specialty heading. Falls back to the gray placeholder. */}
+        <ProgramImage url={program.imageUrl} className="rcard-photo" alt="" />
         <span className="rcard-fav" aria-hidden />
       </div>
       <div className="rcard-body">

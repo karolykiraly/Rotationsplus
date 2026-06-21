@@ -64,6 +64,30 @@ describe("BrowsePage", () => {
     expect(screen.getByText("Los Angeles, CA")).toBeInTheDocument();
   });
 
+  it("renders the hospital image when the program has one, and a bare placeholder when it doesn't", async () => {
+    h.browsePrograms.mockResolvedValue([
+      {
+        id: "p1", programNumber: 1001, specialtyName: "Internal Medicine", programType: "InPerson",
+        maxStudentsPerRotation: 2, minWeeksPerRotation: 4, retailAmountPerWeek: 1500, preceptorName: "Jane Carter",
+        city: "Los Angeles", state: "CA", isOpen: false, tags: [], imageUrl: "https://blob/img1.jpg?sas"
+      },
+      {
+        id: "p2", programNumber: 1002, specialtyName: "Pediatrics", programType: "InPerson",
+        maxStudentsPerRotation: 1, minWeeksPerRotation: 4, retailAmountPerWeek: 1800, preceptorName: null,
+        city: null, state: null, isOpen: false, tags: [], imageUrl: null
+      }
+    ]);
+    const { container } = renderBrowse();
+    await screen.findByText("with Jane Carter");
+
+    // The program with an image renders exactly one <img> pointing at its read URL…
+    const photos = container.querySelectorAll<HTMLImageElement>("img.rcard-photo");
+    expect(photos).toHaveLength(1);
+    expect(photos[0].src).toContain("https://blob/img1.jpg");
+    // …and the image-less program keeps the gray placeholder (no <img> in its card).
+    expect(container.querySelectorAll(".rcard-img").length).toBe(2);
+  });
+
   it("prices a ConsultationSub program hourly (per-week, not × weeks)", async () => {
     h.browsePrograms.mockResolvedValue([
       {
