@@ -120,6 +120,21 @@ module postgres 'modules/postgresql.bicep' = {
 
 var dbConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database=rotationsplus;Username=rplusadmin;Password=${postgresAdminPassword};SSL Mode=Require;Trust Server Certificate=true'
 
+// Blob storage for program/hospital images. Private account; the API mints read SAS from the
+// account-key connection string (held in Key Vault). Storage names: 3-24 chars, lowercase alphanumeric.
+var programImagesContainer = 'program-images'
+module storage 'modules/storage.bicep' = {
+  name: 'storage'
+  params: {
+    // Storage account names are max 24 chars, lowercase alphanumeric. 'st' + prefix + env + 8 of the
+    // suffix stays well under 24 for every env (preprod is the longest at 22), leaving headroom.
+    name: 'st${namePrefix}${environment}${take(suffix, 8)}'
+    location: location
+    tags: tags
+    containers: [programImagesContainer]
+  }
+}
+
 module keyVault 'modules/keyVault.bicep' = {
   name: 'keyVault'
   params: {
@@ -133,6 +148,10 @@ module keyVault 'modules/keyVault.bicep' = {
       {
         name: 'db-connection'
         value: dbConnectionString
+      }
+      {
+        name: 'blob-connection'
+        value: storage.outputs.connectionString
       }
     ]
   }
@@ -150,6 +169,7 @@ module containerEnv 'modules/containerAppsEnvironment.bicep' = {
 }
 
 var dbConnectionSecretUri = '${keyVault.outputs.vaultUri}secrets/db-connection'
+var blobConnectionSecretUri = '${keyVault.outputs.vaultUri}secrets/blob-connection'
 
 module api 'modules/containerApp.bicep' = {
   name: 'api'
@@ -172,12 +192,18 @@ module api 'modules/containerApp.bicep' = {
         name: 'db-connection'
         keyVaultUrl: dbConnectionSecretUri
       }
+      {
+        name: 'blob-connection'
+        keyVaultUrl: blobConnectionSecretUri
+      }
     ]
     env: [
       { name: 'ASPNETCORE_ENVIRONMENT', value: environment == 'dev' ? 'Development' : 'Production' }
       { name: 'ConnectionStrings__rotationsdb', secretRef: 'db-connection' }
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.outputs.connectionString }
       { name: 'Cors__AllowedOrigins__0', value: spaAllowedOrigin }
+      { name: 'Storage__Images__ConnectionString', secretRef: 'blob-connection' }
+      { name: 'Storage__Images__ContainerName', value: programImagesContainer }
     ]
   }
 }

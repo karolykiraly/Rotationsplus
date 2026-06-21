@@ -44,6 +44,9 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
         // are set by the AddProgramCatalogFields migration's raw UpdateData instead.
         builder.Property(x => x.Tags).HasDefaultValueSql("'{}'");
 
+        // Blob name of the hospital image (e.g. "<programId>/<guid>.jpg"); bounded well above any key we mint.
+        builder.Property(x => x.ImageBlobName).HasMaxLength(512);
+
         builder.Property(x => x.RetailAmountPerWeek).HasPrecision(10, 2);
         builder.Property(x => x.WeeklyHonorarium).HasPrecision(10, 2);
         builder.Property(x => x.Description).HasMaxLength(4000);

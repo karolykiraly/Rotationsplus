@@ -236,7 +236,7 @@ Replace `html-pdf`/EJS with **QuestPDF** (free Community license under $1M reven
 | PostgreSQL Flexible Server | B1ms, 32GB | B1ms | B2s or D2ds_v4, zone-redundant HA optional, PITR 7→35 days | |
 | Azure Cache for Redis | (omit — in-memory fallback) | C0 Basic | C1 Standard | |
 | Service Bus | Basic→Standard | Standard | Standard | topics need Standard |
-| Storage (Blob) | LRS | LRS | GRS, soft delete + versioning | containers: `documents` (private), `avatars`, `public-assets` |
+| Storage (Blob) | LRS | LRS | GRS, soft delete + versioning | containers: `program-images` (private, read via SAS — PHASE 2b), `documents` (private), `avatars`, `public-assets`. Account-key connection string in Key Vault (Contributor pipeline can't grant Blob RBAC). |
 | Key Vault | 1 per env | 1 | 1 (purge protection) | |
 | Static Web Apps | Free | Free | Standard | custom domains via Cloudflare CNAME |
 | ACR | Basic (shared across envs) | — | — | |

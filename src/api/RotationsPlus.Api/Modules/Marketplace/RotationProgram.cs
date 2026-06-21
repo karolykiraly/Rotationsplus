@@ -47,5 +47,10 @@ public sealed class RotationProgram : AuditableEntity
     /// balance billed as an outstanding payment. Mirrors the legacy open-vs-manual availability mode.</summary>
     public bool IsOpen { get; set; }
 
+    /// <summary>Storage key (blob name) of the hospital image in the program-images container, or null
+    /// when none. The rewrite analog of the legacy <c>hospital_image</c> path. Never returned to clients
+    /// directly — the API mints a short-lived read URL (SAS) from it at projection time.</summary>
+    public string? ImageBlobName { get; set; }
+
     public string? Description { get; set; }
 }

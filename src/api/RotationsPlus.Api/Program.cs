@@ -50,6 +50,20 @@ builder.Services.AddScoped<StaffProfileProvisioner>();
 builder.Services.Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName));
 builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
 
+// --- Program images: hospital photos live in blob storage; the API mints short-lived read SAS URLs.
+//     The connection string is injected from Key Vault on DEV/PROD (infra/bicep/main.bicep). When it's
+//     absent (local dev / integration tests) a functional in-memory store stands in so upload + serve
+//     still work end-to-end without Azure. ---
+builder.Services.Configure<ProgramImageOptions>(builder.Configuration.GetSection(ProgramImageOptions.SectionName));
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{ProgramImageOptions.SectionName}:ConnectionString"]))
+{
+    builder.Services.AddSingleton<IProgramImageStore, AzureBlobProgramImageStore>();
+}
+else
+{
+    builder.Services.AddSingleton<IProgramImageStore, InMemoryProgramImageStore>();
+}
+
 // --- Data: single Postgres DB / single DbContext (connection name "rotationsdb"). ---
 // The audit interceptor stamps audit columns + soft-deletes. HttpContextAccessor's backing store
 // is a static AsyncLocal, so a directly-constructed instance still resolves the current request's
@@ -99,6 +113,7 @@ app.MapCustomerMeEndpoints();
 app.MapCustomerRotationEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
+app.MapProgramImageEndpoints();
 app.MapPaymentEndpoints();
 app.MapPaymentWebhookEndpoints();
 app.MapPaymentRefundEndpoints();

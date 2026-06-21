@@ -43,6 +43,10 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/programs", [RoleNames.Admin], "Create program (admin)"),
         new("PUT", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update program (admin)"),
         new("DELETE", "/api/programs/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete program (admin)"),
+        // Program image upload/delete are AdminOnly. Empty body / non-existent id → authorized admins get
+        // 400/404 (not 401/403), which the authz-only matrix accepts; behaviour is in ProgramImageEndpointTests.
+        new("POST", "/api/programs/00000000-0000-0000-0000-000000000000/image", [RoleNames.Admin], "Upload program image (admin)"),
+        new("DELETE", "/api/programs/00000000-0000-0000-0000-000000000000/image", [RoleNames.Admin], "Delete program image (admin)"),
         new("GET", "/api/preceptors", RoleNames.Staff, "List marketplace preceptors"),
         new("GET", "/api/preceptors/dddddddd-0000-0000-0000-000000000001", RoleNames.Staff, "Get preceptor by id"),
         new("POST", "/api/preceptors", [RoleNames.Admin], "Create preceptor (admin)"),

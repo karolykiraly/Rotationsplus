@@ -22,7 +22,7 @@ public static class ProgramEndpoints
 
         group.MapGet("/", async (
             Guid? specialtyId, Guid? preceptorId, ProgramType? programType, decimal? maxRetailPerWeek, string? q,
-            RotationsDbContext db, CancellationToken cancellationToken) =>
+            RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             // Catalog search/filter. All filters are optional and AND together; omitting one widens
             // the result. Open to staff + signed-in customers (MarketplaceViewer).
@@ -63,14 +63,19 @@ public static class ProgramEndpoints
                     p.City,
                     p.State,
                     p.IsOpen,
-                    p.Tags))
+                    p.Tags,
+                    p.ImageBlobName)) // raw blob name in SQL; rewritten to a read URL below (can't sign SAS in SQL)
                 .ToListAsync(cancellationToken);
 
-            return Results.Ok(programs);
+            var withUrls = programs
+                .Select(p => p with { ImageUrl = imageStore.GetReadUrl(p.ImageUrl) })
+                .ToList();
+
+            return Results.Ok(withUrls);
         })
         .WithName("ListPrograms");
 
-        group.MapGet("/{id:guid}", async (Guid id, ICurrentUser user, RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/{id:guid}", async (Guid id, ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             // Honorarium (preceptor pay → platform margin) is staff-only; hide it from customers.
             var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
@@ -93,16 +98,22 @@ public static class ProgramEndpoints
                     p.ProgramNumber,
                     p.City,
                     p.State,
-                    p.Tags))
+                    p.Tags,
+                    p.ImageBlobName)) // raw blob name in SQL; rewritten to a read URL below
                 .FirstOrDefaultAsync(cancellationToken);
 
-            return program is null ? Results.NotFound() : Results.Ok(program);
+            if (program is null)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Ok(program with { ImageUrl = imageStore.GetReadUrl(program.ImageUrl) });
         })
         .WithName("GetProgram");
 
         // ---- Admin writes (AdminOnly stacks on the group's MarketplaceViewer) ----
 
-        group.MapPost("/", async (CreateProgramRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapPost("/", async (CreateProgramRequest request, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
                     request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
@@ -141,12 +152,12 @@ public static class ProgramEndpoints
             db.Programs.Add(program);
             await db.SaveChangesAsync(cancellationToken);
 
-            return Results.Created($"/api/programs/{program.Id}", ToDetail(program, specialtyName, preceptorName));
+            return Results.Created($"/api/programs/{program.Id}", ToDetail(program, specialtyName, preceptorName, imageStore));
         })
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("CreateProgram");
 
-        group.MapPut("/{id:guid}", async (Guid id, UpdateProgramRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapPut("/{id:guid}", async (Guid id, UpdateProgramRequest request, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
                     request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
@@ -187,7 +198,7 @@ public static class ProgramEndpoints
             program.Description = description;
             await db.SaveChangesAsync(cancellationToken);
 
-            return Results.Ok(ToDetail(program, specialtyName, preceptorName));
+            return Results.Ok(ToDetail(program, specialtyName, preceptorName, imageStore));
         })
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("UpdateProgram");
@@ -352,8 +363,8 @@ public static class ProgramEndpoints
         return name is null ? (false, null, $"Preceptor '{id}' does not exist.") : (true, name, null);
     }
 
-    private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName) =>
+    private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName, IProgramImageStore imageStore) =>
         new(p.Id, p.SpecialtyId, specialtyName, p.ProgramType, p.MaxStudentsPerRotation,
             p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName,
-            p.IsOpen, p.ProgramNumber, p.City, p.State, p.Tags);
+            p.IsOpen, p.ProgramNumber, p.City, p.State, p.Tags, imageStore.GetReadUrl(p.ImageBlobName));
 }
