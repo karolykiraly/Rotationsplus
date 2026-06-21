@@ -77,6 +77,7 @@ public class CustomerBookingEndpointTests(RotationsApiFactory factory) : IClassF
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var booked = await response.Content.ReadFromJsonAsync<CustomerRotationResponse>(JsonOptions);
         booked!.Status.Should().Be(RotationStatus.Pending);
+        booked.RotationNumber.Should().BeGreaterThan(1001);   // server-assigned sequential number → "R{n}"
         booked.Weeks.Should().Be(4);
         booked.StartDate.Should().Be(FutureStart);
         booked.EndDate.Should().Be(FutureStart.AddDays(28)); // 4 weeks

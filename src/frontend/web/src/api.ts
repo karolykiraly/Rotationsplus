@@ -155,6 +155,7 @@ export type RotationStatus =
 /** Mirror of the API's RotationSummaryResponse contract (enums serialized as strings; dates as YYYY-MM-DD). */
 export interface Rotation {
   id: string;
+  rotationNumber: number;
   studentName: string;
   studentEmail: string;
   specialtyName: string;
@@ -171,6 +172,7 @@ export interface Rotation {
  *  rows) and is what the form's picker binds to. */
 export interface RotationDetail {
   id: string;
+  rotationNumber: number;
   programId: string;
   specialtyName: string;
   programType: ProgramType;

@@ -12,6 +12,10 @@ namespace RotationsPlus.Api.Modules.Rotations;
 /// </summary>
 public sealed class Rotation : AuditableEntity
 {
+    /// <summary>Short, human-facing sequential number (DB identity) shown to users as "R{number}" —
+    /// the rewrite analog of the legacy integer rotation id. Server-assigned; never set from a request.</summary>
+    public int RotationNumber { get; set; }
+
     public required Guid ProgramId { get; set; }
     public RotationProgram Program { get; set; } = null!;
 

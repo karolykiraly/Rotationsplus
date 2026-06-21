@@ -35,6 +35,7 @@ describe("MyRotationsPage", () => {
     h.getCustomerRotations.mockReset().mockResolvedValue([
       {
         id: "r1",
+        rotationNumber: 1001,
         specialtyName: "Internal Medicine",
         programType: "InPerson",
         preceptorName: "Jane Carter",
@@ -45,6 +46,7 @@ describe("MyRotationsPage", () => {
       },
       {
         id: "r2",
+        rotationNumber: 1002,
         specialtyName: "Pediatrics",
         programType: "TeleRotation",
         preceptorName: null,
@@ -55,6 +57,7 @@ describe("MyRotationsPage", () => {
       },
       {
         id: "r3",
+        rotationNumber: 1003,
         specialtyName: "Cardiology",
         programType: "InPerson",
         preceptorName: null,
@@ -78,6 +81,8 @@ describe("MyRotationsPage", () => {
   it("renders the student's rotation cards with preceptor and status", async () => {
     renderPage();
     expect(await screen.findByText("Internal Medicine", { selector: ".pc-specialty" })).toBeInTheDocument();
+    // The rotation number renders as "R{number}".
+    expect(screen.getByText("R1001")).toBeInTheDocument();
     // Preceptor now shows under a "Preceptor" column label (live tracker style), just the name.
     expect(screen.getByText("Jane Carter")).toBeInTheDocument();
     expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();

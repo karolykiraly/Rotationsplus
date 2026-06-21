@@ -118,7 +118,12 @@ export function RotationsPage() {
   // Client-side search + pagination over the (server status-filtered) list.
   const q = search.trim().toLowerCase();
   const filtered = rotations.filter(
-    (r) => !q || `${r.studentName} ${r.studentEmail} ${r.preceptorName ?? ""} ${r.specialtyName}`.toLowerCase().includes(q)
+    (r) =>
+      !q ||
+      // Include the rotation number (both "R1001" and "1001") so the "Number" search works.
+      `R${r.rotationNumber} ${r.rotationNumber} ${r.studentName} ${r.studentEmail} ${r.preceptorName ?? ""} ${r.specialtyName}`
+        .toLowerCase()
+        .includes(q)
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -166,7 +171,7 @@ export function RotationsPage() {
                   <tr key={r.id} className="rot-row">
                     <td className="first-td">
                       <div className="place-holder">Rotation Number</div>
-                      <div className="heading-xxxs">—</div>
+                      <div className="heading-xxxs">{r.rotationNumber ? `R${r.rotationNumber}` : "—"}</div>
                     </td>
                     <td>
                       <div className="place-holder">Student Name</div>

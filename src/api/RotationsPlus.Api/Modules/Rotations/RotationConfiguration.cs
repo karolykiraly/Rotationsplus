@@ -22,6 +22,12 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
         builder.ToTable("rotations", "operations");
         builder.HasKey(x => x.Id);
 
+        // Sequential, server-assigned rotation number (DB identity) shown as "R{number}". The seeded row
+        // uses an explicit high value (1001); the migration restarts the sequence above it so new inserts
+        // never collide. (At cutover the DataMigrator carries legacy rotation ids in and bumps the sequence.)
+        builder.Property(x => x.RotationNumber).UseIdentityByDefaultColumn();
+        builder.HasIndex(x => x.RotationNumber).IsUnique();
+
         // 256 (not 200) so the snapshot can always hold "FirstName LastName" — each is varchar(100) on
         // the student, so the composed name is up to 201 chars.
         builder.Property(x => x.StudentName).HasMaxLength(256).IsRequired();
@@ -58,6 +64,7 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
         builder.HasData(new
         {
             Id = Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"),
+            RotationNumber = 1001,
             ProgramId = Guid.Parse(InternalMedicineInPerson),
             StudentId = Guid.Parse(SamRivera),
             StudentName = "Sam Rivera",

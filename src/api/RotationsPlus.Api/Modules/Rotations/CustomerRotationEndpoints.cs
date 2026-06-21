@@ -39,6 +39,7 @@ public static class CustomerRotationEndpoints
                 .OrderByDescending(r => r.StartDate)
                 .Select(r => new CustomerRotationResponse(
                     r.Id,
+                    r.RotationNumber,
                     r.Program.Specialty.Name,
                     r.Program.ProgramType,
                     r.Program.Preceptor != null ? r.Program.Preceptor.FirstName + " " + r.Program.Preceptor.LastName : null,
@@ -128,7 +129,7 @@ public static class CustomerRotationEndpoints
             await db.SaveChangesAsync(cancellationToken);
 
             var response = new CustomerRotationResponse(
-                rotation.Id, program.SpecialtyName, program.ProgramType, program.PreceptorName,
+                rotation.Id, rotation.RotationNumber, program.SpecialtyName, program.ProgramType, program.PreceptorName,
                 rotation.StartDate, rotation.EndDate, rotation.Weeks, rotation.Status);
             return Results.Created($"/api/customer/rotations/{rotation.Id}", response);
         })

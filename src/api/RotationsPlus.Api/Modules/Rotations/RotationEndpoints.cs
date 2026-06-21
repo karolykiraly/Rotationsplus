@@ -31,6 +31,7 @@ public static class RotationEndpoints
                 .OrderByDescending(r => r.StartDate)
                 .Select(r => new RotationSummaryResponse(
                     r.Id,
+                    r.RotationNumber,
                     r.StudentName,
                     r.StudentEmail,
                     r.Program.Specialty.Name,
@@ -211,7 +212,7 @@ public static class RotationEndpoints
     }
 
     private static RotationDetailResponse ToDetail(Rotation r, ProgramInfo program) =>
-        new(r.Id, r.ProgramId, program.SpecialtyName, program.ProgramType, program.PreceptorName,
+        new(r.Id, r.RotationNumber, r.ProgramId, program.SpecialtyName, program.ProgramType, program.PreceptorName,
             r.StudentId, r.StudentName, r.StudentEmail, r.StudentOid, r.StartDate, r.EndDate, r.Weeks, r.Status,
             RotationStatusMachine.NextFrom(r.Status));
 }

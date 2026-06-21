@@ -5,6 +5,7 @@ namespace RotationsPlus.Contracts.Rotations;
 /// <summary>A rotation as shown in the admin list (program + preceptor flattened for the table).</summary>
 public sealed record RotationSummaryResponse(
     Guid Id,
+    int RotationNumber,
     string StudentName,
     string StudentEmail,
     string SpecialtyName,
@@ -20,6 +21,7 @@ public sealed record RotationSummaryResponse(
 /// the program's preceptor and the dates/status are what they track.</summary>
 public sealed record CustomerRotationResponse(
     Guid Id,
+    int RotationNumber,
     string SpecialtyName,
     ProgramType ProgramType,
     string? PreceptorName,
@@ -32,6 +34,7 @@ public sealed record CustomerRotationResponse(
 /// (null only for legacy rows); the name/email/oid are the snapshot taken at write time.</summary>
 public sealed record RotationDetailResponse(
     Guid Id,
+    int RotationNumber,
     Guid ProgramId,
     string SpecialtyName,
     ProgramType ProgramType,

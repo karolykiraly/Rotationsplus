@@ -64,12 +64,12 @@ export function MyRotationsPage() {
           <div className="div-table">
             {shown.map((r) => (
               <div key={r.id} className="responsive-row" aria-label={`${r.specialtyName} rotation`}>
-                {/* Program ID + Rotation Number are PHASE-2 fields the API doesn't expose yet. */}
+                {/* Program ID stays a placeholder until the customer rotation DTO carries the program code. */}
                 <Cell header="Program ID" value="—" valueClass="responsive-col-strong" />
                 <Cell header="Specialty" value={r.specialtyName} valueClass="responsive-col-value pc-specialty" />
                 <Cell header="Type" value={programTypeLabel(r.programType)} />
                 <Cell header="Preceptor" value={r.preceptorName ?? "—"} />
-                <Cell header="Rotation Number" value="—" valueClass="responsive-col-strong" />
+                <Cell header="Rotation Number" value={r.rotationNumber ? `R${r.rotationNumber}` : "—"} valueClass="responsive-col-strong" />
                 <Cell header="Start Date" value={formatDate(r.startDate)} />
                 <Cell header="End Date" value={formatDate(r.endDate)} />
                 <Cell header="Weeks" value={r.weeks} />

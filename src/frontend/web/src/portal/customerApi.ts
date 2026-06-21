@@ -25,6 +25,7 @@ export interface CustomerMe {
 /** Mirror of the API's CustomerRotationResponse contract — the student's own rotation, as tracked. */
 export interface CustomerRotation {
   id: string;
+  rotationNumber: number;
   specialtyName: string;
   programType: ProgramType;
   preceptorName?: string | null;

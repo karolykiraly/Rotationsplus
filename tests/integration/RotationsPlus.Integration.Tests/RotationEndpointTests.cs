@@ -59,7 +59,8 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
 
         var seeded = list!.SingleOrDefault(r => r.Id == SeededRotationId);
         seeded.Should().NotBeNull();
-        seeded!.StudentName.Should().Be("Sam Rivera");
+        seeded!.RotationNumber.Should().Be(1001);   // seeded sequential number → client formats as "R1001"
+        seeded.StudentName.Should().Be("Sam Rivera");
         seeded.SpecialtyName.Should().Be("Internal Medicine");
         seeded.ProgramType.Should().Be(ProgramType.InPerson);
         seeded.PreceptorName.Should().Be("Jane Carter");
@@ -74,6 +75,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var rotation = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{SeededRotationId}", JsonOptions);
 
         rotation!.Id.Should().Be(SeededRotationId);
+        rotation.RotationNumber.Should().Be(1001);
         rotation.ProgramId.Should().Be(InternalMedicineProgramId);
         rotation.StudentId.Should().Be(SamRiveraStudentId);   // linked to the directory record
         rotation.StudentName.Should().Be("Sam Rivera");
@@ -105,6 +107,7 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var created = await create.Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
         created.Should().NotBeNull();
         created!.ProgramId.Should().Be(InternalMedicineProgramId);
+        created.RotationNumber.Should().BeGreaterThan(1001);   // server-assigned above the seeded number
         created.SpecialtyName.Should().Be("Internal Medicine");
         created.PreceptorName.Should().Be("Jane Carter");
         created.StudentId.Should().Be(DanaColeStudentId);

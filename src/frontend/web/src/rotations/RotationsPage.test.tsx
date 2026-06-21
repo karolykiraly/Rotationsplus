@@ -38,6 +38,7 @@ import { ApiError } from "../api";
 const ADMIN = { objectId: "o", name: "Ada", username: "ada@x", roles: ["Admin"], isStaff: true, profileId: "p" };
 const ROTATION_ROW = {
   id: "r1",
+  rotationNumber: 1001,
   studentName: "Sam Rivera",
   studentEmail: "sam@x.com",
   specialtyName: "Internal Medicine",
@@ -50,6 +51,7 @@ const ROTATION_ROW = {
 };
 const ROTATION_DETAIL = {
   id: "r1",
+  rotationNumber: 1001,
   programId: "prog1",
   specialtyName: "Internal Medicine",
   programType: "InPerson",
@@ -108,8 +110,23 @@ describe("RotationsPage", () => {
     expect(screen.getByText("sam@x.com")).toBeInTheDocument();
     expect(screen.getByText("In person")).toBeInTheDocument();
     expect(screen.getByText("Jane Carter")).toBeInTheDocument();
+    // The rotation number renders as "R{number}".
+    expect(screen.getByText("R1001")).toBeInTheDocument();
     // Status "Active" renders as its badge (scoped: "Active" is also a filter-dropdown option).
     expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();
+  });
+
+  it("filters by rotation number via the search box", async () => {
+    h.getRotations.mockResolvedValue([
+      ROTATION_ROW,
+      { ...ROTATION_ROW, id: "r2", rotationNumber: 2002, studentName: "Dana Cole", studentEmail: "dana@x.com" }
+    ]);
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    await userEvent.type(screen.getByPlaceholderText("Search for Number/Preceptor/Student"), "R1001");
+    expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
+    expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument();
   });
 
   it("blocks non-admins", async () => {
