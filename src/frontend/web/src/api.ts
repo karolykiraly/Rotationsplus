@@ -278,6 +278,25 @@ export interface UpcomingRotation {
   status: RotationStatus;
 }
 
+/** Mirror of the API's ProgramTypeCount contract — how many programs are of a given delivery type. */
+export interface ProgramTypeCount {
+  type: ProgramType;
+  count: number;
+}
+
+/** Mirror of the API's TodayMetrics contract — the "Today's LiveScore" movement (business day). */
+export interface TodayMetrics {
+  newPrograms: number;
+  newProgramsByType: ProgramTypeCount[];
+  newStudents: number;
+  newPreceptors: number;
+  issuesReported: number;
+  rotationsStarting: number;
+  rotationsInProgress: number;
+  rotationsCompleting: number;
+  rotationsCancelled: number;
+}
+
 /** Mirror of the API's DashboardResponse contract — the admin hub aggregate. */
 export interface Dashboard {
   students: number;
@@ -285,8 +304,10 @@ export interface Dashboard {
   preceptors: number;
   specialties: number;
   rotations: number;
+  programsByType: ProgramTypeCount[];
   rotationsByStatus: RotationStatusCount[];
   upcomingStarts: UpcomingRotation[];
+  today: TodayMetrics;
 }
 
 /** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.

@@ -3,6 +3,7 @@ import { useMe } from "../useMe";
 import { useDashboard } from "./useDashboard";
 import { Tabs } from "../components/Tabs";
 import { rotationStatusLabel } from "../rotations/rotationStatuses";
+import { programFamilyCount } from "../programs/programTypes";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -41,8 +42,9 @@ function Pill({ value }: { value: number | string }) {
 }
 
 /** Admin dashboard — cloned to the live app: an Upcoming-Starts calendar + table, a tab bar, and the
- *  Today's-LiveScore / LiveScore metric cards. Totals + the rotations breakdown come from the API;
- *  daily/per-type metrics the API doesn't expose yet are placeholders (0 / —). */
+ *  Today's-LiveScore / LiveScore metric cards. Totals, the per-type program breakdown, the rotation
+ *  pipeline, and the day's movement all come from the API (GET /api/dashboard). "Issues Reported" is
+ *  0 until the issues subsystem exists. */
 export function DashboardPage() {
   const { user } = useMe();
   const dash = useDashboard();
@@ -59,6 +61,9 @@ export function DashboardPage() {
   if (!data) return null;
 
   const byStatus = (s: string) => data.rotationsByStatus.find((x) => x.status === s)?.count ?? 0;
+  const t = data.today;
+  // The Rotations-Cycle circle is the sum of its (disjoint) breakdown buckets.
+  const cycleTotal = t.rotationsStarting + t.rotationsInProgress + t.rotationsCompleting + t.rotationsCancelled;
 
   // Days in the shown month that have an upcoming rotation start (pink calendar dots).
   const eventDays = new Set(
@@ -133,28 +138,28 @@ export function DashboardPage() {
               <div className="score-metric">
                 <div className="score-metric-title">New Programs Added</div>
                 <div className="score-row">
-                  <Circle value={0} />
+                  <Circle value={t.newPrograms} />
                   <ul className="score-breakdown">
-                    <li>InPerson <Badge value={0} /></li>
-                    <li>Consultation <Badge value={0} /></li>
-                    <li>TeleRotation <Badge value={0} /></li>
+                    <li>InPerson <Badge value={programFamilyCount(t.newProgramsByType, "InPerson")} /></li>
+                    <li>Consultation <Badge value={programFamilyCount(t.newProgramsByType, "Consultation")} /></li>
+                    <li>TeleRotation <Badge value={programFamilyCount(t.newProgramsByType, "TeleRotation")} /></li>
                   </ul>
                 </div>
               </div>
               <div className="score-metric">
-                <div className="score-pill-row"><div className="score-metric-title">New Students Registered</div><Pill value={0} /></div>
-                <div className="score-pill-row"><div className="score-metric-title">New Preceptors Approved</div><Pill value={0} /></div>
-                <div className="score-pill-row"><div className="score-metric-title">Issues Reported</div><Pill value={0} /></div>
+                <div className="score-pill-row"><div className="score-metric-title">New Students Registered</div><Pill value={t.newStudents} /></div>
+                <div className="score-pill-row"><div className="score-metric-title">New Preceptors Approved</div><Pill value={t.newPreceptors} /></div>
+                <div className="score-pill-row"><div className="score-metric-title">Issues Reported</div><Pill value={t.issuesReported} /></div>
               </div>
               <div className="score-metric">
                 <div className="score-metric-title">Rotations Cycle</div>
                 <div className="score-row">
-                  <Circle value={0} />
+                  <Circle value={cycleTotal} />
                   <ul className="score-breakdown">
-                    <li>Starting <Badge value={0} /></li>
-                    <li>In Progress <Badge value={0} /></li>
-                    <li>Completing <Badge value={0} /></li>
-                    <li>Canceled <Badge value={0} /></li>
+                    <li>Starting <Badge value={t.rotationsStarting} /></li>
+                    <li>In Progress <Badge value={t.rotationsInProgress} /></li>
+                    <li>Completing <Badge value={t.rotationsCompleting} /></li>
+                    <li>Canceled <Badge value={t.rotationsCancelled} /></li>
                   </ul>
                 </div>
                 <div className="score-metric-title">
@@ -171,10 +176,12 @@ export function DashboardPage() {
                 <div className="score-metric-title">Total Programs</div>
                 <div className="score-row">
                   <Circle value={data.programs} />
+                  {/* The legacy/Figma breakdown shows only these three families; Dental (if any) folds
+                      out, so the circle can exceed the sum of the three rows by the Dental count. */}
                   <ul className="score-breakdown">
-                    <li>InPerson <Badge value="—" /></li>
-                    <li>Consultation <Badge value="—" /></li>
-                    <li>TeleRotation <Badge value="—" /></li>
+                    <li>InPerson <Badge value={programFamilyCount(data.programsByType, "InPerson")} /></li>
+                    <li>Consultation <Badge value={programFamilyCount(data.programsByType, "Consultation")} /></li>
+                    <li>TeleRotation <Badge value={programFamilyCount(data.programsByType, "TeleRotation")} /></li>
                   </ul>
                 </div>
               </div>

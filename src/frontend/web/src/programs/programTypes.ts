@@ -34,3 +34,22 @@ const CODE_PREFIX: Record<ProgramType, string> = {
 /** The user-facing program code, e.g. "IP1042" (prefix by type + the server-assigned number). */
 export const programCode = (type: ProgramType | string, number: number): string =>
   `${CODE_PREFIX[type as ProgramType] ?? "PR"}${number}`;
+
+/** The display families the dashboard breaks programs into (research/sub variants fold into their base). */
+export type ProgramFamily = "InPerson" | "Consultation" | "TeleRotation" | "Dental";
+
+const FAMILY: Record<ProgramType, ProgramFamily> = {
+  InPerson: "InPerson",
+  InPersonResearch: "InPerson",
+  Consultation: "Consultation",
+  ConsultationSub: "Consultation",
+  TeleRotation: "TeleRotation",
+  TeleResearch: "TeleRotation",
+  Dental: "Dental"
+};
+
+/** Sum the per-type counts that belong to one display family (e.g. InPerson + InPersonResearch). */
+export const programFamilyCount = (
+  counts: { type: ProgramType; count: number }[],
+  family: ProgramFamily
+): number => counts.filter((c) => FAMILY[c.type] === family).reduce((n, c) => n + c.count, 0);

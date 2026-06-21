@@ -15,6 +15,13 @@ const DASH = {
   preceptors: 2,
   specialties: 15,
   rotations: 3,
+  // 4 programs: 2 InPerson family (InPerson + InPersonResearch), 1 Consultation, 1 TeleRotation.
+  programsByType: [
+    { type: "InPerson", count: 1 },
+    { type: "InPersonResearch", count: 1 },
+    { type: "Consultation", count: 1 },
+    { type: "TeleRotation", count: 1 }
+  ],
   rotationsByStatus: [
     { status: "Active", count: 2 },
     { status: "NotStarted", count: 1 }
@@ -22,7 +29,21 @@ const DASH = {
   upcomingStarts: [
     // Status "Pending" so its badge doesn't collide with the by-status panel's Active/Approved badges.
     { id: "r1", studentName: "Sam Rivera", specialtyName: "Internal Medicine", startDate: "2026-07-06", status: "Pending" }
-  ]
+  ],
+  today: {
+    newPrograms: 3,
+    newProgramsByType: [
+      { type: "InPerson", count: 2 },
+      { type: "Consultation", count: 1 }
+    ],
+    newStudents: 5,
+    newPreceptors: 4,
+    issuesReported: 0,
+    rotationsStarting: 1,
+    rotationsInProgress: 2,
+    rotationsCompleting: 3,
+    rotationsCancelled: 1
+  }
 };
 
 function newClient() {
@@ -51,6 +72,37 @@ describe("DashboardPage", () => {
     expect(within(students).getByText("2")).toBeInTheDocument();
     const specialties = screen.getByText("Total Specialties").closest(".score-pill-row") as HTMLElement;
     expect(within(specialties).getByText("15")).toBeInTheDocument();
+  });
+
+  it("renders the Total Programs per-type breakdown (families summed)", async () => {
+    renderPage();
+    const programs = (await screen.findByText("Total Programs")).closest(".score-metric") as HTMLElement;
+    // InPerson family = InPerson(1) + InPersonResearch(1) = 2; Consultation = 1; TeleRotation = 1.
+    expect(within(programs).getByText("InPerson").closest("li")).toHaveTextContent("2");
+    expect(within(programs).getByText("Consultation").closest("li")).toHaveTextContent("1");
+    expect(within(programs).getByText("TeleRotation").closest("li")).toHaveTextContent("1");
+  });
+
+  it("renders Today's LiveScore movement (new counts + rotation cycle)", async () => {
+    renderPage();
+    const newProg = (await screen.findByText("New Programs Added")).closest(".score-metric") as HTMLElement;
+    expect(within(newProg).getByText("3")).toBeInTheDocument(); // circle = newPrograms
+    expect(within(newProg).getByText("InPerson").closest("li")).toHaveTextContent("2");
+    expect(within(newProg).getByText("Consultation").closest("li")).toHaveTextContent("1");
+    expect(within(newProg).getByText("TeleRotation").closest("li")).toHaveTextContent("0");
+
+    const students = screen.getByText("New Students Registered").closest(".score-pill-row") as HTMLElement;
+    expect(within(students).getByText("5")).toBeInTheDocument();
+    const preceptors = screen.getByText("New Preceptors Approved").closest(".score-pill-row") as HTMLElement;
+    expect(within(preceptors).getByText("4")).toBeInTheDocument();
+
+    const cycle = screen.getByText("Rotations Cycle").closest(".score-metric") as HTMLElement;
+    // Circle = starting(1) + inProgress(2) + completing(3) + cancelled(1) = 7.
+    expect(within(cycle).getByText("7")).toBeInTheDocument();
+    expect(within(cycle).getByText("Starting").closest("li")).toHaveTextContent("1");
+    expect(within(cycle).getByText("In Progress").closest("li")).toHaveTextContent("2");
+    expect(within(cycle).getByText("Completing").closest("li")).toHaveTextContent("3");
+    expect(within(cycle).getByText("Canceled").closest("li")).toHaveTextContent("1");
   });
 
   it("renders the rotations breakdown from the by-status counts", async () => {

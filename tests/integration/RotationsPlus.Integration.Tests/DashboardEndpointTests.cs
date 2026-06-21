@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Dashboard;
+using RotationsPlus.Contracts.Marketplace;
 using RotationsPlus.Contracts.Rotations;
 
 namespace RotationsPlus.Integration.Tests;
@@ -16,7 +17,24 @@ namespace RotationsPlus.Integration.Tests;
 public class DashboardEndpointTests(RotationsApiFactory factory) : IClassFixture<RotationsApiFactory>
 {
     private static readonly Guid InternalMedicineProgramId = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
+    private static readonly Guid InternalMedicineSpecialtyId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid SamRiveraStudentId = Guid.Parse("ffffffff-0000-0000-0000-000000000001");
+
+    // The business day the dashboard uses (US/Pacific), computed the same way the endpoint does so the
+    // date-driven "today" assertions don't straddle a UTC-vs-Pacific midnight boundary.
+    private static readonly TimeZoneInfo BusinessZone = ResolveBusinessZone();
+    private static DateOnly BusinessToday() =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, BusinessZone).DateTime);
+
+    private static TimeZoneInfo ResolveBusinessZone()
+    {
+        foreach (var id in new[] { "America/Los_Angeles", "Pacific Standard Time" })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException) { }
+        }
+        return TimeZoneInfo.Utc;
+    }
 
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
@@ -46,6 +64,52 @@ public class DashboardEndpointTests(RotationsApiFactory factory) : IClassFixture
         // The pipeline sums to the rotation total, and the seeded Active rotation is represented.
         dash.RotationsByStatus.Sum(s => s.Count).Should().Be(dash.Rotations);
         dash.RotationsByStatus.Should().Contain(s => s.Status == RotationStatus.Active);
+
+        // The per-type program breakdown sums to the program total.
+        dash.ProgramsByType.Sum(p => p.Count).Should().Be(dash.Programs);
+
+        // Today's movement is present and internally consistent (non-negative; new-by-type sums to new).
+        dash.Today.Should().NotBeNull();
+        dash.Today.NewProgramsByType.Sum(p => p.Count).Should().Be(dash.Today.NewPrograms);
+        dash.Today.NewStudents.Should().BeGreaterThanOrEqualTo(0);
+        dash.Today.NewPreceptors.Should().BeGreaterThanOrEqualTo(0);
+        dash.Today.IssuesReported.Should().Be(0); // no issues subsystem yet
+    }
+
+    [Fact]
+    public async Task A_program_created_today_shows_up_in_todays_new_programs()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var before = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+        var dentalBefore = before!.Today.NewProgramsByType
+            .Where(p => p.Type == ProgramType.Dental).Sum(p => p.Count);
+
+        await CreateProgramAsync(admin, ProgramType.Dental);
+
+        var after = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+
+        after!.Today.NewPrograms.Should().BeGreaterThan(before.Today.NewPrograms);
+        after.Today.NewProgramsByType.Where(p => p.Type == ProgramType.Dental).Sum(p => p.Count)
+            .Should().Be(dentalBefore + 1);
+        // The new program also lands in the all-time per-type totals.
+        after.ProgramsByType.Should().Contain(p => p.Type == ProgramType.Dental && p.Count >= 1);
+    }
+
+    [Fact]
+    public async Task A_rotation_starting_today_counts_in_the_rotation_cycle()
+    {
+        var admin = Client(RoleNames.Admin);
+        var today = BusinessToday();
+
+        var before = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+
+        // A live (NotStarted) rotation whose start date is today → counts as "starting today".
+        await CreateRotationAsync(admin, today, today.AddDays(28));
+
+        var after = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+
+        after!.Today.RotationsStarting.Should().Be(before!.Today.RotationsStarting + 1);
     }
 
     [Fact]
@@ -81,6 +145,18 @@ public class DashboardEndpointTests(RotationsApiFactory factory) : IClassFixture
         var response = await factory.CreateClient().GetAsync("/api/dashboard");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task CreateProgramAsync(HttpClient admin, ProgramType type)
+    {
+        var request = new CreateProgramRequest(
+            InternalMedicineSpecialtyId, type,
+            MaxStudentsPerRotation: 2, MinWeeksPerRotation: 4,
+            RetailAmountPerWeek: 500m, WeeklyHonorarium: 100m,
+            Description: "Dashboard metrics test program", PreceptorId: null);
+
+        var response = await admin.PostAsJsonAsync("/api/programs", request, JsonOptions);
+        response.EnsureSuccessStatusCode();
     }
 
     private async Task<Guid> CreateRotationAsync(HttpClient admin, DateOnly start, DateOnly end)
