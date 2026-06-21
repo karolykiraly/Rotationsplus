@@ -21,6 +21,21 @@ public sealed class RotationProgram : AuditableEntity
 
     public required ProgramType ProgramType { get; set; }
 
+    /// <summary>A short, human-facing sequential number (DB identity) shown to users as a typed code
+    /// (e.g. "IP1042") — the rewrite analog of the legacy integer <c>program_id</c>. Server-assigned;
+    /// never set from a request.</summary>
+    public int ProgramNumber { get; set; }
+
+    /// <summary>Program location (city / US state). Optional — populated from the production data
+    /// migration; the rewrite seed leaves sample values.</summary>
+    public string? City { get; set; }
+    public string? State { get; set; }
+
+    /// <summary>Free-form marketplace tags shown as chips (e.g. "Hospital Letterhead LOR", "Research").
+    /// "Instant Approval" is NOT stored here — it is derived from <see cref="IsOpen"/> at projection
+    /// time so the flag and the tag can never disagree.</summary>
+    public List<string> Tags { get; set; } = [];
+
     public int MaxStudentsPerRotation { get; set; }
     public int MinWeeksPerRotation { get; set; }
 

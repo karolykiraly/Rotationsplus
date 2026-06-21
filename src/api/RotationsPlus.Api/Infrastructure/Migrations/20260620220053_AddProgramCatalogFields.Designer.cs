@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RotationsPlus.Api.Infrastructure;
@@ -12,9 +13,11 @@ using RotationsPlus.Api.Infrastructure;
 namespace RotationsPlus.Api.Infrastructure.Migrations
 {
     [DbContext(typeof(RotationsDbContext))]
-    partial class RotationsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260620220053_AddProgramCatalogFields")]
+    partial class AddProgramCatalogFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -303,6 +306,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             RetailAmountPerWeek = 1500m,
                             SpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000001"),
                             State = "CA",
+                            Tags = new List<string> { "Hospital Letterhead LOR", "Inpatient" },
                             WeeklyHonorarium = 500m
                         },
                         new
@@ -322,6 +326,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             RetailAmountPerWeek = 1000m,
                             SpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000001"),
                             State = "NY",
+                            Tags = new List<string> { "Research" },
                             WeeklyHonorarium = 300m
                         },
                         new
@@ -341,6 +346,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             RetailAmountPerWeek = 1800m,
                             SpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000007"),
                             State = "TX",
+                            Tags = new List<string> { "Hands On" },
                             WeeklyHonorarium = 600m
                         },
                         new
@@ -359,6 +365,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             RetailAmountPerWeek = 900m,
                             SpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000003"),
                             State = "IL",
+                            Tags = new List<string>(),
                             WeeklyHonorarium = 250m
                         });
                 });

@@ -12,7 +12,10 @@ public sealed record CreateProgramRequest(
     decimal WeeklyHonorarium,
     string? Description,
     Guid? PreceptorId,
-    bool IsOpen = false);
+    bool IsOpen = false,
+    string? City = null,
+    string? State = null,
+    IReadOnlyList<string>? Tags = null);
 
 /// <summary>Admin payload to update a marketplace program (full replace of mutable fields).
 /// <c>PreceptorId</c> null clears the assignment. <c>IsOpen</c> defaults to non-open.</summary>
@@ -25,4 +28,7 @@ public sealed record UpdateProgramRequest(
     decimal WeeklyHonorarium,
     string? Description,
     Guid? PreceptorId,
-    bool IsOpen = false);
+    bool IsOpen = false,
+    string? City = null,
+    string? State = null,
+    IReadOnlyList<string>? Tags = null);

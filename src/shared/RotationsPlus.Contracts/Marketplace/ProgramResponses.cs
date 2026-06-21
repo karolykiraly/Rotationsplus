@@ -1,15 +1,22 @@
 namespace RotationsPlus.Contracts.Marketplace;
 
 /// <summary>A clinical-rotation program as shown in the catalog list. <c>PreceptorName</c> is null
-/// when no preceptor is assigned yet.</summary>
+/// when no preceptor is assigned yet. <c>ProgramNumber</c> is the server-assigned sequential number
+/// the client formats into a typed code (e.g. "IP1042"); <c>IsOpen</c> drives the "Instant Approval"
+/// chip; <c>Tags</c> are free-form marketplace chips.</summary>
 public sealed record ProgramSummaryResponse(
     Guid Id,
+    int ProgramNumber,
     string SpecialtyName,
     ProgramType ProgramType,
     int MaxStudentsPerRotation,
     int MinWeeksPerRotation,
     decimal RetailAmountPerWeek,
-    string? PreceptorName);
+    string? PreceptorName,
+    string? City,
+    string? State,
+    bool IsOpen,
+    IReadOnlyList<string> Tags);
 
 /// <summary>Full detail for a single clinical-rotation program. <c>WeeklyHonorarium</c> (the
 /// preceptor's pay, i.e. platform margin vs. the retail price) is staff-only — it is null for
@@ -26,4 +33,8 @@ public sealed record ProgramDetailResponse(
     string? Description,
     Guid? PreceptorId,
     string? PreceptorName,
-    bool IsOpen);
+    bool IsOpen,
+    int ProgramNumber,
+    string? City,
+    string? State,
+    IReadOnlyList<string> Tags);

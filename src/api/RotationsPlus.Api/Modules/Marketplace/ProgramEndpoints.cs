@@ -53,12 +53,17 @@ public static class ProgramEndpoints
                 .ThenBy(p => p.ProgramType)
                 .Select(p => new ProgramSummaryResponse(
                     p.Id,
+                    p.ProgramNumber,
                     p.Specialty.Name,
                     p.ProgramType,
                     p.MaxStudentsPerRotation,
                     p.MinWeeksPerRotation,
                     p.RetailAmountPerWeek,
-                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
+                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
+                    p.City,
+                    p.State,
+                    p.IsOpen,
+                    p.Tags))
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(programs);
@@ -84,7 +89,11 @@ public static class ProgramEndpoints
                     p.Description,
                     p.PreceptorId,
                     p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
-                    p.IsOpen))
+                    p.IsOpen,
+                    p.ProgramNumber,
+                    p.City,
+                    p.State,
+                    p.Tags))
                 .FirstOrDefaultAsync(cancellationToken);
 
             return program is null ? Results.NotFound() : Results.Ok(program);
@@ -96,7 +105,8 @@ public static class ProgramEndpoints
         group.MapPost("/", async (CreateProgramRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
-                    request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, out var description, out var error))
+                    request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
+                    out var description, out var city, out var state, out var tags, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -123,6 +133,9 @@ public static class ProgramEndpoints
                 RetailAmountPerWeek = request.RetailAmountPerWeek,
                 WeeklyHonorarium = request.WeeklyHonorarium,
                 IsOpen = request.IsOpen,
+                City = city,
+                State = state,
+                Tags = tags,
                 Description = description,
             };
             db.Programs.Add(program);
@@ -136,7 +149,8 @@ public static class ProgramEndpoints
         group.MapPut("/{id:guid}", async (Guid id, UpdateProgramRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
-                    request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, out var description, out var error))
+                    request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
+                    out var description, out var city, out var state, out var tags, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -167,6 +181,9 @@ public static class ProgramEndpoints
             program.RetailAmountPerWeek = request.RetailAmountPerWeek;
             program.WeeklyHonorarium = request.WeeklyHonorarium;
             program.IsOpen = request.IsOpen;
+            program.City = city;
+            program.State = state;
+            program.Tags = tags;
             program.Description = description;
             await db.SaveChangesAsync(cancellationToken);
 
@@ -222,17 +239,61 @@ public static class ProgramEndpoints
             .Select(s => (string?)s.Name)
             .FirstOrDefaultAsync(cancellationToken);
 
+    private const int MaxLocationLength = 120;
+    private const int MaxTags = 20;
+    private const int MaxTagLength = 60;
+
     private static bool TryValidate(
         ProgramType programType, int maxStudents, int minWeeks, decimal retailPerWeek, decimal weeklyHonorarium,
-        string? description, out string? normalizedDescription, out string error)
+        string? description, string? city, string? state, IReadOnlyList<string>? tags,
+        out string? normalizedDescription, out string? normalizedCity, out string? normalizedState,
+        out List<string> normalizedTags, out string error)
     {
         normalizedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        normalizedCity = string.IsNullOrWhiteSpace(city) ? null : city.Trim();
+        normalizedState = string.IsNullOrWhiteSpace(state) ? null : state.Trim();
+        normalizedTags = [];
         error = string.Empty;
 
         if (!Enum.IsDefined(programType))
         {
             error = "ProgramType is invalid.";
             return false;
+        }
+
+        if (normalizedCity is { Length: > MaxLocationLength })
+        {
+            error = $"City must be {MaxLocationLength} characters or fewer.";
+            return false;
+        }
+
+        if (normalizedState is { Length: > MaxLocationLength })
+        {
+            error = $"State must be {MaxLocationLength} characters or fewer.";
+            return false;
+        }
+
+        if (tags is not null)
+        {
+            // Trim, drop blanks, de-dupe case-insensitively (preserving first-seen casing), bound size.
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var raw in tags)
+            {
+                var tag = raw?.Trim();
+                if (string.IsNullOrEmpty(tag)) continue;
+                if (tag.Length > MaxTagLength)
+                {
+                    error = $"Each tag must be {MaxTagLength} characters or fewer.";
+                    return false;
+                }
+                if (seen.Add(tag)) normalizedTags.Add(tag);
+            }
+
+            if (normalizedTags.Count > MaxTags)
+            {
+                error = $"A program can have at most {MaxTags} tags.";
+                return false;
+            }
         }
 
         if (maxStudents is < 1 or > MaxStudentsCap)
@@ -293,5 +354,6 @@ public static class ProgramEndpoints
 
     private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName) =>
         new(p.Id, p.SpecialtyId, specialtyName, p.ProgramType, p.MaxStudentsPerRotation,
-            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName, p.IsOpen);
+            p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName,
+            p.IsOpen, p.ProgramNumber, p.City, p.State, p.Tags);
 }

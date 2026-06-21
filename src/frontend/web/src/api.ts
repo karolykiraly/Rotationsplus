@@ -40,12 +40,17 @@ export type ProgramType =
 /** Mirror of the API's ProgramSummaryResponse contract (enums serialized as strings). */
 export interface Program {
   id: string;
+  programNumber: number;
   specialtyName: string;
   programType: ProgramType;
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
   preceptorName?: string | null;
+  city?: string | null;
+  state?: string | null;
+  isOpen: boolean;
+  tags: string[];
 }
 
 /** Mirror of the API's ProgramDetailResponse contract — the editable shape. */
@@ -62,6 +67,11 @@ export interface ProgramDetail {
   description?: string | null;
   preceptorId?: string | null;
   preceptorName?: string | null;
+  isOpen: boolean;
+  programNumber: number;
+  city?: string | null;
+  state?: string | null;
+  tags: string[];
 }
 
 /** Admin create/update payload (mirrors Create/UpdateProgramRequest). */

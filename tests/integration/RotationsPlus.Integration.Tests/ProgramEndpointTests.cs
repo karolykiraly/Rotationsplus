@@ -96,6 +96,30 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
+    public async Task Get_by_id_returns_the_catalog_fields()
+    {
+        var program = await StaffClient().GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{SeededInternalMedicineInPerson}", JsonOptions);
+
+        program!.ProgramNumber.Should().Be(1001);   // seeded sequential number → client formats as "IP1001"
+        program.City.Should().Be("Los Angeles");
+        program.State.Should().Be("CA");
+        program.Tags.Should().Contain("Hospital Letterhead LOR").And.Contain("Inpatient");
+    }
+
+    [Fact]
+    public async Task List_carries_the_catalog_fields_and_open_flag()
+    {
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs", JsonOptions);
+
+        // Program numbers are present and unique across the catalog.
+        programs!.Should().OnlyContain(p => p.ProgramNumber > 0);
+        programs!.Select(p => p.ProgramNumber).Should().OnlyHaveUniqueItems();
+        // The seeded tele-rotation is the "open" (instant-approval) one; the InPerson IM program isn't.
+        programs!.Should().Contain(p => p.ProgramType == ProgramType.TeleRotation && p.IsOpen);
+        programs!.Should().Contain(p => p.City == "Los Angeles" && p.State == "CA");
+    }
+
+    [Fact]
     public async Task List_filtered_by_preceptor_returns_only_their_programs()
     {
         var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(

@@ -77,6 +77,44 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task Create_persists_location_and_normalizes_tags()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var body = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Loc/tags offering.", null,
+            IsOpen: false, City: "  Boston ", State: "MA",
+            Tags: new[] { "Research", "research", "  ", "Inpatient" }); // dupe (case), blank → normalized away
+
+        var create = await admin.PostAsJsonAsync("/api/programs", body, JsonOptions);
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await create.Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        created!.City.Should().Be("Boston");                      // trimmed
+        created.State.Should().Be("MA");
+        created.Tags.Should().Equal("Research", "Inpatient");     // trimmed, blank dropped, case-insensitive de-dupe
+        created.ProgramNumber.Should().BeGreaterThan(1004);       // server-assigned above the seeded numbers
+
+        // Location + tags round-trip through a fresh read.
+        var fetched = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        fetched!.City.Should().Be("Boston");
+        fetched.Tags.Should().Equal("Research", "Inpatient");
+    }
+
+    [Fact]
+    public async Task Create_with_too_many_tags_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var tooMany = Enumerable.Range(1, 21).Select(i => $"tag{i}").ToArray();
+        var body = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null, Tags: tooMany);
+
+        var response = await admin.PostAsJsonAsync("/api/programs", body, JsonOptions);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Create_trims_description_whitespace()
     {
         var admin = Client(RoleNames.Admin);

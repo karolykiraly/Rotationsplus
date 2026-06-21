@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCustomerPrograms, usePortalSpecialties } from "./usePortalCatalog";
-import { PROGRAM_TYPES, programTypeLabel } from "../programs/programTypes";
+import { PROGRAM_TYPES, programCode, programTypeLabel } from "../programs/programTypes";
 import type { Program } from "../api";
 
 /** Whole-dollar amounts show no decimals; fractional amounts keep cents (avoids misstating a price). */
@@ -45,9 +45,9 @@ function RotationCard({ program }: { program: Program }) {
       </div>
       <div className="rcard-body">
         <div className="rcard-tags">
-          {/* Program code is a PHASE-2 field (no sequential number in the API yet). */}
-          <span className="tag-pill">Program —</span>
+          <span className="tag-pill">Program {programCode(program.programType, program.programNumber)}</span>
           <span className="tag-pill">{programTypeLabel(program.programType)}</span>
+          {program.isOpen && <span className="tag-pill">Instant Approval</span>}
         </div>
         <h3 className="rcard-title">
           <Link className="rcard-link" to={`/portal/programs/${program.id}`}>{program.specialtyName}</Link>
@@ -60,7 +60,7 @@ function RotationCard({ program }: { program: Program }) {
               fill="#5AA6FF"
             />
           </svg>
-          <span>—</span>
+          <span>{[program.city, program.state].filter(Boolean).join(", ") || "—"}</span>
         </div>
         <div className="rcard-pricerow">
           <div className="rcard-price">${money(cardTotal(program))}</div>

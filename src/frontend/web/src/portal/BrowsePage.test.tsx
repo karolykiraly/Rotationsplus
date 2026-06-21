@@ -31,12 +31,17 @@ describe("BrowsePage", () => {
     h.browsePrograms.mockReset().mockResolvedValue([
       {
         id: "p1",
+        programNumber: 1001,
         specialtyName: "Internal Medicine",
         programType: "InPerson",
         maxStudentsPerRotation: 2,
         minWeeksPerRotation: 4,
         retailAmountPerWeek: 1500,
-        preceptorName: "Jane Carter"
+        preceptorName: "Jane Carter",
+        city: "Los Angeles",
+        state: "CA",
+        isOpen: false,
+        tags: ["Inpatient"]
       }
     ]);
     h.getCustomerSpecialties.mockReset().mockResolvedValue([
@@ -54,18 +59,26 @@ describe("BrowsePage", () => {
     expect(screen.getByText("4 weeks minimum")).toBeInTheDocument();
     expect(screen.getByText("Internal Medicine", { selector: ".rcard-link" })).toBeInTheDocument();
     expect(screen.getByText("In person", { selector: ".tag-pill" })).toBeInTheDocument();
+    // Real catalog fields: the typed program code and the city/state location.
+    expect(screen.getByText("Program IP1001")).toBeInTheDocument();
+    expect(screen.getByText("Los Angeles, CA")).toBeInTheDocument();
   });
 
   it("prices a ConsultationSub program hourly (per-week, not × weeks)", async () => {
     h.browsePrograms.mockResolvedValue([
       {
         id: "p2",
+        programNumber: 1099,
         specialtyName: "Cardiology",
         programType: "ConsultationSub",
         maxStudentsPerRotation: 1,
         minWeeksPerRotation: 4,
         retailAmountPerWeek: 200,
-        preceptorName: null
+        preceptorName: null,
+        city: null,
+        state: null,
+        isOpen: false,
+        tags: []
       }
     ]);
     renderBrowse();

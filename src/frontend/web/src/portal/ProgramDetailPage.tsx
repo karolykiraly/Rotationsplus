@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { bookRotation, getCustomerProgram, getProgramQuote } from "./customerApi";
-import { programTypeLabel } from "../programs/programTypes";
+import { programCode, programTypeLabel } from "../programs/programTypes";
 import type { ProgramDetail } from "../api";
 
 const MAX_WEEKS = 520;
@@ -146,10 +146,9 @@ export function ProgramDetailPage() {
             <div className="pd-head">
               <div className="pd-tagsrow">
                 <div className="rcard-tags">
-                  {/* Program code + seats are PHASE-2 fields the catalog API doesn't expose yet. */}
-                  <span className="tag-pill">Program —</span>
+                  <span className="tag-pill">Program {programCode(p.programType, p.programNumber)}</span>
                   <span className="tag-pill">{programTypeLabel(p.programType)}</span>
-                  {!isHourly(p) && <span className="tag-pill">— seats available</span>}
+                  {!isHourly(p) && <span className="tag-pill">{p.maxStudentsPerRotation} seats available</span>}
                 </div>
                 <span className="pd-mindur">
                   {isHourly(p) ? `${p.minWeeksPerRotation} Hourly` : `For ${p.minWeeksPerRotation} weeks minimum`}
@@ -172,7 +171,7 @@ export function ProgramDetailPage() {
                       fill="#5AA6FF"
                     />
                   </svg>
-                  <span>—</span>
+                  <span>{[p.city, p.state].filter(Boolean).join(", ") || "—"}</span>
                 </div>
                 <span className="pd-deposit">10% Approval Deposit Required</span>
               </div>
@@ -191,7 +190,8 @@ export function ProgramDetailPage() {
 
               <div className="pd-right">
                 <div className="pd-chips">
-                  <span className="tag-chip">{programTypeLabel(p.programType)}</span>
+                  {p.isOpen && <span className="tag-chip">Instant Approval</span>}
+                  {p.tags.map((t) => <span key={t} className="tag-chip">{t}</span>)}
                 </div>
                 <div className="pd-grid">
                   <Detail label="Specialty" value={p.specialtyName} />

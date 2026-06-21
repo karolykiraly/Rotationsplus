@@ -7,7 +7,7 @@ import { useMe } from "../useMe";
 import { getProgram, type Program, type ProgramInput, type ProgramType } from "../api";
 import { usePrograms, useProgramFormOptions } from "./usePrograms";
 import { ProgramFormModal, type ProgramFormInitial } from "./ProgramFormModal";
-import { programTypeLabel } from "./programTypes";
+import { programCode, programTypeLabel } from "./programTypes";
 import noImage from "../assets/images/no_image.webp";
 import filterIcon from "../assets/images/filter.svg";
 import searchIcon from "../assets/icons/search.png";
@@ -170,11 +170,11 @@ export function ProgramsPage() {
                     </td>
                     <td>
                       <div className="place-holder">Program ID</div>
-                      <div className="heading-xxxs-normal">—</div>
+                      <div className="heading-xxxs-normal">{programCode(p.programType, p.programNumber)}</div>
                     </td>
                     <td>
                       <div className="place-holder">Location</div>
-                      <div className="heading-xxxs-normal">—</div>
+                      <div className="heading-xxxs-normal">{[p.city, p.state].filter(Boolean).join(", ") || "—"}</div>
                     </td>
                     <td>
                       <div className="place-holder">Specialty</div>
@@ -182,7 +182,7 @@ export function ProgramsPage() {
                     </td>
                     <td>
                       <div className="place-holder">Instant Approval</div>
-                      <div className="heading-xxxs-normal">—</div>
+                      <div className="heading-xxxs-normal">{p.isOpen ? "Yes" : "No"}</div>
                     </td>
                     <td className="last-td">
                       <div className="place-holder">Retail Amount</div>

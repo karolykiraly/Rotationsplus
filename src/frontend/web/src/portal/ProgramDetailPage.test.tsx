@@ -33,7 +33,12 @@ const program = {
   weeklyHonorarium: null,
   description: "Hands-on inpatient rotation.",
   preceptorId: "d1",
-  preceptorName: "Jane Carter"
+  preceptorName: "Jane Carter",
+  isOpen: false,
+  programNumber: 1001,
+  city: "Los Angeles",
+  state: "CA",
+  tags: ["Hospital Letterhead LOR"]
 };
 
 const quote = {
@@ -80,6 +85,11 @@ describe("ProgramDetailPage", () => {
     expect(screen.getByText("$6,000.00", { selector: ".pd-price" })).toBeInTheDocument();
     expect(screen.getByText("For 4 weeks minimum")).toBeInTheDocument();
     expect(screen.getByText("Jane Carter")).toBeInTheDocument();
+    // Real catalog fields: typed code, location, seats, and a tag chip.
+    expect(screen.getByText("Program IP1001")).toBeInTheDocument();
+    expect(screen.getByText("Los Angeles, CA")).toBeInTheDocument();
+    expect(screen.getByText("2 seats available")).toBeInTheDocument();
+    expect(screen.getByText("Hospital Letterhead LOR", { selector: ".tag-chip" })).toBeInTheDocument();
     expect(screen.getByText("Hands-on inpatient rotation.")).toBeInTheDocument();
     expect(h.getCustomerProgram).toHaveBeenCalledWith("p1");
     // Honorarium must never appear on the customer view.
