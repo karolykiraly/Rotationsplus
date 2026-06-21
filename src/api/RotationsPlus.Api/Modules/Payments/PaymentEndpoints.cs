@@ -160,6 +160,7 @@ public static class PaymentEndpoints
             return Results.Created($"/api/payments/{payment.Id}", ToResponse(payment, intent.ClientSecret));
         })
         .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
+        .RequireRateLimiting(RateLimitPolicies.Payments)
         .WithName("CreateRotationPaymentIntent")
         .WithTags("Payments");
 

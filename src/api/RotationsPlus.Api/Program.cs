@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
@@ -40,6 +43,54 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddRotationsPlusAuthorization();
+
+// --- Uniform error contract: unhandled exceptions become an RFC 7807 ProblemDetails (instead of an
+//     empty/HTML 500), and the exception handler is the one central sink for unexpected faults. In
+//     Production no stack trace is emitted; the SPA gets a consistent JSON shape. ---
+builder.Services.AddProblemDetails();
+
+// --- Rate limiting (PHASE 2e / SEC-2): protect the unauthenticated webhook (per-IP) and the
+//     authenticated money paths (per-user). Limits are config-bound with generous defaults so normal
+//     traffic and the integration suite never trip them; a rejected request gets 429 + Retry-After. ---
+builder.Services.AddRateLimiter(options =>
+{
+    var config = builder.Configuration;
+    var webhookPermit = config.GetValue("RateLimiting:Webhook:PermitLimit", 240);
+    var webhookWindow = TimeSpan.FromSeconds(config.GetValue("RateLimiting:Webhook:WindowSeconds", 60));
+    var paymentsPermit = config.GetValue("RateLimiting:Payments:PermitLimit", 120);
+    var paymentsWindow = TimeSpan.FromSeconds(config.GetValue("RateLimiting:Payments:WindowSeconds", 60));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        // Surface a retry hint and a ProblemDetails body so a 429 matches the rest of the error contract.
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        await Results.Problem(
+                statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Too many requests",
+                detail: "Rate limit exceeded. Please retry later.")
+            .ExecuteAsync(context.HttpContext);
+    };
+
+    // Anonymous webhook → partition by client IP (no identity to key on).
+    options.AddPolicy(RateLimitPolicies.Webhook, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = webhookPermit, Window = webhookWindow, QueueLimit = 0 }));
+
+    // Authenticated money paths → partition by user oid (fall back to IP if somehow unauthenticated).
+    options.AddPolicy(RateLimitPolicies.Payments, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirstValue(ClaimNames.ObjectId)
+                ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = paymentsPermit, Window = paymentsWindow, QueueLimit = 0 }));
+});
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
@@ -87,8 +138,13 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Central fault sink → ProblemDetails. First so it wraps everything downstream.
+app.UseExceptionHandler();
+
 app.UseCors(spaCorsPolicy);
 app.UseAuthentication();
+// After authentication so the per-user (oid) payments partition can read the principal.
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapDefaultEndpoints();

@@ -134,6 +134,7 @@ public static class CustomerRotationEndpoints
             return Results.Created($"/api/customer/rotations/{rotation.Id}", response);
         })
         .RequireAuthorization(AuthorizationPolicies.CustomerOnly)
+        .RequireRateLimiting(RateLimitPolicies.Payments)
         .WithName("CreateCustomerBooking")
         .WithTags("Rotations");
 

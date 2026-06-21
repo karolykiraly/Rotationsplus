@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Common.Authorization;
 using Testcontainers.PostgreSql;
 
 namespace RotationsPlus.Integration.Tests;
@@ -36,6 +37,19 @@ public sealed class RotationsApiFactory : WebApplicationFactory<Program>, IAsync
                 options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
                 options.DefaultScheme = TestAuthHandler.SchemeName;
+
+                // The production policies are scheme-pinned (workforce/customer JWT bearer). Point those
+                // real scheme names at the header-driven TestAuthHandler so a scheme-pinned policy
+                // authenticates the same X-Test-* headers in tests instead of falling through to the
+                // unconfigured JwtBearer handler (which would 401 every pinned endpoint). The handler
+                // reads roles from headers, so staff-vs-customer is still exercised per request.
+                foreach (var name in new[] { AuthenticationSchemes.Workforce, AuthenticationSchemes.Customer })
+                {
+                    if (options.SchemeMap.TryGetValue(name, out var scheme))
+                    {
+                        scheme.HandlerType = typeof(TestAuthHandler);
+                    }
+                }
             });
         });
     }

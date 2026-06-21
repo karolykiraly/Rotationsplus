@@ -78,6 +78,7 @@ public static class PaymentWebhookEndpoints
             return Results.Ok();
         })
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimitPolicies.Webhook)
         .WithName("StripeWebhook")
         .WithTags("Payments");
 
