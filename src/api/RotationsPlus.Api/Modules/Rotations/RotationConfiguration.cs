@@ -58,7 +58,18 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
 
         builder.HasIndex(x => x.ProgramId);
         builder.HasIndex(x => x.StudentId);
-        builder.HasIndex(x => x.Status);
+
+        // The admin list filters by Status and sorts by StartDate; the dashboard's today-cycle counts
+        // filter by (Status, StartDate). One composite index serves both and subsumes the old
+        // Status-only index. Partial on the soft-delete predicate so it matches the global query filter
+        // (every query carries `WHERE NOT "IsDeleted"`) — smaller index, planner-aligned.
+        builder.HasIndex(x => new { x.Status, x.StartDate })
+            .HasFilter("\"IsDeleted\" = false");
+
+        // The dashboard's "upcoming starts" (Where StartDate >= today, OrderBy StartDate) and the
+        // start-date cycle counts filter/sort on StartDate alone, with no leading Status predicate.
+        builder.HasIndex(x => x.StartDate)
+            .HasFilter("\"IsDeleted\" = false");
 
         var seededAt = new DateTimeOffset(2026, 6, 16, 0, 0, 0, TimeSpan.Zero);
         builder.HasData(new

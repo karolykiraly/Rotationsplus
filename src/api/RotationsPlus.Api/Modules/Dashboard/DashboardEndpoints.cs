@@ -79,21 +79,26 @@ public static class DashboardEndpoints
 
             // The today's-rotation-cycle buckets are mutually disjoint so they sum cleanly to the
             // headline number: a same-day rotation counts only as "starting"; "completing" excludes
-            // it (StartDate < today); "in progress" is strictly mid-flight.
-            var starting = await db.Rotations.CountAsync(
-                r => ActiveLifecycle.Contains(r.Status) && r.StartDate == today, cancellationToken);
-            var completing = await db.Rotations.CountAsync(
-                r => ActiveLifecycle.Contains(r.Status) && r.EndDate == today && r.StartDate < today, cancellationToken);
-            var inProgress = await db.Rotations.CountAsync(
-                r => ActiveLifecycle.Contains(r.Status) && r.StartDate < today && r.EndDate > today, cancellationToken);
-            var cancelledToday = await db.Rotations.CountAsync(
-                r => r.Status == RotationStatus.Cancelled && r.ModifiedAtUtc >= startOfDayUtc, cancellationToken);
+            // it (StartDate < today); "in progress" is strictly mid-flight. Computed in ONE pass over
+            // the rotations table (four filtered counts) instead of four separate COUNT round-trips —
+            // EF translates Count(predicate) in an aggregate projection to COUNT(*) FILTER (WHERE ...).
+            // GroupBy over a constant yields a single row (null only when the table is empty → all 0).
+            var cycle = await db.Rotations
+                .GroupBy(_ => 1)
+                .Select(g => new
+                {
+                    Starting = g.Count(r => ActiveLifecycle.Contains(r.Status) && r.StartDate == today),
+                    Completing = g.Count(r => ActiveLifecycle.Contains(r.Status) && r.EndDate == today && r.StartDate < today),
+                    InProgress = g.Count(r => ActiveLifecycle.Contains(r.Status) && r.StartDate < today && r.EndDate > today),
+                    Cancelled = g.Count(r => r.Status == RotationStatus.Cancelled && r.ModifiedAtUtc >= startOfDayUtc),
+                })
+                .FirstOrDefaultAsync(cancellationToken);
 
             // Issues are a future subsystem (no Issue entity yet) — reported as 0 until it exists.
             var today_ = new TodayMetrics(
                 newPrograms, newProgramsByType, newStudents, newPreceptors,
                 IssuesReported: 0,
-                starting, inProgress, completing, cancelledToday);
+                cycle?.Starting ?? 0, cycle?.InProgress ?? 0, cycle?.Completing ?? 0, cycle?.Cancelled ?? 0);
 
             var response = new DashboardResponse(
                 students, programs, preceptors, specialties,

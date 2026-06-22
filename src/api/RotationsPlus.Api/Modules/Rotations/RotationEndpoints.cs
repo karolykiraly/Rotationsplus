@@ -49,7 +49,8 @@ public static class RotationEndpoints
 
         group.MapGet("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            var rotation = await db.Rotations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+            // Read-only GET — no change tracking needed (this entity is only mapped to a DTO, never saved).
+            var rotation = await db.Rotations.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
             if (rotation is null)
             {
                 return Results.NotFound();
