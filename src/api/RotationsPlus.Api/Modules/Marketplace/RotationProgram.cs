@@ -39,6 +39,11 @@ public sealed class RotationProgram : AuditableEntity
     public int MaxStudentsPerRotation { get; set; }
     public int MinWeeksPerRotation { get; set; }
 
+    /// <summary>How many days before the rotation start its required documents are due. Configurable per
+    /// program by the admin (legacy <c>preceptor.document_due_days</c>, defaulting to 14). Drives the due
+    /// date stamped on each materialized rotation document.</summary>
+    public int DocumentDueDays { get; set; } = 14;
+
     public decimal RetailAmountPerWeek { get; set; }
     public decimal WeeklyHonorarium { get; set; }
 

@@ -133,10 +133,10 @@ public static class CustomerDocumentEndpoints
                 await stream.CopyToAsync(buffer, cancellationToken);
             }
 
-            var detectedContentType = DetectDocumentContentType(buffer);
+            var detectedContentType = DocumentContentTypeDetector.Detect(buffer);
             if (detectedContentType is null)
             {
-                return Results.BadRequest("File must be a PDF, JPEG, or PNG.");
+                return Results.BadRequest("File must be a PDF, Word document, JPEG, PNG, or BMP.");
             }
 
             var previousBlob = document.FileBlobName;
@@ -190,40 +190,5 @@ public static class CustomerDocumentEndpoints
             name = "document";
         }
         return name.Length > 200 ? name[..200] : name;
-    }
-
-    /// <summary>Detects PDF/JPEG/PNG from the leading magic bytes; null if unsupported. The
-    /// client-declared content type is never trusted for gating or serving.</summary>
-    private static string? DetectDocumentContentType(Stream stream)
-    {
-        stream.Position = 0;
-        Span<byte> header = stackalloc byte[8];
-        var read = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
-        stream.Position = 0;
-        if (read < 4)
-        {
-            return null;
-        }
-
-        // PDF: 25 50 44 46  ("%PDF")
-        if (header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46)
-        {
-            return "application/pdf";
-        }
-
-        // JPEG: FF D8 FF
-        if (header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
-        {
-            return "image/jpeg";
-        }
-
-        // PNG: 89 50 4E 47 0D 0A 1A 0A
-        if (read >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
-            header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A)
-        {
-            return "image/png";
-        }
-
-        return null;
     }
 }

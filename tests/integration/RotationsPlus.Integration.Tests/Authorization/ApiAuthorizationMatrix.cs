@@ -84,6 +84,16 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/students", [RoleNames.Admin], "Create student (admin)"),
         new("PUT", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update student (admin)"),
         new("DELETE", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete student (admin)"),
+        // Admin document review + config (PHASE 2g-3a) — all AdminOnly. Seeded ids route through to real
+        // resources; non-existent ids / empty bodies give authorized admins 404/400 (authorized-through).
+        new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001/documents", [RoleNames.Admin], "A student's documents (admin review)"),
+        new("PUT", "/api/documents/d40c0000-0000-0000-0000-000000000003/status", [RoleNames.Admin], "Set a document's status (admin)"),
+        new("POST", "/api/documents/d40c0000-0000-0000-0000-000000000003/file", [RoleNames.Admin], "Admin uploads a document on behalf"),
+        new("DELETE", "/api/documents/00000000-0000-0000-0000-000000000000/file", [RoleNames.Admin], "Admin clears a document file"),
+        new("GET", "/api/document-types", [RoleNames.Admin], "Document-type catalog (admin)"),
+        new("POST", "/api/document-types", [RoleNames.Admin], "Add a custom document type (admin)"),
+        new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001/required-documents", [RoleNames.Admin], "A program's required-docs config (admin)"),
+        new("PUT", "/api/programs/cccccccc-0000-0000-0000-000000000001/required-documents", [RoleNames.Admin], "Set a program's required-docs config (admin)"),
     ];
 
     /// <summary>Every role the system issues, across both Entra directories.</summary>

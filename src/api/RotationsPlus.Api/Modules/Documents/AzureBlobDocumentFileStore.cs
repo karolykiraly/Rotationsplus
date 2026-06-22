@@ -40,7 +40,7 @@ public sealed class AzureBlobDocumentFileStore : IDocumentFileStore
     public async Task<string> UploadAsync(Guid rotationDocumentId, Stream content, string contentType, CancellationToken cancellationToken)
     {
         // Foldered by document id; a fresh GUID per upload means a re-upload gets a new URL (no stale cache).
-        var blobName = $"{rotationDocumentId}/{Guid.NewGuid():N}{ExtensionFor(contentType)}";
+        var blobName = $"{rotationDocumentId}/{Guid.NewGuid():N}{DocumentContentTypeDetector.ExtensionFor(contentType)}";
         var blob = _container.GetBlobClient(blobName);
         await blob.UploadAsync(
             content,
@@ -76,14 +76,6 @@ public sealed class AzureBlobDocumentFileStore : IDocumentFileStore
         var token = sas.ToSasQueryParameters(_sharedKey).ToString();
         return $"{blob.Uri}?{token}";
     }
-
-    private static string ExtensionFor(string contentType) => contentType switch
-    {
-        "application/pdf" => ".pdf",
-        "image/jpeg" => ".jpg",
-        "image/png" => ".png",
-        _ => string.Empty,
-    };
 
     private static (string AccountName, string AccountKey) ParseAccountNameAndKey(string connectionString)
     {

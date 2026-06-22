@@ -14,8 +14,8 @@ namespace RotationsPlus.Api.Modules.Documents;
 /// </summary>
 public static class RotationDocumentMaterializer
 {
-    /// <summary>Documents are due this many days before the rotation starts (legacy default).</summary>
-    private const int DueDaysBeforeStart = 14;
+    /// <summary>Fallback when the program's due-days isn't set (legacy default).</summary>
+    private const int DefaultDueDaysBeforeStart = 14;
 
     /// <summary>
     /// Adds an <see cref="DocumentStatus.UploadNeeded"/> <see cref="RotationDocument"/> for each document
@@ -35,7 +35,13 @@ public static class RotationDocumentMaterializer
             return 0;
         }
 
-        var dueDate = rotation.StartDate.AddDays(-DueDaysBeforeStart);
+        // The program's configurable due-days (admin-set; defaults to 14).
+        var dueDays = await db.Programs
+            .Where(p => p.Id == rotation.ProgramId)
+            .Select(p => (int?)p.DocumentDueDays)
+            .FirstOrDefaultAsync(cancellationToken) ?? DefaultDueDaysBeforeStart;
+
+        var dueDate = rotation.StartDate.AddDays(-dueDays);
         foreach (var typeId in typeIds)
         {
             db.RotationDocuments.Add(new RotationDocument

@@ -47,6 +47,8 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
         // Blob name of the hospital image (e.g. "<programId>/<guid>.jpg"); bounded well above any key we mint.
         builder.Property(x => x.ImageBlobName).HasMaxLength(512);
 
+        builder.Property(x => x.DocumentDueDays).HasDefaultValue(14);
+
         builder.Property(x => x.RetailAmountPerWeek).HasPrecision(10, 2);
         builder.Property(x => x.WeeklyHonorarium).HasPrecision(10, 2);
         builder.Property(x => x.Description).HasMaxLength(4000);
@@ -91,6 +93,7 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
             ProgramType = type,
             MaxStudentsPerRotation = maxStudents,
             MinWeeksPerRotation = minWeeks,
+            DocumentDueDays = 14,
             RetailAmountPerWeek = retail,
             WeeklyHonorarium = honorarium,
             IsOpen = isOpen,

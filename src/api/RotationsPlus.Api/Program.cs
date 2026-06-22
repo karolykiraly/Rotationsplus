@@ -181,6 +181,8 @@ app.MapMeEndpoints();
 app.MapCustomerMeEndpoints();
 app.MapCustomerRotationEndpoints();
 app.MapCustomerDocumentEndpoints();
+app.MapAdminDocumentEndpoints();
+app.MapProgramDocumentConfigEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapProgramImageEndpoints();
