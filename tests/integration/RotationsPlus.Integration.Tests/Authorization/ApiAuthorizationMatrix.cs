@@ -28,6 +28,9 @@ public static class ApiAuthorizationMatrix
         // The signed-in student's per-rotation document checklist. A non-owned/seeded rotation yields an
         // empty 200 for an authorized customer (authorized-through), which the authz-only matrix accepts.
         new("GET", "/api/customer/rotations/eeeeeeee-0000-0000-0000-000000000001/documents", RoleNames.Customer, "The student's rotation documents"),
+        // Upload a file for a rotation document. An authorized non-owner customer gets 404 (empty body →
+        // 400 once owned); both are authorized-through, which the authz-only matrix accepts.
+        new("POST", "/api/customer/rotations/eeeeeeee-0000-0000-0000-000000000001/documents/d40c0000-0000-0000-0000-000000000003/file", RoleNames.Customer, "Student uploads a rotation document"),
         // Catalog reads are open to any marketplace viewer (staff + customers).
         new("GET", "/api/specialties", MarketplaceReaders, "List marketplace specialties"),
         // A seeded id, so an authorized caller routes through to a real resource (not a 404).

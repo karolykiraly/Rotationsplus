@@ -123,6 +123,9 @@ var dbConnectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database=rotat
 // Blob storage for program/hospital images. Private account; the API mints read SAS from the
 // account-key connection string (held in Key Vault). Storage names: 3-24 chars, lowercase alphanumeric.
 var programImagesContainer = 'program-images'
+// Student-uploaded rotation documents (PDF/JPEG/PNG). Same private account as images; the API mints
+// short-lived read SAS from the same account-key connection string (held in Key Vault as blob-connection).
+var documentsContainer = 'documents'
 module storage 'modules/storage.bicep' = {
   name: 'storage'
   params: {
@@ -131,7 +134,7 @@ module storage 'modules/storage.bicep' = {
     name: 'st${namePrefix}${environment}${take(suffix, 8)}'
     location: location
     tags: tags
-    containers: [programImagesContainer]
+    containers: [programImagesContainer, documentsContainer]
   }
 }
 
@@ -204,6 +207,8 @@ module api 'modules/containerApp.bicep' = {
       { name: 'Cors__AllowedOrigins__0', value: spaAllowedOrigin }
       { name: 'Storage__Images__ConnectionString', secretRef: 'blob-connection' }
       { name: 'Storage__Images__ContainerName', value: programImagesContainer }
+      { name: 'Storage__Documents__ConnectionString', secretRef: 'blob-connection' }
+      { name: 'Storage__Documents__ContainerName', value: documentsContainer }
     ]
   }
 }

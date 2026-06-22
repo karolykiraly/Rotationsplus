@@ -116,6 +116,18 @@ else
     builder.Services.AddSingleton<IProgramImageStore, InMemoryProgramImageStore>();
 }
 
+// --- Document files: student-uploaded rotation documents. Same Blob account as images (separate
+//     `documents` container); same in-memory fallback when no connection string is configured. ---
+builder.Services.Configure<DocumentFileOptions>(builder.Configuration.GetSection(DocumentFileOptions.SectionName));
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{DocumentFileOptions.SectionName}:ConnectionString"]))
+{
+    builder.Services.AddSingleton<IDocumentFileStore, AzureBlobDocumentFileStore>();
+}
+else
+{
+    builder.Services.AddSingleton<IDocumentFileStore, InMemoryDocumentFileStore>();
+}
+
 // --- Data: single Postgres DB / single DbContext (connection name "rotationsdb"). ---
 // The audit interceptor stamps audit columns + soft-deletes. HttpContextAccessor's backing store
 // is a static AsyncLocal, so a directly-constructed instance still resolves the current request's

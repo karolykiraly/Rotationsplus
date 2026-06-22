@@ -14,5 +14,7 @@ public sealed record RotationDocumentResponse(
     DocumentStatus Status,
     DateOnly DueDate,
     string? FileName,
+    /// <summary>A short-lived read URL for the uploaded file, or null when nothing is uploaded yet.</summary>
+    string? FileUrl,
     DateTimeOffset? SubmittedAtUtc,
     string? RejectionReason);
