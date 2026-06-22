@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Documents;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Common.Security;
+using RotationsPlus.Contracts.Documents;
 using RotationsPlus.Contracts.Rotations;
 
 namespace RotationsPlus.Api.Modules.Rotations;
@@ -46,7 +48,17 @@ public static class CustomerRotationEndpoints
                     r.StartDate,
                     r.EndDate,
                     r.Weeks,
-                    r.Status))
+                    r.Status,
+                    // "Documents" column: Missing if any required doc still needs a (re)upload, else
+                    // Complete; NotRequired when the rotation has no required docs. (EXISTS subqueries.)
+                    !db.RotationDocuments.Any(d => d.RotationId == r.Id)
+                        ? RotationDocumentsState.NotRequired
+                        : db.RotationDocuments.Any(d => d.RotationId == r.Id
+                            && (d.Status == DocumentStatus.UploadNeeded
+                                || d.Status == DocumentStatus.Rejected
+                                || d.Status == DocumentStatus.Expired))
+                            ? RotationDocumentsState.Missing
+                            : RotationDocumentsState.Complete))
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(rotations);
@@ -126,11 +138,15 @@ public static class CustomerRotationEndpoints
                 Status = RotationStatus.Pending,
             };
             db.Rotations.Add(rotation);
+            // Materialize the program's required documents for the new booking (same SaveChanges).
+            var requiredDocs = await RotationDocumentMaterializer.MaterializeAsync(db, rotation, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
 
+            // Fresh bookings have only just-created UploadNeeded docs → Missing if any are required.
+            var documentsState = requiredDocs > 0 ? RotationDocumentsState.Missing : RotationDocumentsState.NotRequired;
             var response = new CustomerRotationResponse(
                 rotation.Id, rotation.RotationNumber, program.SpecialtyName, program.ProgramType, program.PreceptorName,
-                rotation.StartDate, rotation.EndDate, rotation.Weeks, rotation.Status);
+                rotation.StartDate, rotation.EndDate, rotation.Weeks, rotation.Status, documentsState);
             return Results.Created($"/api/customer/rotations/{rotation.Id}", response);
         })
         .RequireAuthorization(AuthorizationPolicies.CustomerOnly)

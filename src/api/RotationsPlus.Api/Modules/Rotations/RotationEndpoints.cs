@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Documents;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Marketplace;
 using RotationsPlus.Contracts.Rotations;
@@ -96,6 +97,9 @@ public static class RotationEndpoints
                 Status = request.Status,
             };
             db.Rotations.Add(rotation);
+            // Materialize the program's required documents for the new booking (same SaveChanges) so the
+            // student sees their document checklist as soon as the admin books them.
+            await RotationDocumentMaterializer.MaterializeAsync(db, rotation, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
 
             return Results.Created($"/api/rotations/{rotation.Id}", ToDetail(rotation, program));

@@ -25,6 +25,9 @@ public static class ApiAuthorizationMatrix
         // get 400 (not 401/403), which the authz-only matrix accepts; behaviour is covered by
         // CustomerBookingEndpointTests.
         new("POST", "/api/customer/rotations", RoleNames.Customer, "Student self-books a rotation"),
+        // The signed-in student's per-rotation document checklist. A non-owned/seeded rotation yields an
+        // empty 200 for an authorized customer (authorized-through), which the authz-only matrix accepts.
+        new("GET", "/api/customer/rotations/eeeeeeee-0000-0000-0000-000000000001/documents", RoleNames.Customer, "The student's rotation documents"),
         // Catalog reads are open to any marketplace viewer (staff + customers).
         new("GET", "/api/specialties", MarketplaceReaders, "List marketplace specialties"),
         // A seeded id, so an authorized caller routes through to a real resource (not a 404).

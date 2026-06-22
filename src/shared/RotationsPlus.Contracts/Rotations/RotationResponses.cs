@@ -1,3 +1,4 @@
+using RotationsPlus.Contracts.Documents;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Contracts.Rotations;
@@ -28,7 +29,10 @@ public sealed record CustomerRotationResponse(
     DateOnly StartDate,
     DateOnly EndDate,
     int Weeks,
-    RotationStatus Status);
+    RotationStatus Status,
+    /// <summary>The student-facing "Documents" column — derived from the rotation's required-document
+    /// statuses (NotRequired / Missing / Complete).</summary>
+    RotationDocumentsState DocumentsState);
 
 /// <summary>Full detail for a single rotation. <c>StudentId</c> links to the directory record
 /// (null only for legacy rows); the name/email/oid are the snapshot taken at write time.</summary>

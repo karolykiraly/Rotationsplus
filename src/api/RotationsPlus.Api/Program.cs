@@ -7,6 +7,7 @@ using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Api.Modules.Dashboard;
+using RotationsPlus.Api.Modules.Documents;
 using RotationsPlus.Api.Modules.Identity;
 using RotationsPlus.Api.Modules.Marketplace;
 using RotationsPlus.Api.Modules.Payments;
@@ -167,6 +168,7 @@ if (!app.Environment.IsProduction())
 app.MapMeEndpoints();
 app.MapCustomerMeEndpoints();
 app.MapCustomerRotationEndpoints();
+app.MapCustomerDocumentEndpoints();
 app.MapSpecialtyEndpoints();
 app.MapProgramEndpoints();
 app.MapProgramImageEndpoints();
