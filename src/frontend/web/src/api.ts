@@ -408,6 +408,24 @@ export async function apiFetch<T>(method: string, path: string, accessToken: str
   return (await response.json()) as T;
 }
 
+/** Issues a multipart/form-data upload with a caller-supplied bearer token. The browser sets the
+ *  multipart Content-Type (with boundary) from the FormData, so we must NOT set it ourselves. */
+export async function apiUpload<T>(method: string, path: string, accessToken: string, form: FormData): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorMessage(response));
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  return (await response.json()) as T;
+}
+
 /** Acquires a workforce (staff) access token and issues the request. */
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];

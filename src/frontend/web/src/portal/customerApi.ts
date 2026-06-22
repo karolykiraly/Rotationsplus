@@ -2,6 +2,7 @@ import { customerLoginRequest, customerMsalInstance } from "../authConfig";
 import {
   acquireTokenOrRedirect,
   apiFetch,
+  apiUpload,
   type PaymentIntentResponse,
   type PaymentSimulationResponse,
   type Program,
@@ -11,6 +12,36 @@ import {
   type RotationStatus,
   type Specialty
 } from "../api";
+
+/** Mirror of the API's DocumentStatus enum (serialized as these string names). */
+export type DocumentStatus = "UploadNeeded" | "Submitted" | "Approved" | "Rejected" | "Expired";
+
+/** Mirror of the API's DocumentCategory enum. */
+export type DocumentCategory =
+  | "Immunization"
+  | "Identity"
+  | "Insurance"
+  | "Certification"
+  | "Professional"
+  | "MedicalTest"
+  | "Agreement"
+  | "Other";
+
+/** Mirror of the API's RotationDocumentsState — the "Documents" tracker column value. */
+export type RotationDocumentsState = "NotRequired" | "Missing" | "Complete";
+
+/** Mirror of the API's RotationDocumentResponse — one row of a rotation's document checklist. */
+export interface RotationDocument {
+  id: string;
+  documentTypeName: string;
+  category: DocumentCategory;
+  status: DocumentStatus;
+  dueDate: string;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  submittedAtUtc?: string | null;
+  rejectionReason?: string | null;
+}
 
 /** Mirror of the API's CustomerMeResponse contract. */
 export interface CustomerMe {
@@ -33,6 +64,8 @@ export interface CustomerRotation {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** The "Documents" tracker column — NotRequired / Missing / Complete. */
+  documentsState: RotationDocumentsState;
 }
 
 /** Acquires a CIAM (customer) access token and issues the request. Mirrors the staff `request`,
@@ -45,6 +78,17 @@ async function customerRequest<T>(method: string, path: string, body?: unknown):
 
   const result = await acquireTokenOrRedirect(customerMsalInstance, customerLoginRequest, account);
   return apiFetch<T>(method, path, result.accessToken, body);
+}
+
+/** Customer multipart upload (acquires the CIAM token, then POSTs FormData). */
+async function customerUpload<T>(method: string, path: string, form: FormData): Promise<T> {
+  const account = customerMsalInstance.getActiveAccount() ?? customerMsalInstance.getAllAccounts()[0];
+  if (!account) {
+    throw new Error("Not signed in");
+  }
+
+  const result = await acquireTokenOrRedirect(customerMsalInstance, customerLoginRequest, account);
+  return apiUpload<T>(method, path, result.accessToken, form);
 }
 
 /** The signed-in customer's identity (GET /api/customer/me). */
@@ -87,3 +131,22 @@ export const simulateDeposit = (
   outcome: "succeeded" | "failed"
 ): Promise<PaymentSimulationResponse> =>
   customerRequest<PaymentSimulationResponse>("POST", `/api/dev/payments/${paymentId}/simulate`, { outcome });
+
+/** The signed-in student's document checklist for one of their rotations. */
+export const getRotationDocuments = (rotationId: string): Promise<RotationDocument[]> =>
+  customerRequest<RotationDocument[]>("GET", `/api/customer/rotations/${rotationId}/documents`);
+
+/** Uploads a file for a rotation document (multipart); the document moves to Submitted. */
+export const uploadRotationDocument = (
+  rotationId: string,
+  documentId: string,
+  file: File
+): Promise<RotationDocument> => {
+  const form = new FormData();
+  form.append("file", file);
+  return customerUpload<RotationDocument>(
+    "POST",
+    `/api/customer/rotations/${rotationId}/documents/${documentId}/file`,
+    form
+  );
+};

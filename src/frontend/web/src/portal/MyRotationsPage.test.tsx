@@ -6,12 +6,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const h = vi.hoisted(() => ({
   getCustomerRotations: vi.fn(),
   openDepositIntent: vi.fn(),
-  simulateDeposit: vi.fn()
+  simulateDeposit: vi.fn(),
+  getRotationDocuments: vi.fn(),
+  uploadRotationDocument: vi.fn()
 }));
 vi.mock("./customerApi", () => ({
   getCustomerRotations: () => h.getCustomerRotations(),
   openDepositIntent: (id: string) => h.openDepositIntent(id),
-  simulateDeposit: (paymentId: string, outcome: string) => h.simulateDeposit(paymentId, outcome)
+  simulateDeposit: (paymentId: string, outcome: string) => h.simulateDeposit(paymentId, outcome),
+  getRotationDocuments: (id: string) => h.getRotationDocuments(id),
+  uploadRotationDocument: (rid: string, did: string, file: File) => h.uploadRotationDocument(rid, did, file)
 }));
 
 import { MyRotationsPage } from "./MyRotationsPage";
@@ -42,7 +46,8 @@ describe("MyRotationsPage", () => {
         startDate: "2026-07-06",
         endDate: "2026-08-03",
         weeks: 4,
-        status: "Active"
+        status: "Active",
+        documentsState: "Missing"
       },
       {
         id: "r2",
@@ -53,7 +58,8 @@ describe("MyRotationsPage", () => {
         startDate: "2026-09-01",
         endDate: "2026-09-29",
         weeks: 4,
-        status: "NotStarted"
+        status: "NotStarted",
+        documentsState: "Complete"
       },
       {
         id: "r3",
@@ -64,7 +70,21 @@ describe("MyRotationsPage", () => {
         startDate: "2026-10-05",
         endDate: "2026-11-02",
         weeks: 4,
-        status: "Pending"
+        status: "Pending",
+        documentsState: "NotRequired"
+      }
+    ]);
+    h.getRotationDocuments.mockReset().mockResolvedValue([
+      {
+        id: "d1",
+        documentTypeName: "Curriculum Vitae (CV)",
+        category: "Professional",
+        status: "UploadNeeded",
+        dueDate: "2026-06-22",
+        fileName: null,
+        fileUrl: null,
+        submittedAtUtc: null,
+        rejectionReason: null
       }
     ]);
     h.openDepositIntent.mockResolvedValue({
@@ -88,6 +108,21 @@ describe("MyRotationsPage", () => {
     expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();
     // NotStarted is surfaced to the student as "Approved".
     expect(screen.getByText("Approved", { selector: ".badge" })).toBeInTheDocument();
+  });
+
+  it("renders the Documents column per state and opens the documents checklist", async () => {
+    renderPage();
+    // Missing → a "Documents Missing" link; Complete → "All Documents Uploaded"; NotRequired → "—".
+    const missing = await screen.findByRole("button", { name: "Documents Missing" });
+    expect(missing).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All Documents Uploaded" })).toBeInTheDocument();
+
+    fireEvent.click(missing);
+
+    // The checklist dialog opens and pulls that rotation's documents.
+    expect(await screen.findByRole("dialog", { name: /Documents — R1001/ })).toBeInTheDocument();
+    expect(h.getRotationDocuments).toHaveBeenCalledWith("r1");
+    expect(await screen.findByText("Curriculum Vitae (CV)")).toBeInTheDocument();
   });
 
   it("offers Pay deposit only on a Pending rotation and opens the payment dialog", async () => {

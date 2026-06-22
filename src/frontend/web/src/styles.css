@@ -178,6 +178,24 @@ table.data { width: 100%; border-collapse: collapse; }
 .dl dt { color: var(--ink-soft); }
 .dl dd { margin: 0; font-weight: 500; }
 .badge { display: inline-block; background: var(--brand-tint); color: var(--brand-dark); font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.badge-ok { background: #e3f5e9; color: #1d7a3e; }
+.badge-warn { background: #fdf0dc; color: #9a6a14; }
+.badge-danger { background: #fde3e3; color: #b3261e; }
+
+/* ---- Documents (My-rotations column + checklist modal) ---- */
+.doc-link { background: none; border: none; padding: 0; font: inherit; color: var(--brand); font-weight: 700; cursor: pointer; text-decoration: underline; }
+.doc-missing .doc-link { color: #b3261e; }
+.doc-list { display: flex; flex-direction: column; gap: 10px; }
+.doc-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.doc-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.doc-name { font-weight: 700; }
+.doc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.doc-due { color: var(--ink-soft); }
+.doc-file { color: var(--brand); text-decoration: underline; overflow-wrap: anywhere; }
+.doc-reject { font-size: 13px; color: #b3261e; }
+.doc-action { flex-shrink: 0; }
+.doc-locked { font-size: 13px; color: #1d7a3e; font-weight: 700; }
+.doc-file-input { display: none; }
 
 /* ---- Modal ---- */
 .overlay {

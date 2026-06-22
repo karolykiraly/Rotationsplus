@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useCustomerRotations } from "./useCustomerRotations";
 import { PaymentModal } from "./PaymentModal";
+import { DocumentsModal } from "./DocumentsModal";
+import type { CustomerRotation } from "./customerApi";
 import { programTypeLabel } from "../programs/programTypes";
 import { rotationStatusLabel } from "../rotations/rotationStatuses";
 
@@ -33,8 +35,8 @@ function Cell({
 
 /** The signed-in student's rotation tracker (GET /api/customer/rotations), cloned to the live
  *  "Rotations Tracker" table: labelled responsive-row cards + progressive reveal. Keeps our
- *  Pay-deposit money path on Pending rotations. Program ID / Rotation Number / Documents are
- *  placeholders the customer API doesn't expose yet. */
+ *  Pay-deposit money path on Pending rotations. The "Documents" column reflects the real required-docs
+ *  status and opens the per-rotation document checklist; Program ID stays a placeholder. */
 export function MyRotationsPage() {
   const rotations = useCustomerRotations();
   const rows = rotations.data ?? [];
@@ -43,6 +45,8 @@ export function MyRotationsPage() {
   const [payingRotationId, setPayingRotationId] = useState<string | null>(null);
   // A rotation whose deposit just succeeded, so we can show a brief confirmation.
   const [paidRotationId, setPaidRotationId] = useState<string | null>(null);
+  // The rotation whose documents checklist is open, if any.
+  const [docsRotation, setDocsRotation] = useState<CustomerRotation | null>(null);
 
   const shown = rows.slice(0, showCount);
   const remaining = rows.length - shown.length;
@@ -73,7 +77,19 @@ export function MyRotationsPage() {
                 <Cell header="Start Date" value={formatDate(r.startDate)} />
                 <Cell header="End Date" value={formatDate(r.endDate)} />
                 <Cell header="Weeks" value={r.weeks} />
-                <Cell header="Documents" value="—" />
+                <Cell
+                  header="Documents"
+                  value={
+                    r.documentsState === "NotRequired" ? (
+                      "—"
+                    ) : (
+                      <button type="button" className="doc-link" onClick={() => setDocsRotation(r)}>
+                        {r.documentsState === "Missing" ? "Documents Missing" : "All Documents Uploaded"}
+                      </button>
+                    )
+                  }
+                  valueClass={r.documentsState === "Missing" ? "responsive-col-value doc-missing" : "responsive-col-value"}
+                />
                 <Cell header="Status" value={<span className="badge">{rotationStatusLabel(r.status)}</span>} />
                 {(r.status === "Pending" || paidRotationId === r.id) && (
                   <div className="responsive-col responsive-col-action" style={{ flex: 2 }}>
@@ -109,6 +125,14 @@ export function MyRotationsPage() {
             setPaidRotationId(payingRotationId);
             setPayingRotationId(null);
           }}
+        />
+      )}
+
+      {docsRotation && (
+        <DocumentsModal
+          rotationId={docsRotation.id}
+          rotationLabel={docsRotation.rotationNumber ? `R${docsRotation.rotationNumber}` : docsRotation.specialtyName}
+          onClose={() => setDocsRotation(null)}
         />
       )}
     </div>
