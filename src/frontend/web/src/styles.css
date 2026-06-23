@@ -703,6 +703,26 @@ table.data { width: 100%; border-collapse: collapse; }
 .todo-secondary { color: var(--ink-soft); font-size: 13px; }
 .todo-more a { font-size: 13px; font-weight: 600; color: var(--brand-dark); }
 
+/* ---- Dashboard Revenue tab ---- */
+.rev-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+@media (max-width: 900px) { .rev-stats { grid-template-columns: repeat(2, 1fr); } }
+.rev-stat { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.rev-stat-label { font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+.rev-stat-value { font-family: var(--font-head); font-weight: 700; font-size: 22px; }
+.rev-stat-value.muted { color: var(--ink-soft); }
+.rev-cols { display: grid; grid-template-columns: 1fr 1.3fr; gap: 28px; }
+@media (max-width: 900px) { .rev-cols { grid-template-columns: 1fr; } }
+.rev-block-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.rev-empty { color: var(--ink-soft); font-size: 14px; }
+.rev-type-list, .rev-trend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rev-type-row { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+.rev-type-amount { font-weight: 700; }
+.rev-trend-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.rev-trend-label { color: var(--ink-soft); }
+.rev-trend-bar-track { background: var(--line); border-radius: 6px; height: 12px; overflow: hidden; }
+.rev-trend-bar { display: block; height: 100%; background: var(--brand); border-radius: 6px; min-width: 2px; }
+.rev-trend-amount { font-weight: 600; white-space: nowrap; }
+
 /* ---- Program rows (image cards) ---- */
 .program-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
 .program-table tr.program-row { cursor: pointer; }

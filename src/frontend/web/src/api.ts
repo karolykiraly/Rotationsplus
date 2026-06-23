@@ -353,6 +353,31 @@ export interface DashboardTodos {
   preceptorApprovals: TodoBucket<PreceptorTodoItem>;
 }
 
+/** Collected revenue for one program delivery type. */
+export interface RevenueByType {
+  type: ProgramType;
+  amount: number;
+}
+
+/** Collected revenue within one business month, for the trend series. */
+export interface RevenueByMonth {
+  year: number;
+  month: number;
+  amount: number;
+}
+
+/** Mirror of the API's DashboardRevenueResponse — the admin hub's "Revenue" tab. All figures are
+ *  platform revenue (deposits captured); a refund nets out of `collected` and is shown via `refunded`. */
+export interface DashboardRevenue {
+  currency: string;
+  collected: number;
+  refunded: number;
+  outstandingReceivable: number;
+  collectedThisMonth: number;
+  byProgramType: RevenueByType[];
+  monthlyTrend: RevenueByMonth[];
+}
+
 /** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.
  *  `depositAmount` is due now; `outstandingAmount` is billed later; `depositPercent` is 0.10 (or 1.00 for
  *  an open/instant-approval program). Pricing is server-authoritative — never recompute it client-side. */
@@ -585,6 +610,8 @@ export const refundRotation = (id: string): Promise<RefundResult> =>
 export const getDashboard = (): Promise<Dashboard> => request<Dashboard>("GET", "/api/dashboard");
 export const getDashboardTodos = (): Promise<DashboardTodos> =>
   request<DashboardTodos>("GET", "/api/dashboard/todos");
+export const getDashboardRevenue = (): Promise<DashboardRevenue> =>
+  request<DashboardRevenue>("GET", "/api/dashboard/revenue");
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
