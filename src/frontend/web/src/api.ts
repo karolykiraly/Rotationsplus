@@ -437,6 +437,17 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   return apiFetch<T>(method, path, result.accessToken, body);
 }
 
+/** Like {@link request} but for a multipart upload with the staff (workforce) token. */
+export async function requestUpload<T>(method: string, path: string, form: FormData): Promise<T> {
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (!account) {
+    throw new Error("Not signed in");
+  }
+
+  const result = await acquireTokenOrRedirect(msalInstance, loginRequest, account);
+  return apiUpload<T>(method, path, result.accessToken, form);
+}
+
 /** True when a failed silent token acquisition can only be resolved by interactive sign-in — i.e. a
  *  full-page redirect. Besides the explicit `InteractionRequiredAuthError`, the *common* expired-session
  *  path in msal-browser v5 is a hidden-iframe renewal that fails with a `BrowserAuthError` (timeout, empty
@@ -587,3 +598,47 @@ export const setProgramRequiredDocuments = (
     documentDueDays,
     requiredDocumentTypeIds
   });
+
+// ---- Documents (admin: per-student review) ----
+/** Mirror of the API's DocumentStatus enum (serialized as these string names). */
+export type DocumentStatus = "UploadNeeded" | "Submitted" | "Approved" | "Rejected" | "Expired";
+
+/** Mirror of the API's AdminRotationDocumentResponse — a student's document with rotation context
+ *  (number, for filtering) plus the upload/review metadata shown on the admin review screen. */
+export interface AdminRotationDocument {
+  id: string;
+  rotationId: string;
+  rotationNumber: number;
+  documentTypeName: string;
+  category: DocumentCategory;
+  status: DocumentStatus;
+  dueDate: string;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  uploadedAtUtc?: string | null;
+  reviewedAtUtc?: string | null;
+  rejectionReason?: string | null;
+}
+
+/** Lists every document across a student's rotations (admin review screen). */
+export const getStudentDocuments = (studentId: string): Promise<AdminRotationDocument[]> =>
+  request<AdminRotationDocument[]>("GET", `/api/students/${studentId}/documents`);
+
+/** Sets a document's lifecycle status (the review dropdown). A reason is expected on Rejected. */
+export const setDocumentStatus = (
+  documentId: string,
+  status: DocumentStatus,
+  rejectionReason: string | null
+): Promise<AdminRotationDocument> =>
+  request<AdminRotationDocument>("PUT", `/api/documents/${documentId}/status`, { status, rejectionReason });
+
+/** Uploads a file on the student's behalf (multipart); the document moves to Submitted. */
+export const uploadDocumentFile = (documentId: string, file: File): Promise<AdminRotationDocument> => {
+  const form = new FormData();
+  form.append("file", file);
+  return requestUpload<AdminRotationDocument>("POST", `/api/documents/${documentId}/file`, form);
+};
+
+/** Clears a document's file (→ UploadNeeded). */
+export const clearDocumentFile = (documentId: string): Promise<AdminRotationDocument> =>
+  request<AdminRotationDocument>("DELETE", `/api/documents/${documentId}/file`);

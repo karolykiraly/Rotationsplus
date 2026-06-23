@@ -208,6 +208,12 @@ table.data { width: 100%; border-collapse: collapse; }
 .doc-add input { flex: 1 1 200px; min-width: 0; }
 .doc-due-input { width: 120px; }
 
+/* ---- Admin per-student document review table ---- */
+.doc-review-table th { text-align: left; font-size: 13px; color: var(--ink-soft); padding: 6px 10px; }
+.doc-review-table td { vertical-align: top; padding: 10px; }
+.doc-review-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.doc-review-actions .doc-add { width: 100%; }
+
 /* ---- Modal ---- */
 .overlay {
   position: fixed; inset: 0; background: rgba(20, 24, 28, 0.45);

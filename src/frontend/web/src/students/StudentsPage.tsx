@@ -7,6 +7,7 @@ import { getStudent, type Student, type StudentInput, type StudentStatus } from 
 import searchIcon from "../assets/icons/search.png";
 import { useStudents } from "./useStudents";
 import { StudentFormModal, type StudentFormInitial } from "./StudentFormModal";
+import { StudentDocumentsModal } from "./StudentDocumentsModal";
 import { STUDENT_STATUSES, academicStatusLabel, studentStatusLabel, visaStatusLabel } from "./studentStatuses";
 
 const DEFAULTS: StudentFormInitial = {
@@ -35,6 +36,7 @@ export function StudentsPage() {
   const { list, create, update, remove } = useStudents(statusFilter);
 
   const [editId, setEditId] = useState<EditId>(null);
+  const [docsStudent, setDocsStudent] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<Student | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -174,6 +176,7 @@ export function StudentsPage() {
                     <td className="last-td">
                       <div className="row-actions">
                         <button className="btn-link" onClick={() => { setFormError(null); setEditId(s.id); }}>Edit</button>
+                        <button className="btn-link" onClick={() => setDocsStudent({ id: s.id, name: s.fullName })}>Documents</button>
                         <button className="btn-link danger" onClick={() => setDeleting(s)}>Delete</button>
                       </div>
                     </td>
@@ -215,6 +218,14 @@ export function StudentsPage() {
             {detail.isError ? `Couldn’t load student: ${(detail.error as Error).message}` : "Loading…"}
           </div>
         </Modal>
+      )}
+
+      {docsStudent && (
+        <StudentDocumentsModal
+          studentId={docsStudent.id}
+          studentName={docsStudent.name}
+          onClose={() => setDocsStudent(null)}
+        />
       )}
 
       {deleting && (
