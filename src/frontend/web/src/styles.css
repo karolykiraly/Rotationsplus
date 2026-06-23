@@ -688,6 +688,21 @@ table.data { width: 100%; border-collapse: collapse; }
 }
 @media (max-width: 900px) { .score-grid { grid-template-columns: 1fr; } }
 
+/* ---- Dashboard ToDo's tab ---- */
+.todo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+@media (max-width: 900px) { .todo-grid { grid-template-columns: 1fr; } }
+.todo-queue { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.todo-queue-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.todo-queue-title { font-size: 15px; font-weight: 700; margin: 0; }
+.todo-count { min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--line); color: var(--ink-soft); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+.todo-count.has { background: var(--brand); color: #fff; }
+.todo-empty { color: var(--ink-soft); font-size: 14px; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.todo-item { display: flex; flex-direction: column; gap: 2px; }
+.todo-primary { font-weight: 600; font-size: 14px; }
+.todo-secondary { color: var(--ink-soft); font-size: 13px; }
+.todo-more a { font-size: 13px; font-weight: 600; color: var(--brand-dark); }
+
 /* ---- Program rows (image cards) ---- */
 .program-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
 .program-table tr.program-row { cursor: pointer; }

@@ -310,6 +310,49 @@ export interface Dashboard {
   today: TodayMetrics;
 }
 
+/** Mirror of the API's TodoBucket<T> — a work queue: full outstanding count + a capped preview. */
+export interface TodoBucket<T> {
+  count: number;
+  items: T[];
+}
+
+/** A document submitted by a student and awaiting admin review. */
+export interface DocumentTodoItem {
+  documentId: string;
+  rotationId: string;
+  rotationNumber: number;
+  studentId?: string | null;
+  studentName: string;
+  documentTypeName: string;
+  dueDate: string;
+  submittedAtUtc?: string | null;
+}
+
+/** A booked rotation whose deposit hasn't been received yet (Pending). */
+export interface PaymentTodoItem {
+  rotationId: string;
+  rotationNumber: number;
+  studentName: string;
+  specialtyName: string;
+  startDate: string;
+}
+
+/** A preceptor awaiting admin approval. */
+export interface PreceptorTodoItem {
+  preceptorId: string;
+  fullName: string;
+  specialtyName: string;
+  email: string;
+  createdAtUtc: string;
+}
+
+/** Mirror of the API's DashboardTodosResponse — the admin hub's "ToDo's" tab queues. */
+export interface DashboardTodos {
+  documentsToReview: TodoBucket<DocumentTodoItem>;
+  awaitingPayment: TodoBucket<PaymentTodoItem>;
+  preceptorApprovals: TodoBucket<PreceptorTodoItem>;
+}
+
 /** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.
  *  `depositAmount` is due now; `outstandingAmount` is billed later; `depositPercent` is 0.10 (or 1.00 for
  *  an open/instant-approval program). Pricing is server-authoritative — never recompute it client-side. */
@@ -540,6 +583,8 @@ export const refundRotation = (id: string): Promise<RefundResult> =>
 
 // ---- Dashboard (AdminOnly) ----
 export const getDashboard = (): Promise<Dashboard> => request<Dashboard>("GET", "/api/dashboard");
+export const getDashboardTodos = (): Promise<DashboardTodos> =>
+  request<DashboardTodos>("GET", "/api/dashboard/todos");
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
