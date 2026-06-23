@@ -46,11 +46,13 @@ interface Props {
   onClose: () => void;
   /** When provided (edit mode), a Delete action appears in the footer. */
   onDelete?: () => void;
+  /** When provided (edit mode), a "Required documents" action appears in the footer. */
+  onConfigureDocuments?: () => void;
 }
 
 /** Create/edit form for a marketplace program. Client validation mirrors the server; server-side
  *  failures (bad specialty/preceptor, money precision) surface in a banner. */
-export function ProgramFormModal({ title, initial, specialties, preceptors, pending, serverError, onSubmit, onClose, onDelete }: Props) {
+export function ProgramFormModal({ title, initial, specialties, preceptors, pending, serverError, onSubmit, onClose, onDelete, onConfigureDocuments }: Props) {
   const {
     register,
     handleSubmit,
@@ -139,6 +141,11 @@ export function ProgramFormModal({ title, initial, specialties, preceptors, pend
           {onDelete && (
             <button type="button" className="btn-link danger" style={{ marginRight: "auto" }} onClick={onDelete} disabled={pending}>
               Delete
+            </button>
+          )}
+          {onConfigureDocuments && (
+            <button type="button" className="btn-link" style={onDelete ? undefined : { marginRight: "auto" }} onClick={onConfigureDocuments} disabled={pending}>
+              Required documents
             </button>
           )}
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={pending}>Cancel</button>

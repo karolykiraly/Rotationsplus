@@ -546,3 +546,44 @@ export const updateStudent = (id: string, input: StudentInput): Promise<StudentD
   request<StudentDetail>("PUT", `/api/students/${id}`, input);
 export const deleteStudent = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/students/${id}`);
+
+// ---- Documents (admin: catalog, per-program required-docs config) ----
+/** Coarse grouping of a document type (mirrors the API's DocumentCategory enum). */
+export type DocumentCategory =
+  | "Immunization" | "Identity" | "Insurance" | "Certification"
+  | "Professional" | "MedicalTest" | "Agreement" | "Other";
+
+/** Mirror of the API's DocumentTypeResponse — a catalog entry. */
+export interface DocumentType {
+  id: string;
+  name: string;
+  category: DocumentCategory;
+}
+
+/** Mirror of the API's ProgramRequiredDocumentsResponse — a program's config + the full catalog. */
+export interface ProgramRequiredDocuments {
+  documentDueDays: number;
+  requiredDocumentTypeIds: string[];
+  catalog: DocumentType[];
+}
+
+export const getDocumentTypes = (): Promise<DocumentType[]> =>
+  request<DocumentType[]>("GET", "/api/document-types");
+
+/** Adds a custom document type to the catalog (admin). */
+export const createDocumentType = (name: string, category: DocumentCategory): Promise<DocumentType> =>
+  request<DocumentType>("POST", "/api/document-types", { name, category });
+
+export const getProgramRequiredDocuments = (programId: string): Promise<ProgramRequiredDocuments> =>
+  request<ProgramRequiredDocuments>("GET", `/api/programs/${programId}/required-documents`);
+
+/** Sets a program's required document types + due-days (full replace). */
+export const setProgramRequiredDocuments = (
+  programId: string,
+  documentDueDays: number,
+  requiredDocumentTypeIds: string[]
+): Promise<ProgramRequiredDocuments> =>
+  request<ProgramRequiredDocuments>("PUT", `/api/programs/${programId}/required-documents`, {
+    documentDueDays,
+    requiredDocumentTypeIds
+  });

@@ -7,6 +7,7 @@ import { useMe } from "../useMe";
 import { getProgram, type Program, type ProgramInput, type ProgramType } from "../api";
 import { usePrograms, useProgramFormOptions } from "./usePrograms";
 import { ProgramFormModal, type ProgramFormInitial } from "./ProgramFormModal";
+import { ProgramDocumentsModal } from "./ProgramDocumentsModal";
 import { programCode, programTypeLabel } from "./programTypes";
 import noImage from "../assets/images/no_image.webp";
 import filterIcon from "../assets/images/filter.svg";
@@ -45,6 +46,7 @@ export function ProgramsPage() {
   const { specialties, preceptors } = useProgramFormOptions();
 
   const [editId, setEditId] = useState<EditId>(null);
+  const [docsProgram, setDocsProgram] = useState<{ id: string; label: string } | null>(null);
   const [deleting, setDeleting] = useState<Program | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -226,6 +228,18 @@ export function ProgramsPage() {
             const prog = programs.find((p) => p.id === editId);
             if (prog) { closeForm(); setDeleting(prog); }
           }}
+          onConfigureDocuments={() => {
+            const d = detail.data!;
+            setDocsProgram({ id: d.id, label: `${d.specialtyName} · ${programCode(d.programType, d.programNumber)}` });
+          }}
+        />
+      )}
+
+      {docsProgram && (
+        <ProgramDocumentsModal
+          programId={docsProgram.id}
+          programLabel={docsProgram.label}
+          onClose={() => setDocsProgram(null)}
         />
       )}
 
