@@ -378,6 +378,29 @@ export interface DashboardRevenue {
   monthlyTrend: RevenueByMonth[];
 }
 
+/** New students + preceptors who registered within one business month. */
+export interface RegistrationsByMonth {
+  year: number;
+  month: number;
+  students: number;
+  preceptors: number;
+}
+
+/** How many rotations belong to a given specialty (busiest first). */
+export interface RotationsBySpecialty {
+  specialtyName: string;
+  rotationCount: number;
+}
+
+/** Mirror of the API's DashboardReportsResponse — the admin hub's "Reports" tab. */
+export interface DashboardReports {
+  totalStudents: number;
+  studentsWithBooking: number;
+  totalRotations: number;
+  registrations: RegistrationsByMonth[];
+  topSpecialties: RotationsBySpecialty[];
+}
+
 /** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.
  *  `depositAmount` is due now; `outstandingAmount` is billed later; `depositPercent` is 0.10 (or 1.00 for
  *  an open/instant-approval program). Pricing is server-authoritative — never recompute it client-side. */
@@ -612,6 +635,8 @@ export const getDashboardTodos = (): Promise<DashboardTodos> =>
   request<DashboardTodos>("GET", "/api/dashboard/todos");
 export const getDashboardRevenue = (): Promise<DashboardRevenue> =>
   request<DashboardRevenue>("GET", "/api/dashboard/revenue");
+export const getDashboardReports = (): Promise<DashboardReports> =>
+  request<DashboardReports>("GET", "/api/dashboard/reports");
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {

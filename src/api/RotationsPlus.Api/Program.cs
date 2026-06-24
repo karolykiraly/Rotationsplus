@@ -195,6 +195,7 @@ app.MapStudentEndpoints();
 app.MapDashboardEndpoints();
 app.MapDashboardTodosEndpoints();
 app.MapDashboardRevenueEndpoints();
+app.MapDashboardReportsEndpoints();
 
 app.Run();
 

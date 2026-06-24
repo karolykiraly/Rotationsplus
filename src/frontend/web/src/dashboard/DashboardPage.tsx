@@ -3,6 +3,7 @@ import { useMe } from "../useMe";
 import { useDashboard } from "./useDashboard";
 import { DashboardTodosPanel } from "./DashboardTodosPanel";
 import { DashboardRevenuePanel } from "./DashboardRevenuePanel";
+import { DashboardReportsPanel } from "./DashboardReportsPanel";
 import { Tabs } from "../components/Tabs";
 import { rotationStatusLabel } from "../rotations/rotationStatuses";
 import { programFamilyCount } from "../programs/programTypes";
@@ -132,6 +133,8 @@ export function DashboardPage() {
 
       {tab === 1 ? (
         <DashboardTodosPanel />
+      ) : tab === 3 ? (
+        <DashboardReportsPanel />
       ) : tab === 4 ? (
         <DashboardRevenuePanel />
       ) : tab !== 0 ? (

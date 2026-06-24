@@ -80,6 +80,7 @@ public static class ApiAuthorizationMatrix
         new("GET", "/api/dashboard", [RoleNames.Admin], "Admin dashboard aggregate"),
         new("GET", "/api/dashboard/todos", [RoleNames.Admin], "Admin dashboard to-do queues"),
         new("GET", "/api/dashboard/revenue", [RoleNames.Admin], "Admin dashboard revenue"),
+        new("GET", "/api/dashboard/reports", [RoleNames.Admin], "Admin dashboard reports"),
         // Student directory: reads StaffOnly (sales/SDR/coordinator work the directory for CRM), writes AdminOnly.
         new("GET", "/api/students", RoleNames.Staff, "List students (staff)"),
         new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001", RoleNames.Staff, "Get student by id (staff)"),

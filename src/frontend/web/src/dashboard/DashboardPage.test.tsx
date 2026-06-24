@@ -120,10 +120,10 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
   });
 
-  it("shows the tab bar and a coming-soon panel for non-Results tabs", async () => {
+  it("shows the tab bar and a coming-soon panel for the not-yet-built Campaign tab", async () => {
     renderPage();
     await screen.findByText("Today's LiveScore");
-    await userEvent.click(screen.getByRole("tab", { name: "Reports" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Campaign" }));
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
     expect(screen.queryByText("Today's LiveScore")).not.toBeInTheDocument();
   });

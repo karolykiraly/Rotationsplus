@@ -722,6 +722,7 @@ table.data { width: 100%; border-collapse: collapse; }
 .rev-trend-bar-track { background: var(--line); border-radius: 6px; height: 12px; overflow: hidden; }
 .rev-trend-bar { display: block; height: 100%; background: var(--brand); border-radius: 6px; min-width: 2px; }
 .rev-trend-amount { font-weight: 600; white-space: nowrap; }
+.rep-spec-label { width: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- Program rows (image cards) ---- */
 .program-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
