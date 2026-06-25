@@ -104,6 +104,42 @@ public class SpecialtyAdminEndpointTests(RotationsApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task Deleting_a_specialty_a_live_program_uses_returns_409()
+    {
+        var admin = Client(RoleNames.Admin);
+        var specialty = await (await admin.PostAsJsonAsync("/api/specialties", new CreateSpecialtyRequest("Allergy & Immunology")))
+            .Content.ReadFromJsonAsync<SpecialtyResponse>();
+
+        // A program now references the specialty → it can't be deleted out from under it.
+        var program = await admin.PostAsJsonAsync("/api/programs",
+            new CreateProgramRequest(specialty!.Id, ProgramType.InPerson, 2, 4, 500m, 100m, "Guard test", PreceptorId: null));
+        program.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var delete = await admin.DeleteAsync($"/api/specialties/{specialty.Id}");
+        delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // Still present after the rejected delete.
+        (await admin.GetAsync($"/api/specialties/{specialty.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Deleting_a_specialty_a_live_preceptor_uses_returns_409()
+    {
+        var admin = Client(RoleNames.Admin);
+        var specialty = await (await admin.PostAsJsonAsync("/api/specialties", new CreateSpecialtyRequest("Neonatology")))
+            .Content.ReadFromJsonAsync<SpecialtyResponse>();
+
+        // A preceptor's PrimarySpecialtyId is the second FK to Specialty — also blocks the delete.
+        var preceptor = await admin.PostAsJsonAsync("/api/preceptors",
+            new CreatePreceptorRequest("Dana", "Lin", $"dana.{Guid.NewGuid():N}@example.com", specialty!.Id,
+                null, null, null, null, PreceptorStatus.Registered, null));
+        preceptor.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var delete = await admin.DeleteAsync($"/api/specialties/{specialty.Id}");
+        delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task Recreating_a_soft_deleted_specialty_restores_it()
     {
         var admin = Client(RoleNames.Admin);

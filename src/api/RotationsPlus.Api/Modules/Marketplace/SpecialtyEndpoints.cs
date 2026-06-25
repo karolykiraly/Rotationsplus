@@ -123,6 +123,19 @@ public static class SpecialtyEndpoints
                 return Results.NotFound();
             }
 
+            // Block deletion while any live row references this specialty. A soft-delete is an UPDATE
+            // (the FK Restrict only governs hard deletes), so without this guard the specialty would be
+            // filtered out from under its references — and anything projecting the required Specialty
+            // navigation (the rotations list + dashboard via Program→Specialty; the preceptor list/detail
+            // via Preceptor→PrimarySpecialty) would read a NULL name. Two FKs point at Specialty:
+            // RotationProgram.SpecialtyId and Preceptor.PrimarySpecialtyId — both must be clear. Mirrors
+            // the program- and student-delete guards. Soft-deleted referrers don't count (global filter).
+            if (await db.Programs.AnyAsync(p => p.SpecialtyId == id, cancellationToken)
+                || await db.Preceptors.AnyAsync(p => p.PrimarySpecialtyId == id, cancellationToken))
+            {
+                return Results.Conflict("This specialty is in use by programs or preceptors and can't be deleted.");
+            }
+
             db.Specialties.Remove(specialty); // interceptor converts the delete into a soft-delete
             await db.SaveChangesAsync(cancellationToken);
             return Results.NoContent();
