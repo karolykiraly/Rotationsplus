@@ -19,4 +19,17 @@
     <ProjectReference Include="..\..\api\RotationsPlus.Api\RotationsPlus.Api.csproj" />
   </ItemGroup>
 
+  <!-- That API reference transitively drags the API's appsettings*.json into the Worker's publish output,
+       colliding with the Worker's own at the same relative path (NETSDK1152, breaks the container publish).
+       Drop the API-sourced appsettings only — the Worker keeps ITS config and the API assembly is retained.
+       (Runtime config on DEV/PROD comes from env/Key Vault regardless; this just unblocks publish.) -->
+  <Target Name="DropReferencedApiAppSettings" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.json'
+                   and $([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').StartsWith('appsettings'))
+                   and $([System.String]::Copy('%(ResolvedFileToPublish.FullPath)').Contains('RotationsPlus.Api'))" />
+    </ItemGroup>
+  </Target>
+
 </Project>
