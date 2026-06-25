@@ -19,6 +19,17 @@ public enum CampaignStatus
     Failed
 }
 
+/// <summary>Per-recipient delivery state within a campaign send. A recipient stays <see cref="Pending"/>
+/// until the send job processes it, then becomes terminal (<see cref="Sent"/>/<see cref="Failed"/>). The
+/// job only ever processes <see cref="Pending"/> rows, so a re-run (resume after a crash) never re-sends a
+/// recipient already marked terminal.</summary>
+public enum RecipientStatus
+{
+    Pending,
+    Sent,
+    Failed
+}
+
 /// <summary>Admin payload to compose a campaign (saved as a Draft).</summary>
 public sealed record CreateCampaignRequest(string Subject, string Body, EmailAudience Audience);
 

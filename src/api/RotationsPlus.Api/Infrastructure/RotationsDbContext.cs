@@ -29,6 +29,7 @@ public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : 
     public DbSet<ProgramRequiredDocument> ProgramRequiredDocuments => Set<ProgramRequiredDocument>();
     public DbSet<RotationDocument> RotationDocuments => Set<RotationDocument>();
     public DbSet<EmailCampaign> EmailCampaigns => Set<EmailCampaign>();
+    public DbSet<CampaignRecipient> CampaignRecipients => Set<CampaignRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
