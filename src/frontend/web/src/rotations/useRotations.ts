@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRotation,
   deleteRotation,
@@ -7,6 +7,7 @@ import {
   getStudents,
   refundRotation,
   updateRotation,
+  type PagedResponse,
   type Program,
   type Rotation,
   type RotationInput,
@@ -14,15 +15,23 @@ import {
   type Student
 } from "../api";
 
-/** List query (optionally filtered by status) + create/update/delete mutations for rotations. */
-export function useRotations(status: RotationStatus | "") {
+/** Server-paginated rotation list (status filter + free-text search + page) plus create/update/delete
+ *  mutations. `keepPreviousData` keeps the current page visible while the next loads, so paging/searching
+ *  doesn't flash an empty table. */
+export function useRotations(status: RotationStatus | "", search: string, page: number, pageSize: number) {
   const qc = useQueryClient();
-  // Invalidate every rotation list (all status filters), not just the active one.
+  // Invalidate every rotation list (all filters/pages), not just the active one.
   const invalidate = () => qc.invalidateQueries({ queryKey: ["rotations"] });
 
-  const list = useQuery<Rotation[]>({
-    queryKey: ["rotations", { status: status || null }],
-    queryFn: () => getRotations(status ? { status } : undefined)
+  const list = useQuery<PagedResponse<Rotation>>({
+    queryKey: ["rotations", { status: status || null, search: search || null, page, pageSize }],
+    queryFn: () => getRotations({
+      status: status || undefined,
+      q: search || undefined,
+      page,
+      pageSize
+    }),
+    placeholderData: keepPreviousData
   });
 
   const create = useMutation({

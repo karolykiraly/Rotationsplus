@@ -608,13 +608,32 @@ export const updatePreceptor = (id: string, input: PreceptorInput): Promise<Prec
 export const deletePreceptor = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/preceptors/${id}`);
 
+/** One page of a server-paginated list (mirror of the API's PagedResponse<T>). `totalCount` is the full
+ *  filtered row count across all pages, for the pager. */
+export interface PagedResponse<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 // ---- Rotations (AdminOnly — reads + writes) ----
-export const getRotations = (params?: { status?: RotationStatus; programId?: string }): Promise<Rotation[]> => {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.programId) q.set("programId", params.programId);
-  const suffix = q.toString();
-  return request<Rotation[]>("GET", `/api/rotations${suffix ? `?${suffix}` : ""}`);
+export const getRotations = (params?: {
+  status?: RotationStatus;
+  programId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Rotation>> => {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.programId) sp.set("programId", params.programId);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Rotation>>("GET", `/api/rotations${suffix ? `?${suffix}` : ""}`);
 };
 export const getRotation = (id: string): Promise<RotationDetail> =>
   request<RotationDetail>("GET", `/api/rotations/${id}`);

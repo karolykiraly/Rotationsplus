@@ -22,14 +22,38 @@ public static class RotationEndpoints
             .WithTags("Rotations");
 
         group.MapGet("/", async (
-            RotationStatus? status, Guid? programId, RotationsDbContext db, CancellationToken cancellationToken) =>
+            RotationStatus? status, Guid? programId, string? q, int? page, int? pageSize,
+            RotationsDbContext db, CancellationToken cancellationToken) =>
         {
+            if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
+            {
+                return Results.BadRequest(searchError);
+            }
+
             var query = db.Rotations.AsQueryable();
             if (status is { } s) query = query.Where(r => r.Status == s);
             if (programId is { } pid) query = query.Where(r => r.ProgramId == pid);
+            if (pattern is not null)
+            {
+                // Mirrors the old client-side search: rotation number (with/without the "R" prefix), student
+                // name/email, preceptor name, and specialty. The number match strips a leading R from the
+                // RAW term (not by slicing the escaped pattern) so "R1001" and "1001" both hit. ILIKE =
+                // case-insensitive contains.
+                var term = q!.Trim();
+                var numberTerm = term.StartsWith("R", StringComparison.OrdinalIgnoreCase) ? term[1..] : term;
+                var numberPattern = PaginationExtensions.EscapeLike(numberTerm);
+                query = query.Where(r =>
+                    EF.Functions.ILike(r.StudentName, pattern) ||
+                    EF.Functions.ILike(r.StudentEmail, pattern) ||
+                    EF.Functions.ILike(r.Program.Specialty.Name, pattern) ||
+                    (r.Program.Preceptor != null
+                        && EF.Functions.ILike(r.Program.Preceptor.FirstName + " " + r.Program.Preceptor.LastName, pattern)) ||
+                    EF.Functions.ILike(r.RotationNumber.ToString()!, numberPattern));
+            }
 
             var rotations = await query
                 .OrderByDescending(r => r.StartDate)
+                .ThenByDescending(r => r.RotationNumber) // tie-break so paging is deterministic across pages
                 .Select(r => new RotationSummaryResponse(
                     r.Id,
                     r.RotationNumber,
@@ -42,7 +66,7 @@ public static class RotationEndpoints
                     r.EndDate,
                     r.Weeks,
                     r.Status))
-                .ToListAsync(cancellationToken);
+                .ToPagedResponseAsync(page, pageSize, cancellationToken); // Normalize() owns the defaulting + caps
 
             return Results.Ok(rotations);
         })

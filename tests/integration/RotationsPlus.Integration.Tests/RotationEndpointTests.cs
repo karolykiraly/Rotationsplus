@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 using RotationsPlus.Contracts.Rotations;
 using RotationsPlus.Contracts.Students;
@@ -55,9 +56,12 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     {
         var admin = Client(RoleNames.Admin);
 
-        var list = await admin.GetFromJsonAsync<List<RotationSummaryResponse>>("/api/rotations", JsonOptions);
+        // Narrow to the seeded rotation's number so the assertion is deterministic regardless of how many
+        // other rotations the shared test DB holds (a plain page-1 scan could push it off as the suite grows).
+        var list = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=R1001&pageSize=100", JsonOptions);
 
-        var seeded = list!.SingleOrDefault(r => r.Id == SeededRotationId);
+        var seeded = list!.Items.SingleOrDefault(r => r.Id == SeededRotationId);
         seeded.Should().NotBeNull();
         seeded!.RotationNumber.Should().Be(1001);   // seeded sequential number → client formats as "R1001"
         seeded.StudentName.Should().Be("Sam Rivera");
@@ -295,8 +299,11 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var getAfter = await admin.GetAsync($"/api/rotations/{created.Id}");
         getAfter.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await admin.GetFromJsonAsync<List<RotationSummaryResponse>>("/api/rotations", JsonOptions);
-        list!.Select(r => r.Id).Should().NotContain(created.Id);
+        // Search by the created rotation's own number so the NotContain is meaningful (not a false pass from
+        // the row simply being off page 1 of an unfiltered list).
+        var list = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            $"/api/rotations?q={created.RotationNumber}&pageSize=100", JsonOptions);
+        list!.Items.Select(r => r.Id).Should().NotContain(created.Id);
     }
 
     [Fact]
@@ -307,10 +314,10 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var created = await (await PostAsync(admin, ValidCreate(status: RotationStatus.Rejected)))
             .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
 
-        var rejected = await admin.GetFromJsonAsync<List<RotationSummaryResponse>>(
-            "/api/rotations?status=Rejected", JsonOptions);
-        rejected!.Select(r => r.Id).Should().Contain(created!.Id);
-        rejected.Should().OnlyContain(r => r.Status == RotationStatus.Rejected);
+        var rejected = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?status=Rejected&pageSize=100", JsonOptions);
+        rejected!.Items.Select(r => r.Id).Should().Contain(created!.Id);
+        rejected.Items.Should().OnlyContain(r => r.Status == RotationStatus.Rejected);
     }
 
     [Fact]
@@ -318,11 +325,11 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     {
         var admin = Client(RoleNames.Admin);
 
-        var byProgram = await admin.GetFromJsonAsync<List<RotationSummaryResponse>>(
-            $"/api/rotations?programId={InternalMedicineProgramId}", JsonOptions);
+        var byProgram = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            $"/api/rotations?programId={InternalMedicineProgramId}&pageSize=100", JsonOptions);
 
-        byProgram!.Should().Contain(r => r.Id == SeededRotationId);
-        byProgram.Should().OnlyContain(r => r.SpecialtyName == "Internal Medicine");
+        byProgram!.Items.Should().Contain(r => r.Id == SeededRotationId);
+        byProgram.Items.Should().OnlyContain(r => r.SpecialtyName == "Internal Medicine");
     }
 
     [Fact]
@@ -340,10 +347,10 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var delete = await admin.DeleteAsync($"/api/programs/{program.Id}");
         delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        var list = await admin.GetAsync("/api/rotations");
+        var list = await admin.GetAsync("/api/rotations?pageSize=100");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
-        var rows = await list.Content.ReadFromJsonAsync<List<RotationSummaryResponse>>(JsonOptions);
-        rows!.Should().Contain(r => r.Id == rotation!.Id);
+        var rows = await list.Content.ReadFromJsonAsync<PagedResponse<RotationSummaryResponse>>(JsonOptions);
+        rows!.Items.Should().Contain(r => r.Id == rotation!.Id);
 
         (await admin.DeleteAsync($"/api/rotations/{rotation!.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await admin.DeleteAsync($"/api/programs/{program.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -357,5 +364,141 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var response = await sales.GetAsync("/api/rotations");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Pages_partition_the_set_without_overlap_or_skips()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A fresh program with exactly three rotations (distinct start dates) so the total is deterministic
+        // regardless of the shared DB's other rows.
+        var program = await (await admin.PostAsJsonAsync("/api/programs",
+                new CreateProgramRequest(InternalMedicineSpecialtyId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Paging set", null), JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        for (var i = 0; i < 3; i++)
+        {
+            (await PostAsync(admin, ValidCreate(programId: program!.Id, studentId: DanaColeStudentId,
+                start: new DateOnly(2027, 3, 1 + i), end: new DateOnly(2027, 4, 1 + i))))
+                .EnsureSuccessStatusCode();
+        }
+
+        var baseUrl = $"/api/rotations?programId={program!.Id}";
+        var page1 = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{baseUrl}&page=1&pageSize=2", JsonOptions);
+        var page2 = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{baseUrl}&page=2&pageSize=2", JsonOptions);
+        var all = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{baseUrl}&pageSize=100", JsonOptions);
+
+        page1!.TotalCount.Should().Be(3);
+        page2!.TotalCount.Should().Be(3);
+        page1.Page.Should().Be(1);
+        page1.PageSize.Should().Be(2);
+        page1.TotalPages.Should().Be(2);
+        page1.Items.Should().HaveCount(2);
+        page2.Items.Should().HaveCount(1); // the remainder
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToList();
+        var page2Ids = page2.Items.Select(r => r.Id).ToList();
+        page1Ids.Should().NotIntersectWith(page2Ids);                       // no row on two pages
+        page1Ids.Concat(page2Ids).Should().BeEquivalentTo(all!.Items.Select(r => r.Id)); // none skipped
+        // Pages follow the same order as the full list (StartDate desc, RotationNumber desc).
+        page1Ids.Concat(page2Ids).Should().ContainInOrder(all.Items.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task List_normalizes_out_of_range_paging_parameters()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // page=0 floors to 1; pageSize=0 falls back to the default — neither 500s.
+        var page = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?page=0&pageSize=0", JsonOptions);
+
+        page!.Page.Should().Be(1);
+        page.PageSize.Should().Be(10); // DefaultPageSize
+    }
+
+    [Fact]
+    public async Task List_pageSize_is_capped_at_the_maximum()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // Asking for an absurd page size is clamped to the server maximum (100), not honoured.
+        var page = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?pageSize=100000", JsonOptions);
+
+        page!.PageSize.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task List_search_matches_the_rotation_number_with_or_without_the_R_prefix()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // The seeded rotation is number 1001. Both "R1001" and "1001" must find it; a non-matching term must not.
+        var withR = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=R1001&pageSize=100", JsonOptions);
+        withR!.Items.Should().Contain(r => r.Id == SeededRotationId);
+
+        var withoutR = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=1001&pageSize=100", JsonOptions);
+        withoutR!.Items.Should().Contain(r => r.Id == SeededRotationId);
+
+        var miss = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=zzz-no-such-rotation&pageSize=100", JsonOptions);
+        miss!.Items.Should().NotContain(r => r.Id == SeededRotationId);
+
+        // "R" + the wrong number must NOT over-match the seeded row (guards the R-strip from matching all).
+        var wrongNumber = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=R9999&pageSize=100", JsonOptions);
+        wrongNumber!.Items.Should().NotContain(r => r.Id == SeededRotationId);
+    }
+
+    [Fact]
+    public async Task List_search_matches_the_preceptor_full_name_across_the_space()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // The seeded rotation's preceptor is "Jane Carter" — a match only works if the first+last concat is
+        // searched server-side (this is the case that fails if the concatenated ILIKE doesn't translate).
+        var byPreceptor = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=Jane Carter&pageSize=100", JsonOptions);
+
+        byPreceptor!.Items.Should().Contain(r => r.Id == SeededRotationId);
+    }
+
+    [Fact]
+    public async Task List_search_at_the_length_limit_is_accepted()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // Exactly the max length is allowed (the reject is only ABOVE the limit) — guards the off-by-one.
+        var response = await admin.GetAsync($"/api/rotations?q={new string('x', 100)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task List_search_matches_the_student_name()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var bySam = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=Rivera&pageSize=100", JsonOptions);
+
+        const StringComparison ci = StringComparison.OrdinalIgnoreCase;
+        bySam!.Items.Should().Contain(r => r.Id == SeededRotationId);
+        bySam.Items.Should().OnlyContain(r =>
+            r.StudentName.Contains("Rivera", ci) || r.StudentEmail.Contains("Rivera", ci)
+            || r.SpecialtyName.Contains("Rivera", ci) || (r.PreceptorName != null && r.PreceptorName.Contains("Rivera", ci)));
+    }
+
+    [Fact]
+    public async Task List_search_over_the_length_limit_is_rejected()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await admin.GetAsync($"/api/rotations?q={new string('x', 101)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

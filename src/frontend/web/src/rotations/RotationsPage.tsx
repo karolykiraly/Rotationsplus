@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
+import { useDebouncedValue } from "../useDebouncedValue";
 import { getRotation, type Rotation, type RotationInput, type RotationStatus } from "../api";
 import searchIcon from "../assets/icons/search.png";
 import { useRotations, useRotationPrograms, useRotationStudents } from "./useRotations";
@@ -36,7 +37,12 @@ function formatDate(iso: string): string {
 export function RotationsPage() {
   const { user } = useMe();
   const [statusFilter, setStatusFilter] = useState<RotationStatus | "">("");
-  const { list, create, update, remove, refund } = useRotations(statusFilter);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  // Debounce the search so we fire one server query per pause, not per keystroke.
+  const debouncedSearch = useDebouncedValue(search.trim());
+
+  const { list, create, update, remove, refund } = useRotations(statusFilter, debouncedSearch, page, PAGE_SIZE);
   const programs = useRotationPrograms();
   const students = useRotationStudents();
 
@@ -45,11 +51,20 @@ export function RotationsPage() {
   const [refunding, setRefunding] = useState<Rotation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
 
-  // First page whenever the status filter or search changes.
-  useEffect(() => setPage(1), [statusFilter, search]);
+  // Back to the first page whenever the status filter or (debounced) search changes.
+  useEffect(() => setPage(1), [statusFilter, debouncedSearch]);
+
+  // Server returns one page + the full filtered count for the pager.
+  const totalItems = list.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  // If the result set shrank past the current page (e.g. deleting the last row on the last page), step back.
+  // Gate on fresh (non-placeholder) data so a stale keepPreviousData total can't drive a wrong jump.
+  // (Declared before the admin guard below so the hook order is stable.)
+  const settled = !list.isPlaceholderData;
+  useEffect(() => {
+    if (settled && page > totalPages) setPage(totalPages);
+  }, [settled, page, totalPages]);
 
   // For edit, load the full detail (the list row lacks programId/oid).
   const detail = useQuery({
@@ -111,23 +126,9 @@ export function RotationsPage() {
     status: d.status
   });
 
-  const rotations = list.data ?? [];
+  const rows = list.data?.items ?? [];
   const programOpts = programs.data ?? [];
   const studentOpts = students.data ?? [];
-
-  // Client-side search + pagination over the (server status-filtered) list.
-  const q = search.trim().toLowerCase();
-  const filtered = rotations.filter(
-    (r) =>
-      !q ||
-      // Include the rotation number (both "R1001" and "1001") so the "Number" search works.
-      `R${r.rotationNumber} ${r.rotationNumber} ${r.studentName} ${r.studentEmail} ${r.preceptorName ?? ""} ${r.specialtyName}`
-        .toLowerCase()
-        .includes(q)
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <>
@@ -160,12 +161,15 @@ export function RotationsPage() {
 
         {list.isLoading && <div className="state">Loading rotations…</div>}
         {list.isError && <div className="state">Couldn’t load rotations: {(list.error as Error).message}</div>}
+        {/* keepPreviousData keeps the prior page visible while the next loads; show that it's updating
+            (isFetching is true on a page/search change, isLoading only on the first load). */}
+        {!list.isLoading && list.isFetching && <div className="state subtle" role="status">Updating…</div>}
 
         {!list.isLoading && !list.isError && (
           rows.length === 0 ? (
             <div className="state">There is no data available.</div>
           ) : (
-            <table className="program-table">
+            <table className="program-table" aria-busy={list.isFetching}>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="rot-row">
@@ -218,7 +222,7 @@ export function RotationsPage() {
           )
         )}
 
-        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
+        <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
       </div>
 
       {editId === "new" && (

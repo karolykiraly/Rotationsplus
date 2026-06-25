@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+/** Wraps rows in the server's PagedResponse envelope (single page). */
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -98,7 +101,7 @@ describe("RotationsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getRotations.mockResolvedValue([ROTATION_ROW]);
+    h.getRotations.mockResolvedValue(paged([ROTATION_ROW]));
     h.getRotation.mockResolvedValue(ROTATION_DETAIL);
     h.getPrograms.mockResolvedValue([PROGRAM]);
     h.getStudents.mockResolvedValue(STUDENTS);
@@ -116,17 +119,99 @@ describe("RotationsPage", () => {
     expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();
   });
 
-  it("filters by rotation number via the search box", async () => {
-    h.getRotations.mockResolvedValue([
-      ROTATION_ROW,
-      { ...ROTATION_ROW, id: "r2", rotationNumber: 2002, studentName: "Dana Cole", studentEmail: "dana@x.com" }
-    ]);
+  it("searches server-side via the debounced search box", async () => {
+    // The server does the filtering now: with a `q` it returns only the match; without, both rows.
+    h.getRotations.mockImplementation((params?: { q?: string }) =>
+      Promise.resolve(paged(
+        params?.q
+          ? [ROTATION_ROW]
+          : [ROTATION_ROW, { ...ROTATION_ROW, id: "r2", rotationNumber: 2002, studentName: "Dana Cole", studentEmail: "dana@x.com" }]
+      ))
+    );
+    renderPage();
+    await screen.findByText("Dana Cole"); // both rows initially
+
+    await userEvent.type(screen.getByPlaceholderText("Search for Number/Preceptor/Student"), "R1001");
+
+    // Debounced → one server query carrying q; the non-match drops out.
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ q: "R1001" })));
+    await waitFor(() => expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument());
+    expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
+  });
+
+  it("pages server-side: clicking Next requests page 2", async () => {
+    // Two pages' worth (totalCount 3, page size 10 in the page → but the pager shows when >1 page, so use a
+    // response that reports 2 pages regardless of item count).
+    h.getRotations.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve({
+        items: params?.page === 2
+          ? [{ ...ROTATION_ROW, id: "p2", studentName: "Page Two" }]
+          : [ROTATION_ROW],
+        page: params?.page ?? 1,
+        pageSize: 10,
+        totalCount: 11, // 2 pages
+        totalPages: 2
+      })
+    );
     renderPage();
     await screen.findByText("Sam Rivera");
 
-    await userEvent.type(screen.getByPlaceholderText("Search for Number/Preceptor/Student"), "R1001");
-    expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
-    expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+    expect(await screen.findByText("Page Two")).toBeInTheDocument();
+  });
+
+  it("steps back a page when deleting the last row shrinks the set past the current page", async () => {
+    // Two pages initially; after the delete-triggered refetch the total drops to one page → clamp to 1.
+    let total = 11;
+    h.getRotations.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve({
+        items: [{ ...ROTATION_ROW, id: `pg${params?.page ?? 1}` }],
+        page: params?.page ?? 1,
+        pageSize: 10,
+        totalCount: total,
+        totalPages: Math.max(1, Math.ceil(total / 10))
+      })
+    );
+    h.deleteRotation.mockResolvedValue(undefined);
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "Next" })); // → page 2
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+
+    // Delete the (only) row on page 2; the success invalidates the list, the refetch reports one page, and
+    // the clamp effect steps the page back to 1.
+    total = 1;
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+  });
+
+  it("resets to the first page when the status filter changes", async () => {
+    h.getRotations.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve({
+        items: [ROTATION_ROW], page: params?.page ?? 1, pageSize: 10, totalCount: 11, totalPages: 2
+      })
+    );
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "Completed");
+
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "Completed", page: 1 })));
+  });
+
+  it("shows the empty state when a page has no rows", async () => {
+    h.getRotations.mockResolvedValue(paged([]));
+    renderPage();
+    expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
   });
 
   it("blocks non-admins", async () => {
@@ -266,7 +351,7 @@ describe("RotationsPage", () => {
 
   it("offers Refund only on a refundable rotation and refunds after confirmation", async () => {
     // A Cancelled rotation is refundable; the default Active row is not.
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.getRotations.mockResolvedValue(paged([{ ...ROTATION_ROW, status: "Cancelled" }]));
     h.refundRotation.mockResolvedValue({ rotationId: "r1", status: "Refunded", paymentsRefunded: 1 });
     renderPage();
     await screen.findByText("Sam Rivera");
@@ -290,7 +375,7 @@ describe("RotationsPage", () => {
 
   it("does not offer Refund on an already-refunded rotation", async () => {
     // Refunded is terminal — no further refund action (guards the off-by-one).
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Refunded" }]);
+    h.getRotations.mockResolvedValue(paged([{ ...ROTATION_ROW, status: "Refunded" }]));
     renderPage();
     await screen.findByText("Sam Rivera");
     const row = screen.getByText("Sam Rivera").closest("tr")!;
@@ -298,7 +383,7 @@ describe("RotationsPage", () => {
   });
 
   it("shows a page banner when a refund fails", async () => {
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.getRotations.mockResolvedValue(paged([{ ...ROTATION_ROW, status: "Cancelled" }]));
     h.refundRotation.mockRejectedValue(new ApiError(409, "This rotation has already been refunded."));
     renderPage();
     await screen.findByText("Sam Rivera");
@@ -314,7 +399,7 @@ describe("RotationsPage", () => {
 
   it("omits Refunded from the edit-form transitions (it's a money action, not a status edit)", async () => {
     // A Cancelled rotation's only forward edge is Refunded — which the form must NOT offer.
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
+    h.getRotations.mockResolvedValue(paged([{ ...ROTATION_ROW, status: "Cancelled" }]));
     h.getRotation.mockResolvedValue({ ...ROTATION_DETAIL, status: "Cancelled", allowedNextStatuses: ["Refunded"] });
     renderPage();
     await screen.findByText("Sam Rivera");
@@ -331,18 +416,18 @@ describe("RotationsPage", () => {
 
   it("filters the list by status and re-renders the filtered rows", async () => {
     h.getRotations.mockImplementation((params?: { status?: string }) =>
-      Promise.resolve(
+      Promise.resolve(paged(
         params?.status === "Completed"
           ? [{ ...ROTATION_ROW, id: "r9", studentName: "Dana Cole", status: "Completed" }]
           : [ROTATION_ROW]
-      )
+      ))
     );
     renderPage();
     await screen.findByText("Sam Rivera");
 
     await userEvent.selectOptions(screen.getByLabelText("Status"), "Completed");
 
-    expect(h.getRotations).toHaveBeenLastCalledWith({ status: "Completed" });
+    expect(h.getRotations).toHaveBeenLastCalledWith(expect.objectContaining({ status: "Completed" }));
     expect(await screen.findByText("Dana Cole")).toBeInTheDocument();
     expect(screen.queryByText("Sam Rivera")).not.toBeInTheDocument();
   });
