@@ -1,5 +1,8 @@
 using Hangfire;
 using Hangfire.PostgreSql;
+using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Common.Email;
+using RotationsPlus.Common.Jobs;
 using RotationsPlus.ServiceDefaults;
 using RotationsPlus.Worker.Infrastructure;
 using RotationsPlus.Worker.Jobs;
@@ -21,6 +24,17 @@ builder.Services.AddHangfire(config => config
     .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
 
 builder.Services.AddHangfireServer();
+
+// Domain data access for jobs: the same RotationsDbContext (application schema) the API uses, against
+// the same Postgres DB. No audit interceptor here — jobs run outside an HTTP request, and the campaign
+// job sets its own timestamps; the global soft-delete query filters still apply.
+builder.AddNpgsqlDbContext<RotationsDbContext>("rotationsdb");
+
+// Email: the fake sender until a real provider is wired at cutover (swapped by registration).
+builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
+
+// The campaign-send job, resolved by Hangfire when the API enqueues ICampaignSendJob.
+builder.Services.AddScoped<ICampaignSendJob, SendCampaignJob>();
 
 var app = builder.Build();
 

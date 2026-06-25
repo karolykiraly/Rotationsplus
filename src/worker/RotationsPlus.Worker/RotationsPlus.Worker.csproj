@@ -13,6 +13,10 @@
     <ProjectReference Include="..\..\shared\RotationsPlus.ServiceDefaults\RotationsPlus.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\shared\RotationsPlus.Common\RotationsPlus.Common.csproj" />
     <ProjectReference Include="..\..\shared\RotationsPlus.Contracts\RotationsPlus.Contracts.csproj" />
+    <!-- The Worker reuses the API's RotationsDbContext + entities for job data access. Pragmatic until a
+         shared RotationsPlus.Data project is extracted; the API never references the Worker (the job seam
+         is the ICampaignSendJob interface in Common), so there's no cycle. -->
+    <ProjectReference Include="..\..\api\RotationsPlus.Api\RotationsPlus.Api.csproj" />
   </ItemGroup>
 
 </Project>

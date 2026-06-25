@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Crm;
 using RotationsPlus.Common.Authorization;
 using Testcontainers.PostgreSql;
 
@@ -22,6 +23,10 @@ public sealed class RotationsApiFactory : WebApplicationFactory<Program>, IAsync
         .WithPassword("postgres")
         .Build();
 
+    /// <summary>Records campaign dispatches in place of the real Hangfire enqueue, so a test can assert a
+    /// send was dispatched without standing up Hangfire storage.</summary>
+    public RecordingCampaignDispatcher CampaignDispatcher { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -29,6 +34,10 @@ public sealed class RotationsApiFactory : WebApplicationFactory<Program>, IAsync
 
         builder.ConfigureTestServices(services =>
         {
+            // Record campaign dispatches instead of enqueuing a real Hangfire job (the Worker isn't
+            // running in tests). The Hangfire client itself is skipped in the Testing host.
+            services.AddSingleton<ICampaignDispatcher>(CampaignDispatcher);
+
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
 

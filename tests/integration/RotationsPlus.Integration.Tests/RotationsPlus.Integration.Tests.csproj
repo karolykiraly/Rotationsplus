@@ -20,6 +20,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\api\RotationsPlus.Api\RotationsPlus.Api.csproj" />
+    <!-- For the SendCampaignJob test (the job lives in the Worker; its internal Program isn't exposed,
+         so there's no Program ambiguity with the API's). -->
+    <ProjectReference Include="..\..\..\src\worker\RotationsPlus.Worker\RotationsPlus.Worker.csproj" />
   </ItemGroup>
 
 </Project>
