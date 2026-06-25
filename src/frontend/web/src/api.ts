@@ -638,6 +638,42 @@ export const getDashboardRevenue = (): Promise<DashboardRevenue> =>
 export const getDashboardReports = (): Promise<DashboardReports> =>
   request<DashboardReports>("GET", "/api/dashboard/reports");
 
+// ---- Email campaigns (AdminOnly) ----
+/** Mirror of the API's EmailAudience enum. */
+export type EmailAudience = "AllStudents" | "StudentsWithBooking" | "StudentsWithoutBooking" | "AllPreceptors";
+
+/** Mirror of the API's CampaignStatus enum. */
+export type CampaignStatus = "Draft" | "Queued" | "Sending" | "Sent" | "Failed";
+
+/** Mirror of the API's CampaignSummaryResponse (list row — no body). */
+export interface CampaignSummary {
+  id: string;
+  subject: string;
+  audience: EmailAudience;
+  status: CampaignStatus;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAtUtc: string;
+  sentAtUtc?: string | null;
+}
+
+/** Mirror of the API's CampaignDetailResponse (with body). */
+export interface CampaignDetail extends CampaignSummary {
+  body: string;
+}
+
+export const getCampaigns = (): Promise<CampaignSummary[]> =>
+  request<CampaignSummary[]>("GET", "/api/campaigns");
+
+/** Composes a campaign as a draft. */
+export const createCampaign = (subject: string, body: string, audience: EmailAudience): Promise<CampaignDetail> =>
+  request<CampaignDetail>("POST", "/api/campaigns", { subject, body, audience });
+
+/** Queues a draft campaign for sending (the Worker fans out + tallies). */
+export const sendCampaign = (id: string): Promise<CampaignDetail> =>
+  request<CampaignDetail>("POST", `/api/campaigns/${id}/send`);
+
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
   const q = new URLSearchParams();

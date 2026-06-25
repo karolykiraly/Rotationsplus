@@ -3,8 +3,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const h = vi.hoisted(() => ({ getMe: vi.fn(), getDashboard: vi.fn() }));
-vi.mock("../api", () => ({ getMe: () => h.getMe(), getDashboard: () => h.getDashboard() }));
+const h = vi.hoisted(() => ({ getMe: vi.fn(), getDashboard: vi.fn(), getCampaigns: vi.fn() }));
+vi.mock("../api", () => ({
+  getMe: () => h.getMe(),
+  getDashboard: () => h.getDashboard(),
+  getCampaigns: () => h.getCampaigns()
+}));
 
 import { DashboardPage } from "./DashboardPage";
 
@@ -62,6 +66,7 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     h.getMe.mockReset().mockResolvedValue(ADMIN);
     h.getDashboard.mockReset().mockResolvedValue(DASH);
+    h.getCampaigns.mockReset().mockResolvedValue([]);
   });
 
   it("renders the LiveScore totals", async () => {
@@ -120,11 +125,12 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
   });
 
-  it("shows the tab bar and a coming-soon panel for the not-yet-built Campaign tab", async () => {
+  it("switches to the Campaign tab and renders its panel", async () => {
     renderPage();
     await screen.findByText("Today's LiveScore");
     await userEvent.click(screen.getByRole("tab", { name: "Campaign" }));
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    // The Campaign compose form replaces the Results panel.
+    expect(await screen.findByText("Save draft")).toBeInTheDocument();
     expect(screen.queryByText("Today's LiveScore")).not.toBeInTheDocument();
   });
 
