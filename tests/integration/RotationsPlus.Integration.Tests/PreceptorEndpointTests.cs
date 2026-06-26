@@ -30,12 +30,12 @@ public class PreceptorEndpointTests(RotationsApiFactory factory) : IClassFixture
         var preceptors = await StaffClient().GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>("/api/preceptors", JsonOptions);
 
         preceptors.Should().NotBeNull();
-        preceptors!.Items.Should().HaveCount(2);
-        preceptors.TotalCount.Should().Be(2);
+        preceptors!.Items.Should().HaveCount(3); // Jane Carter, Nadia Khan (Pending — the approval-queue seed), Omar Reyes
+        preceptors.TotalCount.Should().Be(3);
         preceptors.Items.Select(p => p.FullName).Should().Contain("Jane Carter");
         preceptors.Items.Select(p => p.PrimarySpecialtyName).Should().Contain("Internal Medicine");
         // Ordered by last name, then first.
-        preceptors.Items.Select(p => p.FullName).Should().ContainInOrder("Jane Carter", "Omar Reyes");
+        preceptors.Items.Select(p => p.FullName).Should().ContainInOrder("Jane Carter", "Nadia Khan", "Omar Reyes");
     }
 
     [Fact]

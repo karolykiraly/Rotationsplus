@@ -752,6 +752,12 @@ table.data { width: 100%; border-collapse: collapse; }
 /* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
 .list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
 .list-count { font-size: 13px; color: #7f848b; }
+/* List footer: pager on the left, a primary Save on the right (legacy Permission screen). */
+.list-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.list-foot .pager { margin-top: 0; }
+.text-center { text-align: center; }
+.ok-text { color: var(--ok); font-weight: 700; }
+.brand-text { color: var(--brand-dark); font-weight: 700; }
 
 /* ---- Pagination (First/Prev/1..N/Next/Last) ---- */
 .pager { display: flex; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap; }

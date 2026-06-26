@@ -23,6 +23,14 @@ public sealed class Preceptor : AuditableEntity
     public string? City { get; set; }
     public string? State { get; set; }
 
+    /// <summary>Contact mobile number (legacy <c>mobile_phone</c>) — shown on the admin Permission screen.</summary>
+    public string? MobilePhone { get; set; }
+
+    /// <summary>Whether an onboarding call has been scheduled with this preceptor (legacy
+    /// <c>call_scheduled</c>) — the Permission screen's "Scheduled" Yes/No column. The flow that sets it
+    /// (call booking) is a post-cutover improvement; defaults to false ("No") for now.</summary>
+    public bool CallScheduled { get; set; }
+
     public PreceptorStatus Status { get; set; } = PreceptorStatus.Registered;
 
     public string? Bio { get; set; }

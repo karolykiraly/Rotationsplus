@@ -212,77 +212,61 @@ public static class PreceptorEndpoints
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("DeletePreceptor");
 
-        // ---- Approval queue (/admin/permission): approve / reject a Pending preceptor (AdminOnly) ----
+        // ---- Approval queue (/admin/permission): batch activate / reject Pending preceptors (AdminOnly) ----
 
-        // Approve → activates the account. Only a Pending preceptor (the queue state) is approvable; any
-        // other status is 409 (use the edit form for manual status overrides). Stamps reviewer + time and
-        // clears any prior rejection reason.
-        group.MapPost("/{id:guid}/approve", async (
-            Guid id, RotationsDbContext db, ICurrentUser user, TimeProvider clock, CancellationToken cancellationToken) =>
-        {
-            var preceptor = await db.Preceptors.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-            if (preceptor is null)
-            {
-                return Results.NotFound();
-            }
-            if (preceptor.Status != PreceptorStatus.Pending)
-            {
-                return Results.Conflict("Only a pending preceptor can be approved.");
-            }
-
-            preceptor.Status = PreceptorStatus.MemberActivated;
-            preceptor.RejectionReason = null;
-            preceptor.ReviewedBy = user.ObjectId;
-            preceptor.ReviewedAtUtc = clock.GetUtcNow();
-            await db.SaveChangesAsync(cancellationToken);
-
-            var specialtyName = await ResolveSpecialtyNameAsync(db, preceptor.PrimarySpecialtyId, cancellationToken) ?? string.Empty;
-            return Results.Ok(ToDetail(preceptor, specialtyName));
-        })
-        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
-        .WithName("ApprovePreceptor");
-
-        // Reject → terminal Rejected with a required, admin-supplied reason. Same Pending-only guard.
-        group.MapPost("/{id:guid}/reject", async (
-            Guid id, RejectPreceptorRequest request, RotationsDbContext db, ICurrentUser user,
+        // The Permission screen toggles an Activated and a Reject checkbox per row and clicks Save; this
+        // applies the whole batch in one transaction (mirrors the legacy updatePreceptorPermissions). Only
+        // Pending preceptors transition (others are silently ignored — the queue only shows Pending anyway);
+        // an id appearing in BOTH lists is a 400. Activate → MemberActivated, Reject → Rejected (reason-less,
+        // matching production's binary checkbox). Stamps the reviewer (oid) + time on each.
+        group.MapPost("/permissions", async (
+            SavePreceptorPermissionsRequest request, RotationsDbContext db, ICurrentUser user,
             TimeProvider clock, CancellationToken cancellationToken) =>
         {
-            var reason = request.Reason?.Trim();
-            if (string.IsNullOrEmpty(reason))
+            var activateIds = request.ActivateIds?.Distinct().ToHashSet() ?? [];
+            var rejectIds = request.RejectIds?.Distinct().ToHashSet() ?? [];
+            if (activateIds.Overlaps(rejectIds))
             {
-                return Results.BadRequest("A rejection reason is required.");
+                return Results.BadRequest("A preceptor can't be both activated and rejected.");
             }
-            if (reason.Length > RejectionReasonMaxLength)
+            if (activateIds.Count == 0 && rejectIds.Count == 0)
             {
-                return Results.BadRequest($"Reason must be {RejectionReasonMaxLength} characters or fewer.");
-            }
-
-            var preceptor = await db.Preceptors.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-            if (preceptor is null)
-            {
-                return Results.NotFound();
-            }
-            if (preceptor.Status != PreceptorStatus.Pending)
-            {
-                return Results.Conflict("Only a pending preceptor can be rejected.");
+                return Results.Ok(new SavePreceptorPermissionsResponse(0, 0));
             }
 
-            preceptor.Status = PreceptorStatus.Rejected;
-            preceptor.RejectionReason = reason;
-            preceptor.ReviewedBy = user.ObjectId;
-            preceptor.ReviewedAtUtc = clock.GetUtcNow();
+            var affectedIds = activateIds.Concat(rejectIds).ToList();
+            var preceptors = await db.Preceptors
+                .Where(p => affectedIds.Contains(p.Id) && p.Status == PreceptorStatus.Pending)
+                .ToListAsync(cancellationToken);
+
+            var now = clock.GetUtcNow();
+            var activated = 0;
+            var rejected = 0;
+            foreach (var preceptor in preceptors)
+            {
+                if (activateIds.Contains(preceptor.Id))
+                {
+                    preceptor.Status = PreceptorStatus.MemberActivated;
+                    preceptor.RejectionReason = null;
+                    activated++;
+                }
+                else
+                {
+                    preceptor.Status = PreceptorStatus.Rejected;
+                    rejected++;
+                }
+                preceptor.ReviewedBy = user.ObjectId;
+                preceptor.ReviewedAtUtc = now;
+            }
             await db.SaveChangesAsync(cancellationToken);
 
-            var specialtyName = await ResolveSpecialtyNameAsync(db, preceptor.PrimarySpecialtyId, cancellationToken) ?? string.Empty;
-            return Results.Ok(ToDetail(preceptor, specialtyName));
+            return Results.Ok(new SavePreceptorPermissionsResponse(activated, rejected));
         })
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
-        .WithName("RejectPreceptor");
+        .WithName("SavePreceptorPermissions");
 
         return routes;
     }
-
-    private const int RejectionReasonMaxLength = 1000;
 
     private const int NameMaxLength = 100;
     private const int EmailMaxLength = 256;
@@ -393,5 +377,6 @@ public static class PreceptorEndpoints
     // evaluated client-side over un-joined entities, leaving PrimarySpecialty null (→ NRE at materialization).
     private static readonly Expression<Func<Preceptor, PreceptorSummaryResponse>> Summary =
         p => new PreceptorSummaryResponse(
-            p.Id, p.FirstName + " " + p.LastName, p.Email, p.PrimarySpecialty.Name, p.City, p.State, p.Status);
+            p.Id, p.FirstName + " " + p.LastName, p.Email, p.PrimarySpecialty.Name, p.City, p.State,
+            p.MobilePhone, p.CallScheduled, p.Status);
 }

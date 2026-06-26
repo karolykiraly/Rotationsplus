@@ -107,6 +107,8 @@ export interface Preceptor {
   primarySpecialtyName: string;
   city?: string | null;
   state?: string | null;
+  mobilePhone?: string | null;
+  callScheduled: boolean;
   status: PreceptorStatus;
 }
 
@@ -642,12 +644,17 @@ export const updatePreceptor = (id: string, input: PreceptorInput): Promise<Prec
   request<PreceptorDetail>("PUT", `/api/preceptors/${id}`, input);
 export const deletePreceptor = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/preceptors/${id}`);
-/** Approval queue: activate a pending preceptor. */
-export const approvePreceptor = (id: string): Promise<PreceptorDetail> =>
-  request<PreceptorDetail>("POST", `/api/preceptors/${id}/approve`);
-/** Approval queue: reject a pending preceptor with a required reason. */
-export const rejectPreceptor = (id: string, reason: string): Promise<PreceptorDetail> =>
-  request<PreceptorDetail>("POST", `/api/preceptors/${id}/reject`, { reason });
+/** Result of a Permission save (mirror of SavePreceptorPermissionsResponse). */
+export interface SavePermissionsResult {
+  activated: number;
+  rejected: number;
+}
+/** Permission screen batch save: activate the checked preceptors, reject the others (Pending only). */
+export const savePreceptorPermissions = (
+  activateIds: string[],
+  rejectIds: string[]
+): Promise<SavePermissionsResult> =>
+  request<SavePermissionsResult>("POST", "/api/preceptors/permissions", { activateIds, rejectIds });
 
 /** One page of a server-paginated list (mirror of the API's PagedResponse<T>). `totalCount` is the full
  *  filtered row count across all pages, for the pager. */

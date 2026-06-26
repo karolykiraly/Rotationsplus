@@ -29,6 +29,7 @@ public sealed class PreceptorConfiguration : IEntityTypeConfiguration<Preceptor>
         builder.Property(x => x.LicenseState).HasMaxLength(50);
         builder.Property(x => x.City).HasMaxLength(100);
         builder.Property(x => x.State).HasMaxLength(50);
+        builder.Property(x => x.MobilePhone).HasMaxLength(32);
         builder.Property(x => x.Bio).HasMaxLength(4000);
 
         builder.Property(x => x.Status)
@@ -54,14 +55,17 @@ public sealed class PreceptorConfiguration : IEntityTypeConfiguration<Preceptor>
         var seededAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.Zero);
         builder.HasData(
             Seed("dddddddd-0000-0000-0000-000000000001", "Jane", "Carter", "jane.carter@example.com",
-                InternalMedicine, "IL", "Chicago", PreceptorStatus.MemberActivated, seededAt),
+                InternalMedicine, "IL", "Chicago", "+1 312-555-0101", true, PreceptorStatus.MemberActivated, seededAt),
             Seed("dddddddd-0000-0000-0000-000000000002", "Omar", "Reyes", "omar.reyes@example.com",
-                Pediatrics, "TX", "Houston", PreceptorStatus.MemberValidated, seededAt));
+                Pediatrics, "TX", "Houston", "+1 713-555-0102", false, PreceptorStatus.MemberValidated, seededAt),
+            // A Pending preceptor so the admin Permission approval queue shows realistic data on DEV.
+            Seed("dddddddd-0000-0000-0000-000000000003", "Nadia", "Khan", "nadia.khan@example.com",
+                InternalMedicine, "NY", "New York", "+1 212-555-0103", false, PreceptorStatus.Pending, seededAt));
     }
 
     private static object Seed(
         string id, string firstName, string lastName, string email, string specialtyId,
-        string state, string city, PreceptorStatus status, DateTimeOffset seededAt) => new
+        string state, string city, string mobilePhone, bool callScheduled, PreceptorStatus status, DateTimeOffset seededAt) => new
         {
             Id = Guid.Parse(id),
             FirstName = firstName,
@@ -71,6 +75,8 @@ public sealed class PreceptorConfiguration : IEntityTypeConfiguration<Preceptor>
             LicenseState = state,
             City = city,
             State = state,
+            MobilePhone = mobilePhone,
+            CallScheduled = callScheduled,
             Status = status,
             CreatedAtUtc = seededAt,
             CreatedBy = "seed",

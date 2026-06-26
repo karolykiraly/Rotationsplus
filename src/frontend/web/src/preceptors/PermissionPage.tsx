@@ -1,26 +1,27 @@
 import { useEffect, useState } from "react";
-import { Modal } from "../components/Modal";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
-import type { Preceptor } from "../api";
 import { usePermissionQueue } from "./usePermissionQueue";
 
 const PAGE_SIZE = 10;
 
-/** The admin "Permissions" screen — the preceptor approval queue. Lists preceptors awaiting approval
- *  (status Pending) and lets an admin Approve (activate) or Reject (with a required reason) each one.
- *  The agreement-PDF / W9 / doc-due-date pieces of the legacy permission screen are later slices. */
+/** Per-row checkbox selection: which preceptors are checked to Activate vs Reject. Keyed by id so the
+ *  selection survives paging until the admin clicks Save. */
+type Selection = Record<string, "activate" | "reject" | undefined>;
+
+/** The admin "Permissions" screen — the preceptor approval queue, matching production: a row per Pending
+ *  preceptor (Name · Specialty · Scheduled · Phone · Email) with an **Activated** and a **Reject** checkbox,
+ *  and a single **Save** that applies the whole batch (activate the checked, reject the others). Activated
+ *  and Reject are mutually exclusive per row so a row can't be sent as both. */
 export function PermissionPage() {
   const { user } = useMe();
   const [page, setPage] = useState(1);
-  const { list, approve, reject } = usePermissionQueue(page, PAGE_SIZE);
+  const { list, save } = usePermissionQueue(page, PAGE_SIZE);
 
-  const [rejecting, setRejecting] = useState<Preceptor | null>(null);
-  const [reason, setReason] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>({});
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  // Step back if the queue shrinks past the current page (a decision removes a row). Gated on fresh data;
+  // Step back if the queue shrinks past the current page (a Save removes rows). Gated on fresh data;
   // declared before the admin guard so hooks stay stable.
   const totalItems = list.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -35,25 +36,24 @@ export function PermissionPage() {
 
   const rows = list.data?.items ?? [];
 
-  const onApprove = (p: Preceptor) => {
-    approve.mutate(p.id, {
-      onSuccess: () => setBanner({ type: "ok", text: `Approved ${p.fullName}.` }),
-      onError: (e) => setBanner({ type: "error", text: (e as Error).message })
-    });
-  };
+  const toggle = (id: string, choice: "activate" | "reject") =>
+    setSelection((prev) => ({ ...prev, [id]: prev[id] === choice ? undefined : choice }));
 
-  const confirmReject = () => {
-    if (!rejecting) return;
-    if (reason.trim().length === 0) {
-      setFormError("A rejection reason is required.");
+  const onSave = () => {
+    const activateIds = Object.keys(selection).filter((id) => selection[id] === "activate");
+    const rejectIds = Object.keys(selection).filter((id) => selection[id] === "reject");
+    if (activateIds.length === 0 && rejectIds.length === 0) {
+      setBanner({ type: "error", text: "Check Activated or Reject on at least one preceptor first." });
       return;
     }
-    const name = rejecting.fullName;
-    reject.mutate(
-      { id: rejecting.id, reason: reason.trim() },
+    save.mutate(
+      { activateIds, rejectIds },
       {
-        onSuccess: () => { setRejecting(null); setReason(""); setBanner({ type: "ok", text: `Rejected ${name}.` }); },
-        onError: (e) => setFormError((e as Error).message)
+        onSuccess: (r) => {
+          setSelection({});
+          setBanner({ type: "ok", text: `Saved — activated ${r.activated}, rejected ${r.rejected}.` });
+        },
+        onError: (e) => setBanner({ type: "error", text: (e as Error).message })
       }
     );
   };
@@ -63,6 +63,11 @@ export function PermissionPage() {
       {banner && <div className={`banner ${banner.type}`} role="alert">{banner.text}</div>}
 
       <div className="lead-page">
+        <div className="list-head">
+          <h2 className="heading-xxs">Permissions</h2>
+          <span className="list-count">{totalItems} items</span>
+        </div>
+
         {list.isLoading && <div className="state">Loading approvals…</div>}
         {list.isError && <div className="state">Couldn’t load approvals: {(list.error as Error).message}</div>}
         {!list.isLoading && list.isFetching && <div className="state subtle" role="status">Updating…</div>}
@@ -76,37 +81,46 @@ export function PermissionPage() {
                 {rows.map((p) => (
                   <tr key={p.id} className="rot-row">
                     <td className="first-td">
-                      <div className="place-holder">Name</div>
+                      <div className="place-holder">Preceptor Name</div>
                       <div className="heading-xxxs">{p.fullName}</div>
-                    </td>
-                    <td>
-                      <div className="place-holder">Email</div>
-                      <div className="heading-xxxs-normal">{p.email}</div>
                     </td>
                     <td>
                       <div className="place-holder">Specialty</div>
                       <div className="heading-xxxs-normal">{p.primarySpecialtyName}</div>
                     </td>
                     <td>
-                      <div className="place-holder">Location</div>
-                      <div className="heading-xxxs-normal">{[p.city, p.state].filter(Boolean).join(", ") || "—"}</div>
-                    </td>
-                    <td className="last-td">
-                      <div className="row-actions">
-                        <button
-                          className="btn btn-primary button-sm"
-                          onClick={() => onApprove(p)}
-                          disabled={approve.isPending && approve.variables === p.id}
-                        >
-                          {approve.isPending && approve.variables === p.id ? "Approving…" : "Approve"}
-                        </button>
-                        <button
-                          className="btn-link danger"
-                          onClick={() => { setFormError(null); setReason(""); setRejecting(p); }}
-                        >
-                          Reject
-                        </button>
+                      <div className="place-holder">Scheduled</div>
+                      <div className={`heading-xxxs-normal ${p.callScheduled ? "ok-text" : "brand-text"}`}>
+                        {p.callScheduled ? "Yes" : "No"}
                       </div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Phone Number</div>
+                      <div className="heading-xxxs-normal">{p.mobilePhone || "—"}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">Email</div>
+                      <div className="heading-xxxs-normal">{p.email}</div>
+                    </td>
+                    <td className="text-center">
+                      <div className="place-holder">Activated</div>
+                      <input
+                        type="checkbox"
+                        aria-label={`Activate ${p.fullName}`}
+                        checked={selection[p.id] === "activate"}
+                        disabled={save.isPending}
+                        onChange={() => toggle(p.id, "activate")}
+                      />
+                    </td>
+                    <td className="last-td text-center">
+                      <div className="place-holder">Reject</div>
+                      <input
+                        type="checkbox"
+                        aria-label={`Reject ${p.fullName}`}
+                        checked={selection[p.id] === "reject"}
+                        disabled={save.isPending}
+                        onChange={() => toggle(p.id, "reject")}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -115,31 +129,13 @@ export function PermissionPage() {
           )
         )}
 
-        <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
+        <div className="list-foot">
+          <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
+          <button className="btn btn-primary" onClick={onSave} disabled={save.isPending || rows.length === 0}>
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
-
-      {rejecting && (
-        <Modal title={`Reject ${rejecting.fullName}`} onClose={() => setRejecting(null)}>
-          <div className="modal-body">
-            <label htmlFor="reject-reason">Reason (shown in the audit record)</label>
-            <textarea
-              id="reject-reason"
-              rows={4}
-              value={reason}
-              maxLength={1000}
-              onChange={(e) => { setReason(e.target.value); if (formError) setFormError(null); }}
-              placeholder="Why is this preceptor being rejected?"
-            />
-            {formError && <div className="err" role="alert">{formError}</div>}
-          </div>
-          <div className="modal-foot">
-            <button className="btn btn-ghost" onClick={() => setRejecting(null)} disabled={reject.isPending}>Cancel</button>
-            <button className="btn btn-danger" onClick={confirmReject} disabled={reject.isPending}>
-              {reject.isPending ? "Rejecting…" : "Reject"}
-            </button>
-          </div>
-        </Modal>
-      )}
     </>
   );
 }

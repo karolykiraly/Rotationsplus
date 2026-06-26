@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -9,15 +9,14 @@ const paged = <T,>(items: T[], totalCount = items.length) =>
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
   getPreceptors: vi.fn(),
-  approvePreceptor: vi.fn(),
-  rejectPreceptor: vi.fn()
+  savePreceptorPermissions: vi.fn()
 }));
 
 vi.mock("../api", () => ({
   getMe: () => h.getMe(),
   getPreceptors: (params: unknown) => h.getPreceptors(params),
-  approvePreceptor: (id: string) => h.approvePreceptor(id),
-  rejectPreceptor: (id: string, reason: string) => h.rejectPreceptor(id, reason),
+  savePreceptorPermissions: (activateIds: string[], rejectIds: string[]) =>
+    h.savePreceptorPermissions(activateIds, rejectIds),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -36,6 +35,8 @@ const ROW = {
   primarySpecialtyName: "Internal Medicine",
   city: "Chicago",
   state: "IL",
+  mobilePhone: "+1 312-555-0101",
+  callScheduled: false,
   status: "Pending"
 };
 
@@ -56,14 +57,15 @@ describe("PermissionPage", () => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
     h.getPreceptors.mockResolvedValue(paged([ROW]));
-    h.approvePreceptor.mockResolvedValue({ ...ROW, status: "MemberActivated" });
-    h.rejectPreceptor.mockResolvedValue({ ...ROW, status: "Rejected" });
+    h.savePreceptorPermissions.mockResolvedValue({ activated: 1, rejected: 0 });
   });
 
-  it("requests the Pending queue and lists awaiting preceptors", async () => {
+  it("requests the Pending queue and shows the production columns", async () => {
     renderPage();
     expect(await screen.findByText("Jane Carter")).toBeInTheDocument();
-    expect(screen.getByText("Chicago, IL")).toBeInTheDocument();
+    expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
+    expect(screen.getByText("+1 312-555-0101")).toBeInTheDocument();
+    expect(screen.getByText("No")).toBeInTheDocument(); // Scheduled
     expect(h.getPreceptors).toHaveBeenCalledWith(expect.objectContaining({ status: "Pending" }));
   });
 
@@ -74,60 +76,60 @@ describe("PermissionPage", () => {
     expect(screen.queryByText("Jane Carter")).not.toBeInTheDocument();
   });
 
-  it("approves a preceptor and shows a confirmation", async () => {
+  it("activates a checked preceptor on Save and confirms", async () => {
     renderPage();
     await screen.findByText("Jane Carter");
 
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Activate Jane Carter/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(h.approvePreceptor).toHaveBeenCalledWith("pr1");
-    expect(await screen.findByText(/Approved Jane Carter/)).toBeInTheDocument();
+    await waitFor(() => expect(h.savePreceptorPermissions).toHaveBeenCalledWith(["pr1"], []));
+    expect(await screen.findByText(/activated 1, rejected 0/i)).toBeInTheDocument();
   });
 
-  it("requires a reason before rejecting, then rejects", async () => {
+  it("rejects a checked preceptor on Save", async () => {
+    h.savePreceptorPermissions.mockResolvedValue({ activated: 0, rejected: 1 });
     renderPage();
     await screen.findByText("Jane Carter");
 
-    await userEvent.click(screen.getByRole("button", { name: "Reject" }));
-    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Reject Jane Carter/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    // Empty reason → blocked, no API call.
-    await userEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
-    expect(await within(dialog).findByText("A rejection reason is required.")).toBeInTheDocument();
-    expect(h.rejectPreceptor).not.toHaveBeenCalled();
-
-    // With a reason → rejects.
-    await userEvent.type(within(dialog).getByLabelText(/Reason/), "License unverifiable");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
-
-    await waitFor(() => expect(h.rejectPreceptor).toHaveBeenCalledWith("pr1", "License unverifiable"));
-    expect(await screen.findByText(/Rejected Jane Carter/)).toBeInTheDocument();
+    await waitFor(() => expect(h.savePreceptorPermissions).toHaveBeenCalledWith([], ["pr1"]));
   });
 
-  it("surfaces a server error from approve in a banner", async () => {
-    h.approvePreceptor.mockRejectedValue(new ApiError(409, "Only a pending preceptor can be approved."));
+  it("makes Activated and Reject mutually exclusive per row", async () => {
     renderPage();
     await screen.findByText("Jane Carter");
+    const activate = screen.getByRole("checkbox", { name: /Activate Jane Carter/i });
+    const reject = screen.getByRole("checkbox", { name: /Reject Jane Carter/i });
 
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
-
-    expect(await screen.findByText(/Only a pending preceptor can be approved/)).toBeInTheDocument();
+    await userEvent.click(activate);
+    expect(activate).toBeChecked();
+    await userEvent.click(reject); // checking Reject clears Activate
+    expect(reject).toBeChecked();
+    expect(activate).not.toBeChecked();
   });
 
-  it("steps back a page when approving the last row on the last page shrinks the queue", async () => {
-    // Two pages initially; after the approve-triggered refetch the total drops to one page → clamp to 1.
-    let total = 11;
-    h.getPreceptors.mockImplementation((params?: { page?: number }) =>
-      Promise.resolve(paged([{ ...ROW, id: `pg${params?.page ?? 1}` }], total)));
+  it("warns when Save is clicked with nothing checked (no API call)", async () => {
     renderPage();
     await screen.findByText("Jane Carter");
-    await userEvent.click(screen.getByRole("button", { name: "Next" })); // → page 2
-    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
 
-    // Approve the only row on page 2; the queue drops to one page and the clamp steps back to page 1.
-    total = 1;
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
-    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(h.savePreceptorPermissions).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Check Activated or Reject/i)).toBeInTheDocument();
+  });
+
+  it("surfaces a server error from Save in a banner", async () => {
+    h.savePreceptorPermissions.mockRejectedValue(new ApiError(400, "A preceptor can't be both activated and rejected."));
+    renderPage();
+    await screen.findByText("Jane Carter");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /Activate Jane Carter/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/can't be both activated and rejected/i)).toBeInTheDocument();
   });
 
   it("shows the empty state when nothing awaits approval", async () => {
