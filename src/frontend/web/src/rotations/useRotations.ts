@@ -4,7 +4,7 @@ import {
   deleteRotation,
   getPrograms,
   getRotations,
-  getStudents,
+  getStudentOptions,
   refundRotation,
   updateRotation,
   type PagedResponse,
@@ -73,7 +73,7 @@ export function useRotationPrograms() {
   return useQuery<Program[]>({ queryKey: ["programs"], queryFn: getPrograms });
 }
 
-/** Student option list for the rotation form's student picker. */
+/** Student option list for the rotation form's student picker (the unpaginated options endpoint). */
 export function useRotationStudents() {
-  return useQuery<Student[]>({ queryKey: ["students", { status: null }], queryFn: () => getStudents() });
+  return useQuery<Student[]>({ queryKey: ["student-options"], queryFn: getStudentOptions });
 }

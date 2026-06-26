@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+/** Wraps rows in the server's PagedResponse envelope (single page). */
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -75,7 +78,7 @@ describe("StudentsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getStudents.mockResolvedValue([STUDENT_ROW]);
+    h.getStudents.mockResolvedValue(paged([STUDENT_ROW]));
     h.getStudent.mockResolvedValue(STUDENT_DETAIL);
   });
 
@@ -90,9 +93,9 @@ describe("StudentsPage", () => {
   });
 
   it("renders an em-dash for a student with no visa status or location", async () => {
-    h.getStudents.mockResolvedValue([
+    h.getStudents.mockResolvedValue(paged([
       { ...STUDENT_ROW, id: "s3", fullName: "No Visa", visaStatus: null, city: null, state: null }
-    ]);
+    ]));
     renderPage();
 
     const row = (await screen.findByText("No Visa")).closest("tr")!;
@@ -199,20 +202,66 @@ describe("StudentsPage", () => {
 
   it("filters the list by status and re-renders the filtered rows", async () => {
     h.getStudents.mockImplementation((params?: { status?: string }) =>
-      Promise.resolve(
+      Promise.resolve(paged(
         params?.status === "TurnedIntoContact"
           ? [{ ...STUDENT_ROW, id: "s9", fullName: "Dana Cole", status: "TurnedIntoContact" }]
           : [STUDENT_ROW]
-      )
+      ))
     );
     renderPage();
     await screen.findByText("Sam Rivera");
 
     await userEvent.selectOptions(screen.getByLabelText("Status"), "TurnedIntoContact");
 
-    expect(h.getStudents).toHaveBeenLastCalledWith({ status: "TurnedIntoContact" });
+    expect(h.getStudents).toHaveBeenLastCalledWith(expect.objectContaining({ status: "TurnedIntoContact" }));
     expect(await screen.findByText("Dana Cole")).toBeInTheDocument();
     expect(screen.queryByText("Sam Rivera")).not.toBeInTheDocument();
+  });
+
+  it("searches server-side via the debounced search box", async () => {
+    h.getStudents.mockImplementation((params?: { q?: string }) =>
+      Promise.resolve(paged(
+        params?.q
+          ? [STUDENT_ROW]
+          : [STUDENT_ROW, { ...STUDENT_ROW, id: "s2", fullName: "Dana Cole", email: "dana@x.com" }]
+      ))
+    );
+    renderPage();
+    await screen.findByText("Dana Cole");
+
+    await userEvent.type(screen.getByPlaceholderText("Search for Name/Email/Location"), "Rivera");
+
+    await waitFor(() => expect(h.getStudents).toHaveBeenLastCalledWith(expect.objectContaining({ q: "Rivera" })));
+    await waitFor(() => expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument());
+    expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
+  });
+
+  it("pages server-side: clicking Next requests page 2 and resets on a status change", async () => {
+    h.getStudents.mockImplementation((params?: { page?: number; status?: string }) =>
+      Promise.resolve({
+        items: params?.page === 2
+          ? [{ ...STUDENT_ROW, id: "p2", fullName: "Page Two" }]
+          : [STUDENT_ROW],
+        page: params?.page ?? 1, pageSize: 10, totalCount: 11, totalPages: 2
+      })
+    );
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(h.getStudents).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+    expect(await screen.findByText("Page Two")).toBeInTheDocument();
+
+    // Changing the status filter resets to page 1.
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "TurnedIntoContact");
+    await waitFor(() => expect(h.getStudents).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "TurnedIntoContact", page: 1 })));
+  });
+
+  it("shows the empty state when a page has no rows", async () => {
+    h.getStudents.mockResolvedValue(paged([]));
+    renderPage();
+    expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
   });
 
   it("shows an error modal when the student detail fails to load", async () => {

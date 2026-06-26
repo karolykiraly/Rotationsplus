@@ -694,13 +694,25 @@ export const sendCampaign = (id: string): Promise<CampaignDetail> =>
   request<CampaignDetail>("POST", `/api/campaigns/${id}/send`);
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
-export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.academicStatus) q.set("academicStatus", params.academicStatus);
-  const suffix = q.toString();
-  return request<Student[]>("GET", `/api/students${suffix ? `?${suffix}` : ""}`);
+export const getStudents = (params?: {
+  status?: StudentStatus;
+  academicStatus?: AcademicStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Student>> => {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.academicStatus) sp.set("academicStatus", params.academicStatus);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Student>>("GET", `/api/students${suffix ? `?${suffix}` : ""}`);
 };
+/** Unpaginated student list for form pickers (the rotation form's student dropdown needs every option). */
+export const getStudentOptions = (): Promise<Student[]> =>
+  request<Student[]>("GET", "/api/students/options");
 export const getStudent = (id: string): Promise<StudentDetail> =>
   request<StudentDetail>("GET", `/api/students/${id}`);
 export const createStudent = (input: StudentInput): Promise<StudentDetail> =>

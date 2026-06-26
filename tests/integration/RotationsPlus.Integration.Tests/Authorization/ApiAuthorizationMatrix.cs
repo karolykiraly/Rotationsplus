@@ -86,6 +86,7 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/campaigns/00000000-0000-0000-0000-000000000000/send", [RoleNames.Admin], "Send campaign (admin)"),
         // Student directory: reads StaffOnly (sales/SDR/coordinator work the directory for CRM), writes AdminOnly.
         new("GET", "/api/students", RoleNames.Staff, "List students (staff)"),
+        new("GET", "/api/students/options", RoleNames.Staff, "List student options for form pickers (staff)"),
         new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001", RoleNames.Staff, "Get student by id (staff)"),
         new("POST", "/api/students", [RoleNames.Admin], "Create student (admin)"),
         new("PUT", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update student (admin)"),

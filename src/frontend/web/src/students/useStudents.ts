@@ -1,23 +1,34 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createStudent,
   deleteStudent,
   getStudents,
   updateStudent,
+  type PagedResponse,
   type Student,
   type StudentInput,
   type StudentStatus
 } from "../api";
 
-/** List query (optionally filtered by lifecycle status) + create/update/delete mutations for students. */
-export function useStudents(status: StudentStatus | "") {
+/** Server-paginated student list (status filter + free-text search + page) + create/update/delete mutations.
+ *  keepPreviousData keeps the current page visible while the next loads (no flash on page/search). */
+export function useStudents(status: StudentStatus | "", search: string, page: number, pageSize: number) {
   const qc = useQueryClient();
-  // Invalidate every student list (all status filters), not just the active one.
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["students"] });
+  // Invalidate every student list (all filters/pages) AND the picker options, not just the active one.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["students"] });
+    qc.invalidateQueries({ queryKey: ["student-options"] });
+  };
 
-  const list = useQuery<Student[]>({
-    queryKey: ["students", { status: status || null }],
-    queryFn: () => getStudents(status ? { status } : undefined)
+  const list = useQuery<PagedResponse<Student>>({
+    queryKey: ["students", { status: status || null, search: search || null, page, pageSize }],
+    queryFn: () => getStudents({
+      status: status || undefined,
+      q: search || undefined,
+      page,
+      pageSize
+    }),
+    placeholderData: keepPreviousData
   });
 
   const create = useMutation({

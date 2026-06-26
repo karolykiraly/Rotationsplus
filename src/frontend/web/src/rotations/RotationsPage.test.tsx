@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
   deleteRotation: vi.fn(),
   refundRotation: vi.fn(),
   getPrograms: vi.fn(),
-  getStudents: vi.fn()
+  getStudentOptions: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -27,7 +27,7 @@ vi.mock("../api", () => ({
   deleteRotation: (id: string) => h.deleteRotation(id),
   refundRotation: (id: string) => h.refundRotation(id),
   getPrograms: () => h.getPrograms(),
-  getStudents: (params: unknown) => h.getStudents(params),
+  getStudentOptions: () => h.getStudentOptions(),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -104,7 +104,7 @@ describe("RotationsPage", () => {
     h.getRotations.mockResolvedValue(paged([ROTATION_ROW]));
     h.getRotation.mockResolvedValue(ROTATION_DETAIL);
     h.getPrograms.mockResolvedValue([PROGRAM]);
-    h.getStudents.mockResolvedValue(STUDENTS);
+    h.getStudentOptions.mockResolvedValue(STUDENTS);
   });
 
   it("lists rotations with student, type label, weeks and status", async () => {
