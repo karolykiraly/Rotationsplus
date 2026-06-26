@@ -713,8 +713,16 @@ export interface CampaignDetail extends CampaignSummary {
   body: string;
 }
 
-export const getCampaigns = (): Promise<CampaignSummary[]> =>
-  request<CampaignSummary[]>("GET", "/api/campaigns");
+export const getCampaigns = (params?: {
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<CampaignSummary>> => {
+  const sp = new URLSearchParams();
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<CampaignSummary>>("GET", `/api/campaigns${suffix ? `?${suffix}` : ""}`);
+};
 
 /** Composes a campaign as a draft. */
 export const createCampaign = (subject: string, body: string, audience: EmailAudience): Promise<CampaignDetail> =>

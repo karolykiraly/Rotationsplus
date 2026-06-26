@@ -18,14 +18,17 @@ public static class CampaignEndpoints
             .RequireAuthorization(AuthorizationPolicies.AdminOnly)
             .WithTags("Campaigns");
 
-        group.MapGet("/", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (int? page, int? pageSize, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
+            // Newest first; Id (a time-ordered v7 GUID) is the unique tie-break so paging is deterministic
+            // when two campaigns share a created-at instant.
             var campaigns = await db.EmailCampaigns
                 .OrderByDescending(c => c.CreatedAtUtc)
+                .ThenByDescending(c => c.Id)
                 .Select(c => new CampaignSummaryResponse(
                     c.Id, c.Subject, c.Audience, c.Status,
                     c.RecipientCount, c.SentCount, c.FailedCount, c.CreatedAtUtc, c.SentAtUtc))
-                .ToListAsync(cancellationToken);
+                .ToPagedResponseAsync(page, pageSize, cancellationToken);
             return Results.Ok(campaigns);
         });
 

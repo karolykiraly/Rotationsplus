@@ -66,7 +66,7 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     h.getMe.mockReset().mockResolvedValue(ADMIN);
     h.getDashboard.mockReset().mockResolvedValue(DASH);
-    h.getCampaigns.mockReset().mockResolvedValue([]);
+    h.getCampaigns.mockReset().mockResolvedValue({ items: [], page: 1, pageSize: 10, totalCount: 0, totalPages: 1 });
   });
 
   it("renders the LiveScore totals", async () => {

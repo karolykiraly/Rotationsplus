@@ -2,13 +2,16 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const paged = <T,>(items: T[], totalCount = items.length) =>
+  ({ items, page: 1, pageSize: 10, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / 10)) });
+
 const h = vi.hoisted(() => ({
   getCampaigns: vi.fn(),
   createCampaign: vi.fn(),
   sendCampaign: vi.fn()
 }));
 vi.mock("../api", () => ({
-  getCampaigns: () => h.getCampaigns(),
+  getCampaigns: (params: unknown) => h.getCampaigns(params),
   createCampaign: (s: string, b: string, a: string) => h.createCampaign(s, b, a),
   sendCampaign: (id: string) => h.sendCampaign(id)
 }));
@@ -51,7 +54,7 @@ const sent = {
 
 describe("DashboardCampaignPanel", () => {
   beforeEach(() => {
-    h.getCampaigns.mockReset().mockResolvedValue([draft, sent]);
+    h.getCampaigns.mockReset().mockResolvedValue(paged([draft, sent]));
     h.createCampaign.mockReset().mockResolvedValue({ ...draft, body: "x" });
     h.sendCampaign.mockReset().mockResolvedValue({ ...draft, status: "Queued" });
   });
@@ -88,6 +91,22 @@ describe("DashboardCampaignPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(h.sendCampaign).toHaveBeenCalledWith("c1"));
     await waitFor(() => expect(h.getCampaigns.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("pages server-side: clicking Next requests page 2", async () => {
+    h.getCampaigns.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve(
+        params?.page === 2
+          ? paged([{ ...sent, id: "c9", subject: "Page Two Campaign" }], 11)
+          : paged([draft, sent], 11)
+      )
+    );
+    renderPanel();
+    await screen.findByText("Spring rotations are open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(h.getCampaigns).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+    expect(await screen.findByText("Page Two Campaign")).toBeInTheDocument();
   });
 
   it("shows an error state when campaigns fail to load", async () => {

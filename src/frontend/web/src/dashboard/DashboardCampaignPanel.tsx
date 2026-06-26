@@ -1,13 +1,17 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pagination } from "../components/Pagination";
 import {
   createCampaign,
   getCampaigns,
   sendCampaign,
   type CampaignStatus,
   type CampaignSummary,
-  type EmailAudience
+  type EmailAudience,
+  type PagedResponse
 } from "../api";
+
+const PAGE_SIZE = 10;
 
 const AUDIENCES: { value: EmailAudience; label: string }[] = [
   { value: "AllStudents", label: "All students" },
@@ -40,7 +44,12 @@ function formatWhen(iso?: string | null): string {
  *  list shows each campaign's status + sent/failed tally. */
 export function DashboardCampaignPanel() {
   const queryClient = useQueryClient();
-  const campaigns = useQuery<CampaignSummary[]>({ queryKey: ["campaigns"], queryFn: getCampaigns });
+  const [page, setPage] = useState(1);
+  const campaigns = useQuery<PagedResponse<CampaignSummary>>({
+    queryKey: ["campaigns", { page, pageSize: PAGE_SIZE }],
+    queryFn: () => getCampaigns({ page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData
+  });
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -48,9 +57,18 @@ export function DashboardCampaignPanel() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["campaigns"] });
 
+  // Step back if the current page passes the end (gated on fresh, non-placeholder data).
+  const totalItems = campaigns.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const settled = !campaigns.isPlaceholderData;
+  useEffect(() => {
+    if (settled && page > totalPages) setPage(totalPages);
+  }, [settled, page, totalPages]);
+
   const create = useMutation({
     mutationFn: () => createCampaign(subject.trim(), body.trim(), audience),
-    onSuccess: () => { setSubject(""); setBody(""); void invalidate(); }
+    // The new draft is newest-first → jump to page 1 so the admin sees it.
+    onSuccess: () => { setSubject(""); setBody(""); setPage(1); void invalidate(); }
   });
 
   const send = useMutation({
@@ -58,7 +76,7 @@ export function DashboardCampaignPanel() {
     onSuccess: () => void invalidate()
   });
 
-  const rows = campaigns.data ?? [];
+  const rows = campaigns.data?.items ?? [];
   const canCreate = subject.trim().length > 0 && body.trim().length > 0 && !create.isPending;
 
   return (
@@ -94,12 +112,13 @@ export function DashboardCampaignPanel() {
       {campaigns.isError && (
         <div className="banner error" role="alert">Couldn’t load campaigns: {(campaigns.error as Error).message}</div>
       )}
+      {!campaigns.isLoading && campaigns.isFetching && <div className="state subtle" role="status">Updating…</div>}
       {!campaigns.isLoading && !campaigns.isError && rows.length === 0 && (
         <div className="state">No campaigns yet — compose one above.</div>
       )}
 
       {rows.length > 0 && (
-        <table className="program-table campaign-table">
+        <table className="program-table campaign-table" aria-busy={campaigns.isFetching}>
           <thead>
             <tr><th>Subject</th><th>Audience</th><th>Status</th><th>Sent / Failed</th><th>Sent at</th><th></th></tr>
           </thead>
@@ -124,6 +143,7 @@ export function DashboardCampaignPanel() {
           </tbody>
         </table>
       )}
+      <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
       {send.isError && <div className="banner error" role="alert">{(send.error as Error).message}</div>}
     </section>
   );

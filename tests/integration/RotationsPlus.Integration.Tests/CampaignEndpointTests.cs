@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Crm;
 
 namespace RotationsPlus.Integration.Tests;
@@ -48,8 +49,28 @@ public class CampaignEndpointTests(RotationsApiFactory factory) : IClassFixture<
         detail!.Subject.Should().Be("Spring rotations are open");
         detail.Body.Should().Be("Book your spring rotation today.");
 
-        var list = await admin.GetFromJsonAsync<List<CampaignSummaryResponse>>("/api/campaigns", JsonOptions);
-        list!.Should().Contain(c => c.Id == created.Id);
+        var list = await admin.GetFromJsonAsync<PagedResponse<CampaignSummaryResponse>>("/api/campaigns?pageSize=100", JsonOptions);
+        list!.Items.Should().Contain(c => c.Id == created.Id);
+    }
+
+    [Fact]
+    public async Task List_paginates_newest_first_with_disjoint_pages()
+    {
+        var admin = Client(RoleNames.Admin);
+        // Three fresh drafts; this class's DB is isolated, but other tests here also create campaigns, so
+        // assert structurally (disjoint pages, ordered by created-at desc) rather than on exact totals.
+        var created = new List<Guid>();
+        for (var i = 0; i < 3; i++) created.Add((await CreateDraftAsync(admin)).Id);
+
+        var page1 = await admin.GetFromJsonAsync<PagedResponse<CampaignSummaryResponse>>("/api/campaigns?page=1&pageSize=2", JsonOptions);
+        var page2 = await admin.GetFromJsonAsync<PagedResponse<CampaignSummaryResponse>>("/api/campaigns?page=2&pageSize=2", JsonOptions);
+
+        page1!.Items.Should().HaveCount(2);
+        page2!.Items.Should().NotBeEmpty();
+        page1.Items.Select(c => c.Id).Should().NotIntersectWith(page2.Items.Select(c => c.Id)); // no overlap
+        // The first page holds the newest three creates (this run), in created-at-desc order.
+        page1.Items.Select(c => c.CreatedAtUtc).Should().BeInDescendingOrder();
+        page1.TotalCount.Should().BeGreaterThanOrEqualTo(3);
     }
 
     [Fact]
