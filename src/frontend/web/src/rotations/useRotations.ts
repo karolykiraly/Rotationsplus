@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   createRotation,
   deleteRotation,
-  getPrograms,
+  getProgramCatalog,
   getRotations,
   getStudentOptions,
   refundRotation,
@@ -68,9 +68,9 @@ export function useRotations(status: RotationStatus | "", search: string, page: 
   return { list, create, update, remove, refund };
 }
 
-/** Program option list for the rotation form's program dropdown. */
+/** Program option list for the rotation form's program dropdown (the unpaginated catalog endpoint). */
 export function useRotationPrograms() {
-  return useQuery<Program[]>({ queryKey: ["programs"], queryFn: getPrograms });
+  return useQuery<Program[]>({ queryKey: ["program-catalog"], queryFn: getProgramCatalog });
 }
 
 /** Student option list for the rotation form's student picker (the unpaginated options endpoint). */

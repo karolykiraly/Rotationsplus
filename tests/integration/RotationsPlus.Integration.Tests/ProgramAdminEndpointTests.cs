@@ -412,7 +412,7 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         var getAfter = await admin.GetAsync($"/api/programs/{created.Id}");
         getAfter.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs", JsonOptions);
+        var list = await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions);
         list!.Select(p => p.Id).Should().NotContain(created.Id);
     }
 }

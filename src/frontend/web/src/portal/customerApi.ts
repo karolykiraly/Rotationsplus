@@ -94,9 +94,10 @@ async function customerUpload<T>(method: string, path: string, form: FormData): 
 /** The signed-in customer's identity (GET /api/customer/me). */
 export const getCustomerMe = (): Promise<CustomerMe> => customerRequest<CustomerMe>("GET", "/api/customer/me");
 
-/** Browse the program catalog with the given query string (e.g. "?specialtyId=…&q=…"). */
+/** Browse the program catalog with the given query string (e.g. "?specialtyId=…&q=…"). The catalog
+ *  endpoint returns the full filtered list (the admin list at /api/programs is paginated). */
 export const browsePrograms = (queryString = ""): Promise<Program[]> =>
-  customerRequest<Program[]>("GET", `/api/programs${queryString}`);
+  customerRequest<Program[]>("GET", `/api/programs/catalog${queryString}`);
 
 /** A single program's detail (honorarium comes back null for customers). */
 export const getCustomerProgram = (id: string): Promise<ProgramDetail> =>

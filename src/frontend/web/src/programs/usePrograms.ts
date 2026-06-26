@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createProgram,
   deleteProgram,
@@ -6,20 +6,29 @@ import {
   getPrograms,
   getSpecialties,
   updateProgram,
+  type PagedResponse,
   type Program,
   type ProgramInput,
+  type ProgramType,
   type Preceptor,
   type Specialty
 } from "../api";
 
-const KEY = ["programs"];
-
-/** List query + create/update/delete mutations for marketplace programs. */
-export function usePrograms() {
+/** Server-paginated program list (program-type tabs + name search + page) + create/update/delete mutations.
+ *  keepPreviousData keeps the current page visible while the next loads (no flash on tab/page/search). */
+export function usePrograms(programTypes: ProgramType[], search: string, page: number, pageSize: number) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: KEY });
+  // Invalidate every program list (all tabs/pages) AND the full catalog (browse + form picker), not just one.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["programs"] });
+    qc.invalidateQueries({ queryKey: ["program-catalog"] });
+  };
 
-  const list = useQuery<Program[]>({ queryKey: KEY, queryFn: getPrograms });
+  const list = useQuery<PagedResponse<Program>>({
+    queryKey: ["programs", { programTypes, search: search || null, page, pageSize }],
+    queryFn: () => getPrograms({ programType: programTypes, q: search || undefined, page, pageSize }),
+    placeholderData: keepPreviousData
+  });
 
   const create = useMutation({
     mutationFn: (input: ProgramInput) => createProgram(input),

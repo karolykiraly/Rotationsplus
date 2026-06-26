@@ -586,8 +586,25 @@ export const updateSpecialty = (id: string, name: string): Promise<Specialty> =>
 export const deleteSpecialty = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/specialties/${id}`);
 
-// ---- Programs (read: StaffOnly; writes: AdminOnly) ----
-export const getPrograms = (): Promise<Program[]> => request<Program[]>("GET", "/api/programs");
+// ---- Programs (read: MarketplaceViewer; writes: AdminOnly) ----
+// Paged admin list — program-type tabs (multi) + name search over specialty/preceptor.
+export const getPrograms = (params?: {
+  programType?: ProgramType[];
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Program>> => {
+  const sp = new URLSearchParams();
+  for (const t of params?.programType ?? []) sp.append("programType", t);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Program>>("GET", `/api/programs${suffix ? `?${suffix}` : ""}`);
+};
+/** Full program catalog (unpaginated) — the rotation form's program picker needs every option. */
+export const getProgramCatalog = (): Promise<Program[]> =>
+  request<Program[]>("GET", "/api/programs/catalog");
 export const getProgram = (id: string): Promise<ProgramDetail> =>
   request<ProgramDetail>("GET", `/api/programs/${id}`);
 export const createProgram = (input: ProgramInput): Promise<ProgramDetail> =>

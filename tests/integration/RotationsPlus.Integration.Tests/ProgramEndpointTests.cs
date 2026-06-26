@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Integration.Tests;
@@ -42,7 +43,7 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     {
         // The student-facing portal reads the catalog with a CIAM (Student) token.
         var programs = await StudentClient()
-            .GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs?q=internal", JsonOptions);
+            .GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog?q=internal", JsonOptions);
 
         programs.Should().NotBeNull();
         programs!.Should().OnlyContain(p => p.SpecialtyName == "Internal Medicine");
@@ -59,13 +60,15 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         program.WeeklyHonorarium.Should().BeNull();         // preceptor pay / margin — hidden from customers
     }
 
+    // The catalog (full filtered list) backs the customer browse + form picker; its filters are
+    // specialtyId/preceptorId/programType/maxRetailPerWeek and a q over specialty + description.
     private Task<List<ProgramSummaryResponse>?> Search(string queryString) =>
-        StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>($"/api/programs?{queryString}", JsonOptions);
+        StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>($"/api/programs/catalog?{queryString}", JsonOptions);
 
     [Fact]
-    public async Task List_returns_seeded_programs_with_specialty_names()
+    public async Task Catalog_returns_seeded_programs_with_specialty_names()
     {
-        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs", JsonOptions);
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions);
 
         programs.Should().NotBeNull();
         programs!.Should().HaveCount(4);
@@ -107,9 +110,9 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
-    public async Task List_carries_the_catalog_fields_and_open_flag()
+    public async Task Catalog_carries_the_catalog_fields_and_open_flag()
     {
-        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs", JsonOptions);
+        var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions);
 
         // Program numbers are present and unique across the catalog.
         programs!.Should().OnlyContain(p => p.ProgramNumber > 0);
@@ -120,10 +123,10 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
-    public async Task List_filtered_by_preceptor_returns_only_their_programs()
+    public async Task Catalog_filtered_by_preceptor_returns_only_their_programs()
     {
         var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
-            $"/api/programs?preceptorId={JaneCarterId}", JsonOptions);
+            $"/api/programs/catalog?preceptorId={JaneCarterId}", JsonOptions);
 
         programs.Should().NotBeNull();
         programs!.Should().HaveCount(2); // both seeded Internal Medicine programs
@@ -132,20 +135,20 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
-    public async Task List_filtered_by_another_preceptor_returns_only_their_program()
+    public async Task Catalog_filtered_by_another_preceptor_returns_only_their_program()
     {
         var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
-            $"/api/programs?preceptorId={OmarReyesId}", JsonOptions);
+            $"/api/programs/catalog?preceptorId={OmarReyesId}", JsonOptions);
 
         // Omar offers exactly the one seeded Pediatrics program — proves the filter discriminates.
         programs!.Should().ContainSingle().Which.PreceptorName.Should().Be("Omar Reyes");
     }
 
     [Fact]
-    public async Task List_filtered_by_unknown_preceptor_returns_empty()
+    public async Task Catalog_filtered_by_unknown_preceptor_returns_empty()
     {
         var programs = await StaffClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
-            $"/api/programs?preceptorId={Guid.NewGuid()}", JsonOptions);
+            $"/api/programs/catalog?preceptorId={Guid.NewGuid()}", JsonOptions);
 
         programs.Should().NotBeNull();
         programs!.Should().BeEmpty();
@@ -165,6 +168,88 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         var response = await factory.CreateClient().GetAsync("/api/programs");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ---- Paged admin list (/api/programs): program-type tabs + name search over specialty/preceptor ----
+
+    [Fact]
+    public async Task Paged_list_returns_a_page_and_the_full_total()
+    {
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?pageSize=2", JsonOptions);
+
+        page.Should().NotBeNull();
+        page!.TotalCount.Should().Be(4);           // four seeded programs
+        page.Items.Should().HaveCount(2);          // one page
+        page.Items.Select(p => p.SpecialtyName).Should().BeInAscendingOrder();
+    }
+
+    [Fact]
+    public async Task Paged_list_pages_are_disjoint_and_cover_the_set()
+    {
+        var page1 = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?page=1&pageSize=2", JsonOptions);
+        var page2 = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?page=2&pageSize=2", JsonOptions);
+
+        page1!.Items.Should().HaveCount(2);
+        page2!.Items.Should().HaveCount(2);
+        page1.Items.Select(p => p.Id).Should().NotIntersectWith(page2.Items.Select(p => p.Id));
+        page1.Items.Concat(page2.Items).Select(p => p.Id).Should().OnlyHaveUniqueItems().And.HaveCount(4);
+    }
+
+    [Fact]
+    public async Task Paged_list_filters_by_a_single_program_type_tab()
+    {
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?programType=InPerson&pageSize=100", JsonOptions);
+
+        page!.TotalCount.Should().Be(2); // Internal Medicine InPerson + Pediatrics InPerson
+        page.Items.Should().OnlyContain(p => p.ProgramType == ProgramType.InPerson);
+    }
+
+    [Fact]
+    public async Task Paged_list_filters_by_multiple_program_types_for_one_tab()
+    {
+        // The Consultation tab spans two enum values; the multi-valued programType is OR within the filter.
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?programType=InPerson&programType=TeleRotation&pageSize=100", JsonOptions);
+
+        page!.Items.Should().OnlyContain(p =>
+            p.ProgramType == ProgramType.InPerson || p.ProgramType == ProgramType.TeleRotation);
+        page.Items.Should().Contain(p => p.ProgramType == ProgramType.TeleRotation);
+    }
+
+    [Fact]
+    public async Task Paged_list_search_matches_preceptor_name()
+    {
+        // The admin list searches specialty + preceptor name (NOT description — that's the catalog).
+        // "Carter" is Jane's surname; it matches her programs and nothing by description.
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?q=Carter&pageSize=100", JsonOptions);
+
+        page!.Items.Should().NotBeEmpty();
+        page.Items.Should().OnlyContain(p => p.PreceptorName == "Jane Carter");
+    }
+
+    [Fact]
+    public async Task Paged_list_q_too_long_returns_400()
+    {
+        var response = await StaffClient().GetAsync($"/api/programs?q={new string('a', 101)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Paged_list_q_wildcard_is_treated_literally()
+    {
+        // %25 is URL-encoded '%' (an ILIKE wildcard). Escaped, it matches a literal '%' (none seeded),
+        // so the page is empty rather than "everything" — proving the shared escaper is applied here too.
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?q=%25&pageSize=100", JsonOptions);
+
+        page!.Items.Should().BeEmpty();
+        page.TotalCount.Should().Be(0);
     }
 
     [Fact]
@@ -239,9 +324,9 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
-    public async Task Search_q_too_long_returns_400()
+    public async Task Catalog_q_too_long_returns_400()
     {
-        var response = await StaffClient().GetAsync($"/api/programs?q={new string('a', 101)}");
+        var response = await StaffClient().GetAsync($"/api/programs/catalog?q={new string('a', 101)}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

@@ -40,7 +40,8 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/specialties", [RoleNames.Admin], "Create specialty (admin)"),
         new("PUT", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update specialty (admin)"),
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
-        new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs"),
+        new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs (paged admin list)"),
+        new("GET", "/api/programs/catalog", MarketplaceReaders, "Full program catalog (customer browse + form picker)"),
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", MarketplaceReaders, "Get program by id"),
         // Server-computed price quote — open to marketplace viewers (students need pricing to book).
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001/quote?weeks=4", MarketplaceReaders, "Program price quote"),

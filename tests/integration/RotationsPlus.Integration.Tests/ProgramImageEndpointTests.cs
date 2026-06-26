@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Integration.Tests;
@@ -70,8 +71,13 @@ public class ProgramImageEndpointTests(RotationsApiFactory factory) : IClassFixt
         var after = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{id}", JsonOptions);
         after!.ImageUrl.Should().NotBeNullOrWhiteSpace();
 
-        var list = await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs", JsonOptions);
-        list!.Single(p => p.Id == id).ImageUrl.Should().NotBeNullOrWhiteSpace();
+        // The signed read URL (not the raw blob name) surfaces on the catalog list — proving the rewrite ran.
+        var list = await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions);
+        list!.Single(p => p.Id == id).ImageUrl.Should().Contain("images.local/");
+
+        // The paged admin list signs the read URL on the page too (a separate rewrite path from /catalog).
+        var paged = await admin.GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>("/api/programs?pageSize=100", JsonOptions);
+        paged!.Items.Single(p => p.Id == id).ImageUrl.Should().Contain("images.local/");
     }
 
     [Fact]

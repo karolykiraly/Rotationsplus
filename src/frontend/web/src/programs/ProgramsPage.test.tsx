@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -16,7 +18,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("../api", () => ({
   getMe: () => h.getMe(),
-  getPrograms: () => h.getPrograms(),
+  getPrograms: (params: unknown) => h.getPrograms(params),
   getProgram: (id: string) => h.getProgram(id),
   createProgram: (input: unknown) => h.createProgram(input),
   updateProgram: (id: string, input: unknown) => h.updateProgram(id, input),
@@ -86,7 +88,7 @@ describe("ProgramsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getPrograms.mockResolvedValue([PROGRAM_ROW]);
+    h.getPrograms.mockResolvedValue(paged([PROGRAM_ROW]));
     h.getProgram.mockResolvedValue(PROGRAM_DETAIL);
     h.getSpecialties.mockResolvedValue([
       { id: "s1", name: "Internal Medicine" },
@@ -103,16 +105,28 @@ describe("ProgramsPage", () => {
     expect(screen.getAllByText("Internal Medicine").length).toBeGreaterThan(0);
   });
 
-  it("filters to an empty tab and by search text", async () => {
+  it("drives the program-type tab and search server-side", async () => {
+    // The server answers per params: the InPerson tab (default) returns the row; the Consultation tab
+    // (Consultation + ConsultationSub) and any q return empty here.
+    h.getPrograms.mockImplementation((params?: { programType?: string[]; q?: string }) => {
+      const onInPerson = !params?.programType || params.programType.includes("InPerson");
+      const noSearch = !params?.q;
+      return Promise.resolve(paged(onInPerson && noSearch ? [PROGRAM_ROW] : []));
+    });
     renderPage();
     await screen.findByText("Program ID");
-    // Consultation tab has no matching program -> empty state.
+
+    // Consultation tab requests both Consultation variants and shows the empty state.
     await userEvent.click(screen.getByRole("tab", { name: "Consultation" }));
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ programType: ["Consultation", "ConsultationSub"] })));
     expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
-    // Back to InPerson; a non-matching search clears the row.
+
+    // Back to InPerson; a (debounced) non-matching search requests q and clears the row.
     await userEvent.click(screen.getByRole("tab", { name: "InPerson" }));
     await screen.findByText("Program ID");
     await userEvent.type(screen.getByLabelText("Search for programs"), "zzzzz");
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(expect.objectContaining({ q: "zzzzz" })));
     expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
   });
 
