@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Integration.Tests;
@@ -26,14 +27,15 @@ public class PreceptorEndpointTests(RotationsApiFactory factory) : IClassFixture
     [Fact]
     public async Task List_returns_seeded_preceptors_with_specialty_names()
     {
-        var preceptors = await StaffClient().GetFromJsonAsync<List<PreceptorSummaryResponse>>("/api/preceptors", JsonOptions);
+        var preceptors = await StaffClient().GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>("/api/preceptors", JsonOptions);
 
         preceptors.Should().NotBeNull();
-        preceptors!.Should().HaveCount(2);
-        preceptors!.Select(p => p.FullName).Should().Contain("Jane Carter");
-        preceptors!.Select(p => p.PrimarySpecialtyName).Should().Contain("Internal Medicine");
+        preceptors!.Items.Should().HaveCount(2);
+        preceptors.TotalCount.Should().Be(2);
+        preceptors.Items.Select(p => p.FullName).Should().Contain("Jane Carter");
+        preceptors.Items.Select(p => p.PrimarySpecialtyName).Should().Contain("Internal Medicine");
         // Ordered by last name, then first.
-        preceptors!.Select(p => p.FullName).Should().ContainInOrder("Jane Carter", "Omar Reyes");
+        preceptors.Items.Select(p => p.FullName).Should().ContainInOrder("Jane Carter", "Omar Reyes");
     }
 
     [Fact]

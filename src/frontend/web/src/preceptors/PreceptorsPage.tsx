@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
+import { useDebouncedValue } from "../useDebouncedValue";
 import { getPreceptor, type Preceptor, type PreceptorInput } from "../api";
 import searchIcon from "../assets/icons/search.png";
 import { usePreceptors, usePreceptorSpecialties } from "./usePreceptors";
@@ -28,17 +29,29 @@ const PAGE_SIZE = 10;
 
 export function PreceptorsPage() {
   const { user } = useMe();
-  const { list, create, update, remove } = usePreceptors();
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search.trim());
+
+  const { list, create, update, remove } = usePreceptors(debouncedSearch, page, PAGE_SIZE);
   const specialties = usePreceptorSpecialties();
 
   const [editId, setEditId] = useState<EditId>(null);
   const [deleting, setDeleting] = useState<Preceptor | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
 
-  useEffect(() => setPage(1), [search]);
+  // Back to the first page whenever the (debounced) search changes.
+  useEffect(() => setPage(1), [debouncedSearch]);
+
+  // Server returns one page + the full filtered count for the pager. If the set shrinks past the current
+  // page, step back. Gate on fresh (non-placeholder) data; declared before the admin guard so hooks are stable.
+  const totalItems = list.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const settled = !list.isPlaceholderData;
+  useEffect(() => {
+    if (settled && page > totalPages) setPage(totalPages);
+  }, [settled, page, totalPages]);
 
   const detail = useQuery({
     queryKey: ["preceptor", editId],
@@ -90,17 +103,8 @@ export function PreceptorsPage() {
     bio: d.bio ?? ""
   });
 
-  const preceptors = list.data ?? [];
   const opts = specialties.data ?? [];
-
-  // Client-side search + pagination.
-  const q = search.trim().toLowerCase();
-  const filtered = preceptors.filter(
-    (p) => !q || `${p.fullName} ${p.email} ${p.primarySpecialtyName} ${[p.city, p.state].filter(Boolean).join(", ")}`.toLowerCase().includes(q)
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const rows = list.data?.items ?? [];
 
   return (
     <>
@@ -114,7 +118,7 @@ export function PreceptorsPage() {
           <div className="search-form2">
             <img src={searchIcon} alt="" />
             <input
-              placeholder="Search for Name/Email/Specialty"
+              placeholder="Search for Name/Email/Location"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search for preceptors"
@@ -124,12 +128,13 @@ export function PreceptorsPage() {
 
         {list.isLoading && <div className="state">Loading preceptors…</div>}
         {list.isError && <div className="state">Couldn’t load preceptors: {(list.error as Error).message}</div>}
+        {!list.isLoading && list.isFetching && <div className="state subtle" role="status">Updating…</div>}
 
         {!list.isLoading && !list.isError && (
           rows.length === 0 ? (
             <div className="state">There is no data available.</div>
           ) : (
-            <table className="program-table">
+            <table className="program-table" aria-busy={list.isFetching}>
               <tbody>
                 {rows.map((p) => (
                   <tr key={p.id} className="rot-row">
@@ -166,7 +171,7 @@ export function PreceptorsPage() {
           )
         )}
 
-        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
+        <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
       </div>
 
       {editId === "new" && (

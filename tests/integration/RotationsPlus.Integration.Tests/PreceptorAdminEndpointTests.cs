@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Integration.Tests;
@@ -313,7 +314,96 @@ public class PreceptorAdminEndpointTests(RotationsApiFactory factory) : IClassFi
         var getAfter = await admin.GetAsync($"/api/preceptors/{created.Id}");
         getAfter.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await admin.GetFromJsonAsync<List<PreceptorSummaryResponse>>("/api/preceptors", JsonOptions);
-        list!.Select(p => p.Id).Should().NotContain(created.Id);
+        var list = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>("/api/preceptors?pageSize=100", JsonOptions);
+        list!.Items.Select(p => p.Id).Should().NotContain(created.Id);
+    }
+
+    [Fact]
+    public async Task List_paginates_and_searches_by_name()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // Three preceptors sharing a unique surname token → a q on it returns exactly those three, deterministic.
+        var token = $"Pagington{Guid.NewGuid():N}";
+        for (var i = 0; i < 3; i++)
+        {
+            (await PostAsync(admin, ValidCreate(firstName: $"P{i}", lastName: token))).EnsureSuccessStatusCode();
+        }
+
+        var page1 = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>(
+            $"/api/preceptors?q={token}&page=1&pageSize=2", JsonOptions);
+        var page2 = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>(
+            $"/api/preceptors?q={token}&page=2&pageSize=2", JsonOptions);
+
+        page1!.TotalCount.Should().Be(3);
+        page1.Items.Should().HaveCount(2);
+        page2!.Items.Should().HaveCount(1);
+        page1.Items.Select(p => p.Id).Should().NotIntersectWith(page2.Items.Select(p => p.Id)); // no overlap
+        page1.Items.Concat(page2.Items).Should().OnlyContain(p => p.FullName.Contains(token));
+    }
+
+    [Fact]
+    public async Task List_search_matches_email()
+    {
+        var admin = Client(RoleNames.Admin);
+        var email = UniqueEmail();
+        var created = await (await PostAsync(admin, ValidCreate(email: email)))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        // Search by a distinctive fragment of the email.
+        var frag = email.Split('@')[0];
+        var found = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>(
+            $"/api/preceptors?q={frag}&pageSize=100", JsonOptions);
+
+        found!.Items.Should().ContainSingle(p => p.Id == created!.Id);
+    }
+
+    [Fact]
+    public async Task List_search_matches_location()
+    {
+        var admin = Client(RoleNames.Admin);
+        // A distinctive city so the location (city/state) ILIKE branch is what matches — not name/email.
+        var city = $"Townsville{Guid.NewGuid():N}";
+        var created = await (await PostAsync(admin, ValidCreate(city: city)))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        var found = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>(
+            $"/api/preceptors?q={city}&pageSize=100", JsonOptions);
+
+        found!.Items.Should().ContainSingle(p => p.Id == created!.Id);
+    }
+
+    [Fact]
+    public async Task List_search_over_the_length_limit_is_rejected()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await admin.GetAsync($"/api/preceptors?q={new string('x', 101)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Options_returns_the_unpaginated_picker_list_including_a_created_preceptor()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        // The options endpoint is for form pickers — it returns the full list, not a page.
+        var options = await Client(RoleNames.Coordinator)
+            .GetFromJsonAsync<List<PreceptorSummaryResponse>>("/api/preceptors/options", JsonOptions);
+
+        options!.Should().Contain(p => p.Id == created!.Id);
+    }
+
+    [Fact]
+    public async Task Customer_cannot_list_preceptor_options()
+    {
+        var student = Client(RoleNames.Student);
+
+        var response = await student.GetAsync("/api/preceptors/options");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createProgram,
   deleteProgram,
-  getPreceptors,
+  getPreceptorOptions,
   getPrograms,
   getSpecialties,
   updateProgram,
@@ -50,6 +50,6 @@ export function usePrograms() {
 /** Specialty + preceptor option lists for the program form dropdowns. */
 export function useProgramFormOptions() {
   const specialties = useQuery<Specialty[]>({ queryKey: ["specialties"], queryFn: getSpecialties });
-  const preceptors = useQuery<Preceptor[]>({ queryKey: ["preceptors"], queryFn: getPreceptors });
+  const preceptors = useQuery<Preceptor[]>({ queryKey: ["preceptor-options"], queryFn: getPreceptorOptions });
   return { specialties, preceptors };
 }

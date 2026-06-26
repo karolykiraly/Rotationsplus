@@ -11,7 +11,7 @@ const h = vi.hoisted(() => ({
   updateProgram: vi.fn(),
   deleteProgram: vi.fn(),
   getSpecialties: vi.fn(),
-  getPreceptors: vi.fn()
+  getPreceptorOptions: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -22,7 +22,7 @@ vi.mock("../api", () => ({
   updateProgram: (id: string, input: unknown) => h.updateProgram(id, input),
   deleteProgram: (id: string) => h.deleteProgram(id),
   getSpecialties: () => h.getSpecialties(),
-  getPreceptors: () => h.getPreceptors(),
+  getPreceptorOptions: () => h.getPreceptorOptions(),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -92,7 +92,7 @@ describe("ProgramsPage", () => {
       { id: "s1", name: "Internal Medicine" },
       { id: "s2", name: "Pediatrics" }
     ]);
-    h.getPreceptors.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
+    h.getPreceptorOptions.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
   });
 
   it("lists programs in the active type tab with the retail amount", async () => {

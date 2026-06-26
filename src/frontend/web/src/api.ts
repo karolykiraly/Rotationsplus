@@ -598,7 +598,21 @@ export const deleteProgram = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/programs/${id}`);
 
 // ---- Preceptors (read: StaffOnly; writes: AdminOnly) ----
-export const getPreceptors = (): Promise<Preceptor[]> => request<Preceptor[]>("GET", "/api/preceptors");
+export const getPreceptors = (params?: {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Preceptor>> => {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Preceptor>>("GET", `/api/preceptors${suffix ? `?${suffix}` : ""}`);
+};
+/** Unpaginated preceptor list for form pickers (the program form's preceptor dropdown needs every option). */
+export const getPreceptorOptions = (): Promise<Preceptor[]> =>
+  request<Preceptor[]>("GET", "/api/preceptors/options");
 export const getPreceptor = (id: string): Promise<PreceptorDetail> =>
   request<PreceptorDetail>("GET", `/api/preceptors/${id}`);
 export const createPreceptor = (input: PreceptorInput): Promise<PreceptorDetail> =>

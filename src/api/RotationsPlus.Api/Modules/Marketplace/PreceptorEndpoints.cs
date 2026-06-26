@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -20,24 +21,53 @@ public static class PreceptorEndpoints
             .RequireAuthorization(AuthorizationPolicies.StaffOnly)
             .WithTags("Marketplace");
 
-        group.MapGet("/", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (
+            string? q, int? page, int? pageSize,
+            RotationsDbContext db, CancellationToken cancellationToken) =>
         {
-            var preceptors = await db.Preceptors
+            if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
+            {
+                return Results.BadRequest(searchError);
+            }
+
+            var query = db.Preceptors.AsQueryable();
+            if (pattern is not null)
+            {
+                // Mirrors the old client-side search: name, email, and location (city/state). ILIKE = ci contains.
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.FirstName + " " + p.LastName, pattern) ||
+                    EF.Functions.ILike(p.Email, pattern) ||
+                    (p.City != null && EF.Functions.ILike(p.City, pattern)) ||
+                    (p.State != null && EF.Functions.ILike(p.State, pattern)));
+            }
+
+            var preceptors = await query
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
-                .Select(p => new PreceptorSummaryResponse(
-                    p.Id,
-                    p.FirstName + " " + p.LastName,
-                    p.Email,
-                    p.PrimarySpecialty.Name,
-                    p.City,
-                    p.State,
-                    p.Status))
-                .ToListAsync(cancellationToken);
+                .ThenBy(p => p.Id) // tie-break so paging is deterministic when names collide
+                .Select(Summary)
+                .ToPagedResponseAsync(page, pageSize, cancellationToken);
 
             return Results.Ok(preceptors);
         })
         .WithName("ListPreceptors");
+
+        // Unpaginated lightweight list for form pickers (the program form's preceptor dropdown), which need
+        // every option, not a page. Same DTO + StaffOnly as the paginated list (no new data/audience),
+        // ordered by name. Deliberately unbounded: fine at directory scale; if the preceptor directory ever
+        // grows past a comfortable dropdown, switch the picker to a server-side typeahead reusing the list's
+        // `q` search and retire this. (Plan_Preceptor.md.)
+        group.MapGet("/options", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            var options = await db.Preceptors
+                .OrderBy(p => p.LastName)
+                .ThenBy(p => p.FirstName)
+                .Select(Summary)
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(options);
+        })
+        .WithName("ListPreceptorOptions");
 
         group.MapGet("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
@@ -283,4 +313,11 @@ public static class PreceptorEndpoints
     private static PreceptorDetailResponse ToDetail(Preceptor p, string specialtyName) =>
         new(p.Id, p.FirstName, p.LastName, p.Email, p.PrimarySpecialtyId, specialtyName,
             p.MedicalLicenseNumber, p.LicenseState, p.City, p.State, p.Status, p.Bio);
+
+    // Shared list/options projection. Must be an Expression (not a compiled method) so EF composes it into
+    // the SQL — the PrimarySpecialty.Name navigation then translates to a JOIN. A static method would be
+    // evaluated client-side over un-joined entities, leaving PrimarySpecialty null (→ NRE at materialization).
+    private static readonly Expression<Func<Preceptor, PreceptorSummaryResponse>> Summary =
+        p => new PreceptorSummaryResponse(
+            p.Id, p.FirstName + " " + p.LastName, p.Email, p.PrimarySpecialty.Name, p.City, p.State, p.Status);
 }
