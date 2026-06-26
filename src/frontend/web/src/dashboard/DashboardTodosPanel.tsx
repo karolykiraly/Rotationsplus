@@ -108,8 +108,8 @@ export function DashboardTodosPanel() {
           title="Preceptor approvals"
           count={data.preceptorApprovals.count}
           items={data.preceptorApprovals.items}
-          to="/admin/preceptors"
-          linkLabel="review preceptors"
+          to="/admin/permission"
+          linkLabel="review approvals"
           itemKey={(p) => p.preceptorId}
           renderItem={(p) => (
             <>

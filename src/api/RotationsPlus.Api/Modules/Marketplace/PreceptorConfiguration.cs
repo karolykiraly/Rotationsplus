@@ -40,6 +40,10 @@ public sealed class PreceptorConfiguration : IEntityTypeConfiguration<Preceptor>
         builder.Property(x => x.ModifiedBy).HasMaxLength(64);
         builder.Property(x => x.DeletedBy).HasMaxLength(64);
 
+        // Approval-queue audit (oid of the reviewer + rejection reason).
+        builder.Property(x => x.ReviewedBy).HasMaxLength(64);
+        builder.Property(x => x.RejectionReason).HasMaxLength(1000);
+
         builder.HasOne(x => x.PrimarySpecialty)
             .WithMany()
             .HasForeignKey(x => x.PrimarySpecialtyId)

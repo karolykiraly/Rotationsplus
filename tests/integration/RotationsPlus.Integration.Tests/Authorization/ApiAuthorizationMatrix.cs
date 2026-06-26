@@ -60,6 +60,10 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/preceptors", [RoleNames.Admin], "Create preceptor (admin)"),
         new("PUT", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update preceptor (admin)"),
         new("DELETE", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete preceptor (admin)"),
+        // Approval queue. The seeded preceptor isn't Pending, so an authorized admin gets 409 (not 401/403),
+        // which the authz-only matrix accepts; the approve/reject behaviour is covered by PreceptorAdminEndpointTests.
+        new("POST", "/api/preceptors/dddddddd-0000-0000-0000-000000000001/approve", [RoleNames.Admin], "Approve a pending preceptor (admin)"),
+        new("POST", "/api/preceptors/dddddddd-0000-0000-0000-000000000001/reject", [RoleNames.Admin], "Reject a pending preceptor (admin)"),
         // Rotation management is AdminOnly (reads too — students see their own via the portal later).
         new("GET", "/api/rotations", [RoleNames.Admin], "List rotations (admin)"),
         new("GET", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001", [RoleNames.Admin], "Get rotation by id (admin)"),

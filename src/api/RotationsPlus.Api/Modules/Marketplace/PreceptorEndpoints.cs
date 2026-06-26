@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Common.Security;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Api.Modules.Marketplace;
@@ -22,7 +23,7 @@ public static class PreceptorEndpoints
             .WithTags("Marketplace");
 
         group.MapGet("/", async (
-            string? q, int? page, int? pageSize,
+            PreceptorStatus? status, string? q, int? page, int? pageSize,
             RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
@@ -31,6 +32,7 @@ public static class PreceptorEndpoints
             }
 
             var query = db.Preceptors.AsQueryable();
+            if (status is { } s) query = query.Where(p => p.Status == s); // the approval queue filters status=Pending
             if (pattern is not null)
             {
                 // Mirrors the old client-side search: name, email, and location (city/state). ILIKE = ci contains.
@@ -85,7 +87,9 @@ public static class PreceptorEndpoints
                     p.City,
                     p.State,
                     p.Status,
-                    p.Bio))
+                    p.Bio,
+                    p.ReviewedAtUtc,
+                    p.RejectionReason))
                 .FirstOrDefaultAsync(cancellationToken);
 
             return preceptor is null ? Results.NotFound() : Results.Ok(preceptor);
@@ -208,8 +212,77 @@ public static class PreceptorEndpoints
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("DeletePreceptor");
 
+        // ---- Approval queue (/admin/permission): approve / reject a Pending preceptor (AdminOnly) ----
+
+        // Approve → activates the account. Only a Pending preceptor (the queue state) is approvable; any
+        // other status is 409 (use the edit form for manual status overrides). Stamps reviewer + time and
+        // clears any prior rejection reason.
+        group.MapPost("/{id:guid}/approve", async (
+            Guid id, RotationsDbContext db, ICurrentUser user, TimeProvider clock, CancellationToken cancellationToken) =>
+        {
+            var preceptor = await db.Preceptors.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            if (preceptor is null)
+            {
+                return Results.NotFound();
+            }
+            if (preceptor.Status != PreceptorStatus.Pending)
+            {
+                return Results.Conflict("Only a pending preceptor can be approved.");
+            }
+
+            preceptor.Status = PreceptorStatus.MemberActivated;
+            preceptor.RejectionReason = null;
+            preceptor.ReviewedBy = user.ObjectId;
+            preceptor.ReviewedAtUtc = clock.GetUtcNow();
+            await db.SaveChangesAsync(cancellationToken);
+
+            var specialtyName = await ResolveSpecialtyNameAsync(db, preceptor.PrimarySpecialtyId, cancellationToken) ?? string.Empty;
+            return Results.Ok(ToDetail(preceptor, specialtyName));
+        })
+        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
+        .WithName("ApprovePreceptor");
+
+        // Reject → terminal Rejected with a required, admin-supplied reason. Same Pending-only guard.
+        group.MapPost("/{id:guid}/reject", async (
+            Guid id, RejectPreceptorRequest request, RotationsDbContext db, ICurrentUser user,
+            TimeProvider clock, CancellationToken cancellationToken) =>
+        {
+            var reason = request.Reason?.Trim();
+            if (string.IsNullOrEmpty(reason))
+            {
+                return Results.BadRequest("A rejection reason is required.");
+            }
+            if (reason.Length > RejectionReasonMaxLength)
+            {
+                return Results.BadRequest($"Reason must be {RejectionReasonMaxLength} characters or fewer.");
+            }
+
+            var preceptor = await db.Preceptors.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            if (preceptor is null)
+            {
+                return Results.NotFound();
+            }
+            if (preceptor.Status != PreceptorStatus.Pending)
+            {
+                return Results.Conflict("Only a pending preceptor can be rejected.");
+            }
+
+            preceptor.Status = PreceptorStatus.Rejected;
+            preceptor.RejectionReason = reason;
+            preceptor.ReviewedBy = user.ObjectId;
+            preceptor.ReviewedAtUtc = clock.GetUtcNow();
+            await db.SaveChangesAsync(cancellationToken);
+
+            var specialtyName = await ResolveSpecialtyNameAsync(db, preceptor.PrimarySpecialtyId, cancellationToken) ?? string.Empty;
+            return Results.Ok(ToDetail(preceptor, specialtyName));
+        })
+        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
+        .WithName("RejectPreceptor");
+
         return routes;
     }
+
+    private const int RejectionReasonMaxLength = 1000;
 
     private const int NameMaxLength = 100;
     private const int EmailMaxLength = 256;
@@ -312,7 +385,8 @@ public static class PreceptorEndpoints
 
     private static PreceptorDetailResponse ToDetail(Preceptor p, string specialtyName) =>
         new(p.Id, p.FirstName, p.LastName, p.Email, p.PrimarySpecialtyId, specialtyName,
-            p.MedicalLicenseNumber, p.LicenseState, p.City, p.State, p.Status, p.Bio);
+            p.MedicalLicenseNumber, p.LicenseState, p.City, p.State, p.Status, p.Bio,
+            p.ReviewedAtUtc, p.RejectionReason);
 
     // Shared list/options projection. Must be an Expression (not a compiled method) so EF composes it into
     // the SQL — the PrimarySpecialty.Name navigation then translates to a JOIN. A static method would be

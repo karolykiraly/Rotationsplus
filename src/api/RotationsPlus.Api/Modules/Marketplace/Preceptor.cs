@@ -26,4 +26,11 @@ public sealed class Preceptor : AuditableEntity
     public PreceptorStatus Status { get; set; } = PreceptorStatus.Registered;
 
     public string? Bio { get; set; }
+
+    // ---- Admin approval queue (/admin/permission) audit ----
+    // Who actioned the approve/reject (the reviewer's oid) and when; the reason captured on rejection.
+    // Null until the preceptor has been through the queue. (Agreement/W9 handling is a later slice — §3.15a.)
+    public string? ReviewedBy { get; set; }
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+    public string? RejectionReason { get; set; }
 }

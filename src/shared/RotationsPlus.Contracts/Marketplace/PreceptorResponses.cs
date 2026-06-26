@@ -23,4 +23,9 @@ public sealed record PreceptorDetailResponse(
     string? City,
     string? State,
     PreceptorStatus Status,
-    string? Bio);
+    string? Bio,
+    DateTimeOffset? ReviewedAtUtc = null,
+    string? RejectionReason = null);
+
+/// <summary>Admin rejection of a preceptor in the approval queue — carries the required reason.</summary>
+public sealed record RejectPreceptorRequest(string Reason);

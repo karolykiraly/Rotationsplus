@@ -406,4 +406,114 @@ public class PreceptorAdminEndpointTests(RotationsApiFactory factory) : IClassFi
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    // ---- Approval queue (/admin/permission): approve / reject ----
+
+    private async Task<PreceptorDetailResponse> CreatePendingAsync(HttpClient admin) =>
+        (await (await PostAsync(admin, ValidCreate(status: PreceptorStatus.Pending)))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions))!;
+
+    [Fact]
+    public async Task Approve_activates_a_pending_preceptor_and_stamps_the_review()
+    {
+        var admin = Client(RoleNames.Admin);
+        var pending = await CreatePendingAsync(admin);
+
+        var approved = await (await admin.PostAsync($"/api/preceptors/{pending.Id}/approve", null))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        approved!.Status.Should().Be(PreceptorStatus.MemberActivated);
+        approved.ReviewedAtUtc.Should().NotBeNull();      // review stamped
+        approved.RejectionReason.Should().BeNull();        // no rejection on an approval
+    }
+
+    [Fact]
+    public async Task Reject_sets_rejected_with_the_required_reason_and_stamps_the_review()
+    {
+        var admin = Client(RoleNames.Admin);
+        var pending = await CreatePendingAsync(admin);
+
+        var rejected = await (await admin.PostAsJsonAsync($"/api/preceptors/{pending.Id}/reject",
+                new RejectPreceptorRequest("Medical license could not be verified."), JsonOptions))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        rejected!.Status.Should().Be(PreceptorStatus.Rejected);
+        rejected.RejectionReason.Should().Be("Medical license could not be verified.");
+        rejected.ReviewedAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Reject_without_a_reason_is_rejected_with_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var pending = await CreatePendingAsync(admin);
+
+        var response = await admin.PostAsJsonAsync($"/api/preceptors/{pending.Id}/reject",
+            new RejectPreceptorRequest("   "), JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reject_a_non_pending_preceptor_is_conflict()
+    {
+        var admin = Client(RoleNames.Admin);
+        // ValidCreate defaults to Registered (not Pending) → not in the approval queue.
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        var response = await admin.PostAsJsonAsync($"/api/preceptors/{created!.Id}/reject",
+            new RejectPreceptorRequest("Not eligible."), JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Reject_with_an_oversized_reason_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var pending = await CreatePendingAsync(admin);
+
+        var response = await admin.PostAsJsonAsync($"/api/preceptors/{pending.Id}/reject",
+            new RejectPreceptorRequest(new string('x', 1001)), JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Approve_a_non_pending_preceptor_is_conflict()
+    {
+        var admin = Client(RoleNames.Admin);
+        // ValidCreate defaults to Registered (not Pending) → not in the approval queue.
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        var response = await admin.PostAsync($"/api/preceptors/{created!.Id}/approve", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Approve_an_unknown_preceptor_is_404()
+    {
+        var response = await Client(RoleNames.Admin).PostAsync($"/api/preceptors/{Guid.NewGuid()}/approve", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task List_filtered_by_status_returns_only_that_status()
+    {
+        var admin = Client(RoleNames.Admin);
+        var pending = await CreatePendingAsync(admin);
+        var registered = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<PreceptorDetailResponse>(JsonOptions);
+
+        var queue = await admin.GetFromJsonAsync<PagedResponse<PreceptorSummaryResponse>>(
+            "/api/preceptors?status=Pending&pageSize=100", JsonOptions);
+
+        queue!.Items.Should().Contain(p => p.Id == pending.Id);
+        queue.Items.Should().NotContain(p => p.Id == registered!.Id);
+        queue.Items.Should().OnlyContain(p => p.Status == PreceptorStatus.Pending);
+    }
 }

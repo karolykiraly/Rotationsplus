@@ -124,6 +124,8 @@ export interface PreceptorDetail {
   state?: string | null;
   status: PreceptorStatus;
   bio?: string | null;
+  reviewedAtUtc?: string | null;
+  rejectionReason?: string | null;
 }
 
 /** Admin create/update payload (mirrors Create/UpdatePreceptorRequest). */
@@ -616,11 +618,13 @@ export const deleteProgram = (id: string): Promise<void> =>
 
 // ---- Preceptors (read: StaffOnly; writes: AdminOnly) ----
 export const getPreceptors = (params?: {
+  status?: PreceptorStatus;
   q?: string;
   page?: number;
   pageSize?: number;
 }): Promise<PagedResponse<Preceptor>> => {
   const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
   if (params?.q) sp.set("q", params.q);
   if (params?.page) sp.set("page", String(params.page));
   if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
@@ -638,6 +642,12 @@ export const updatePreceptor = (id: string, input: PreceptorInput): Promise<Prec
   request<PreceptorDetail>("PUT", `/api/preceptors/${id}`, input);
 export const deletePreceptor = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/preceptors/${id}`);
+/** Approval queue: activate a pending preceptor. */
+export const approvePreceptor = (id: string): Promise<PreceptorDetail> =>
+  request<PreceptorDetail>("POST", `/api/preceptors/${id}/approve`);
+/** Approval queue: reject a pending preceptor with a required reason. */
+export const rejectPreceptor = (id: string, reason: string): Promise<PreceptorDetail> =>
+  request<PreceptorDetail>("POST", `/api/preceptors/${id}/reject`, { reason });
 
 /** One page of a server-paginated list (mirror of the API's PagedResponse<T>). `totalCount` is the full
  *  filtered row count across all pages, for the pager. */

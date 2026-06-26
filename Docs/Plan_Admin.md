@@ -42,7 +42,7 @@
 | `/admin/programs/:slug` | `AdminProgramDetail.js` | Edit program: description, image, type, preceptor assignment, publish state |
 | `/admin/rotations` | `AdminRotations.js` | Current + history tabs; full status filter (12 statuses); edit rotation modal (status/payment/dates/docs), change-date modal, delete |
 | `/admin/rotations/new` | `AdminRotationsNew.js` | Manual rotation creation: student picker + program picker + date range (auto weeks) |
-| `/admin/permission` | `AdminPermission.js` | Preceptor approval queue: activate/reject, send agreement (rewrite: emails generated PDF, tracks signed-copy upload + admin approval — HelloSign removed), request W9, set doc due dates, per-program access |
+| `/admin/permission` | `AdminPermission.js` | Preceptor approval queue: activate/reject, send agreement (rewrite: emails generated PDF, tracks signed-copy upload + admin approval — HelloSign removed), request W9, set doc due dates, per-program access. **PERM-1 built (PR #73):** the approve/reject queue (Pending → MemberActivated / Rejected, audited reviewer + reason). **Deferred to follow-on slices:** agreement-PDF flow (§3.15a — needs QuestPDF + email + the preceptor Documents page), W9 request, doc due dates, per-program access. |
 | `/admin/honorarium` | `AdminHonorarium.js` | Preceptor payouts in 3 stages (Deposit / Start / Evaluation), mark paid, refund flag + history |
 | `/admin/data` | `AdminData.js` | Preceptor groups (email-based grouping for batch ops): create/add/move/delete |
 | `/admin/admin` | `AdminAdmin.js` | Staff account management: Admins / SDRs / Sales / Coordinators tabs; add user, send email, reset password, delete |
