@@ -102,6 +102,11 @@ public static class RotationEndpoints
                 return Results.BadRequest($"Program '{request.ProgramId}' does not exist.");
             }
 
+            if (!TryValidateMoney(program, WeeksBetween(request.StartDate, request.EndDate), out var moneyError))
+            {
+                return Results.BadRequest(moneyError);
+            }
+
             var student = await ResolveStudentAsync(db, request.StudentId, cancellationToken);
             if (student is null)
             {
@@ -164,6 +169,11 @@ public static class RotationEndpoints
                 return Results.BadRequest($"Program '{request.ProgramId}' does not exist.");
             }
 
+            if (!TryValidateMoney(program, WeeksBetween(request.StartDate, request.EndDate), out var moneyError))
+            {
+                return Results.BadRequest(moneyError);
+            }
+
             var student = await ResolveStudentAsync(db, request.StudentId, cancellationToken);
             if (student is null)
             {
@@ -202,8 +212,11 @@ public static class RotationEndpoints
         return routes;
     }
 
-    /// <summary>Program facts needed to flatten a rotation into its response.</summary>
-    private sealed record ProgramInfo(string SpecialtyName, ProgramType ProgramType, string? PreceptorName);
+    /// <summary>Program facts needed to flatten a rotation into its response, plus the per-week money
+    /// figures (used to validate that the booking's totals can't overflow their money columns).</summary>
+    private sealed record ProgramInfo(
+        string SpecialtyName, ProgramType ProgramType, string? PreceptorName,
+        decimal RetailAmountPerWeek, decimal WeeklyHonorarium);
 
     /// <summary>The directory student's identity, snapshotted onto the rotation on write.</summary>
     private sealed record StudentInfo(string Name, string Email, string? Oid);
@@ -214,7 +227,9 @@ public static class RotationEndpoints
             .Select(p => new ProgramInfo(
                 p.Specialty.Name,
                 p.ProgramType,
-                p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null))
+                p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
+                p.RetailAmountPerWeek,
+                p.WeeklyHonorarium))
             .FirstOrDefaultAsync(cancellationToken);
 
     private static Task<StudentInfo?> ResolveStudentAsync(RotationsDbContext db, Guid studentId, CancellationToken cancellationToken) =>
@@ -230,12 +245,44 @@ public static class RotationEndpoints
     private static int WeeksBetween(DateOnly start, DateOnly end) =>
         Math.Max(1, (end.DayNumber - start.DayNumber + 6) / 7);
 
+    /// <summary>Upper bound on a rotation's duration (mirrors <c>CustomerRotationEndpoints.MaxWeeks</c>) —
+    /// a sanity bound against a fat-fingered date range (e.g. a mistyped year). The actual money-overflow
+    /// guard is <see cref="TryValidateMoney"/>, which checks the per-week × weeks PRODUCTS; the week cap
+    /// alone is insufficient because a high weekly figure can overflow with very few weeks.</summary>
+    private const int MaxWeeks = 520;
+
+    /// <summary>The <c>numeric(10,2)</c> ceiling shared by the payment (deposit/total) and honorarium
+    /// amount columns. A booking whose per-week figure × weeks exceeds this would overflow at fulfilment
+    /// — and the honorarium overflow happens INSIDE the webhook transaction, wedging a paid booking — so
+    /// we reject it here, before any money is computed.</summary>
+    private const decimal MaxMoney = 99_999_999.99m;
+
     private static bool TryValidateDates(DateOnly startDate, DateOnly endDate, RotationStatus status, out string error)
     {
         error = string.Empty;
 
         if (!Enum.IsDefined(status)) { error = "Status is invalid."; return false; }
         if (endDate <= startDate) { error = "EndDate must be after StartDate."; return false; }
+        if (WeeksBetween(startDate, endDate) > MaxWeeks)
+        {
+            error = $"A rotation can span at most {MaxWeeks} weeks.";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Rejects a booking whose total deposit price (retail × weeks) or total honorarium (weekly
+    /// honorarium × weeks) would exceed the money columns' <see cref="MaxMoney"/> ceiling — closing the
+    /// overflow that would otherwise throw inside the deposit-fulfilment transaction.</summary>
+    private static bool TryValidateMoney(ProgramInfo program, int weeks, out string error)
+    {
+        error = string.Empty;
+        if (program.RetailAmountPerWeek * weeks > MaxMoney || program.WeeklyHonorarium * weeks > MaxMoney)
+        {
+            error = $"This program's per-week amounts over {weeks} week(s) exceed the maximum supported total.";
+            return false;
+        }
 
         return true;
     }

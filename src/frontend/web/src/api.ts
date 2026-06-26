@@ -742,6 +742,59 @@ export const createCampaign = (subject: string, body: string, audience: EmailAud
 export const sendCampaign = (id: string): Promise<CampaignDetail> =>
   request<CampaignDetail>("POST", `/api/campaigns/${id}/send`);
 
+// ---- Honorarium (preceptor payouts — AdminOnly) ----
+/** Mirror of the API's HonorariumStage enum (the three payout-screen tabs). */
+export type HonorariumStage = "Deposit" | "Start" | "Evaluation";
+
+/** Mirror of the API's HonorariumStatus enum. */
+export type HonorariumStatus = "Pending" | "Paid" | "Cancelled";
+
+/** Mirror of the API's HonorariumResponse (one payout row). */
+export interface Honorarium {
+  id: string;
+  rotationId: string;
+  rotationNumber: number;
+  preceptorId?: string | null;
+  preceptorName: string;
+  studentName: string;
+  stage: HonorariumStage;
+  amount: number;
+  currency: string;
+  status: HonorariumStatus;
+  refunded: boolean;
+  rotationStartDate: string;
+  paidAtUtc?: string | null;
+}
+
+export const getHonorariums = (params?: {
+  stage?: HonorariumStage;
+  status?: HonorariumStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Honorarium>> => {
+  const sp = new URLSearchParams();
+  if (params?.stage) sp.set("stage", params.stage);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Honorarium>>("GET", `/api/honorariums${suffix ? `?${suffix}` : ""}`);
+};
+
+/** Marks a honorarium stage paid (bookkeeping; stages must be paid in order — the server gates this). */
+export const payHonorarium = (id: string): Promise<Honorarium> =>
+  request<Honorarium>("POST", `/api/honorariums/${id}/pay`);
+
+/** Toggles the independent "refunded" bookkeeping flag on a honorarium row. */
+export const setHonorariumRefund = (id: string, refunded: boolean): Promise<Honorarium> =>
+  request<Honorarium>("POST", `/api/honorariums/${id}/refund-flag`, { refunded });
+
+/** Removes an erroneously-generated payout row (soft-delete). Server refuses (409) if it is already Paid. */
+export const deleteHonorarium = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/honorariums/${id}`);
+
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
 export const getStudents = (params?: {
   status?: StudentStatus;

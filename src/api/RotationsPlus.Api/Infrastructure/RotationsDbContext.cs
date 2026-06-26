@@ -24,6 +24,7 @@ public class RotationsDbContext(DbContextOptions<RotationsDbContext> options) : 
     public DbSet<Rotation> Rotations => Set<Rotation>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Honorarium> Honorariums => Set<Honorarium>();
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
     public DbSet<ProgramRequiredDocument> ProgramRequiredDocuments => Set<ProgramRequiredDocument>();

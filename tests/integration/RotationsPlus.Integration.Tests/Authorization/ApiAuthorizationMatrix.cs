@@ -87,6 +87,13 @@ public static class ApiAuthorizationMatrix
         new("GET", "/api/dashboard/todos", [RoleNames.Admin], "Admin dashboard to-do queues"),
         new("GET", "/api/dashboard/revenue", [RoleNames.Admin], "Admin dashboard revenue"),
         new("GET", "/api/dashboard/reports", [RoleNames.Admin], "Admin dashboard reports"),
+        // Honorarium (preceptor payouts) — AdminOnly. The list always authorizes-through (200); pay/refund
+        // on an unknown id give an authorized admin 404 (not 401/403), which the authz-only matrix accepts.
+        // Behaviour (generation, ordered pay, refund flag) is covered by HonorariumEndpointTests.
+        new("GET", "/api/honorariums", [RoleNames.Admin], "List honorariums (admin)"),
+        new("POST", "/api/honorariums/00000000-0000-0000-0000-000000000000/pay", [RoleNames.Admin], "Pay a honorarium stage (admin)"),
+        new("POST", "/api/honorariums/00000000-0000-0000-0000-000000000000/refund-flag", [RoleNames.Admin], "Toggle a honorarium refunded flag (admin)"),
+        new("DELETE", "/api/honorariums/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete a honorarium (admin)"),
         // Email campaigns (compose/list/send) — AdminOnly.
         new("GET", "/api/campaigns", [RoleNames.Admin], "List campaigns (admin)"),
         new("POST", "/api/campaigns/00000000-0000-0000-0000-000000000000/send", [RoleNames.Admin], "Send campaign (admin)"),

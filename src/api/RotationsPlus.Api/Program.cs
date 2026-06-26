@@ -208,6 +208,7 @@ app.MapProgramImageEndpoints();
 app.MapPaymentEndpoints();
 app.MapPaymentWebhookEndpoints();
 app.MapPaymentRefundEndpoints();
+app.MapHonorariumEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
 app.MapStudentEndpoints();

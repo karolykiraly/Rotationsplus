@@ -34,7 +34,7 @@ const NAV: { label: string; icon: string; iconSel?: string; to?: string }[] = [
   { label: "Analytics", icon: analyticsIcon },
   { label: "Permissions", icon: permissionIcon, to: "/admin/permission" },
   { label: "Rotations", icon: rotationsIcon, iconSel: rotationsSel, to: "/admin/rotations" },
-  { label: "Honorarium", icon: honorariumIcon },
+  { label: "Honorarium", icon: honorariumIcon, to: "/admin/honorarium" },
   { label: "Contacts", icon: contactsIcon },
   { label: "Programs", icon: programIcon, iconSel: programSel, to: "/admin/programs" },
   { label: "Leads", icon: leadIcon },
@@ -52,6 +52,7 @@ const TITLES: Record<string, string> = {
   "/admin/specialties": "Specialties",
   "/admin/preceptors": "Preceptors",
   "/admin/permission": "Preceptor approvals",
+  "/admin/honorarium": "Honorarium",
   "/admin/students": "Students"
 };
 

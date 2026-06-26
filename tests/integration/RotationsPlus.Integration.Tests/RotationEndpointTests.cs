@@ -99,6 +99,19 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task Creating_a_rotation_longer_than_the_week_cap_is_rejected()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A fat-fingered far-future end date (~11 years → >520 weeks) would overflow the per-week money
+        // columns (deposit price + honorarium schedule) at fulfilment; the cap rejects it up front.
+        var response = await PostAsync(admin, ValidCreate(
+            start: new DateOnly(2026, 9, 7), end: new DateOnly(2037, 9, 7)));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Admin_can_create_a_rotation_snapshotting_the_student_and_deriving_weeks()
     {
         var admin = Client(RoleNames.Admin);

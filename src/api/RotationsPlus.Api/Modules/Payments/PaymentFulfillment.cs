@@ -44,6 +44,9 @@ internal static class PaymentFulfillment
             case PaymentWebhookEventTypes.PaymentSucceeded when payment.Status == PaymentStatus.Pending:
                 payment.Status = PaymentStatus.Succeeded;
                 await ApproveRotationAsync(db, payment.RotationId, cancellationToken);
+                // The deposit is confirmed → generate the preceptor's three-stage payout schedule (idempotent,
+                // so a re-delivered success event won't double-schedule). Mirrors the legacy paid-booking trigger.
+                await HonorariumGenerator.EnsureForRotationAsync(db, payment.RotationId, cancellationToken);
                 break;
 
             case PaymentWebhookEventTypes.PaymentFailed when payment.Status == PaymentStatus.Pending:
