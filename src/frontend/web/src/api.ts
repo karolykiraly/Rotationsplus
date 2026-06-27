@@ -605,15 +605,35 @@ export const deleteSpecialty = (id: string): Promise<void> =>
 
 // ---- Programs (read: MarketplaceViewer; writes: AdminOnly) ----
 // Paged admin list — program-type tabs (multi) + name search over specialty/preceptor.
+/** FilterProgram modal selections (all optional; AND-combined server-side). */
+export interface ProgramFilter {
+  specialtyId?: string;
+  /** The "City, State" string the location dropdown lists. */
+  city?: string;
+  /** Instant Approval: true (Yes) / false (No) / undefined (Both). */
+  instantApproval?: boolean;
+  honorariumMin?: number;
+  honorariumMax?: number;
+  programNumber?: number;
+  tags?: string[];
+}
+
 export const getPrograms = (params?: {
   programType?: ProgramType[];
   q?: string;
   page?: number;
   pageSize?: number;
-}): Promise<PagedResponse<Program>> => {
+} & ProgramFilter): Promise<PagedResponse<Program>> => {
   const sp = new URLSearchParams();
   for (const t of params?.programType ?? []) sp.append("programType", t);
   if (params?.q) sp.set("q", params.q);
+  if (params?.specialtyId) sp.set("specialtyId", params.specialtyId);
+  if (params?.city) sp.set("city", params.city);
+  if (params?.instantApproval !== undefined) sp.set("instantApproval", String(params.instantApproval));
+  if (params?.honorariumMin !== undefined) sp.set("honorariumMin", String(params.honorariumMin));
+  if (params?.honorariumMax !== undefined) sp.set("honorariumMax", String(params.honorariumMax));
+  if (params?.programNumber !== undefined) sp.set("programNumber", String(params.programNumber));
+  for (const tag of params?.tags ?? []) sp.append("tags", tag);
   if (params?.page) sp.set("page", String(params.page));
   if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
   const suffix = sp.toString();
@@ -680,20 +700,39 @@ export interface PagedResponse<T> {
 }
 
 // ---- Rotations (AdminOnly — reads + writes) ----
-export const getRotations = (params?: {
+/** FilterRotation modal selections (all optional; AND-combined server-side). */
+export interface RotationFilter {
   status?: RotationStatus;
+  /** start_date >= startFrom (YYYY-MM-DD). */
+  startFrom?: string;
+  /** end_date <= endTo (YYYY-MM-DD). */
+  endTo?: string;
+  retailMin?: number;
+  retailMax?: number;
+  /** Only rotations whose student needs visa help (the "Needs Visa" checkbox). */
+  needsVisa?: boolean;
+  rotationNumber?: number;
+}
+
+export const getRotations = (params?: {
   /** "current" (non-terminal lifecycle) or "historical" (terminal) — the two admin sections. */
   scope?: "current" | "historical";
   programId?: string;
   q?: string;
   page?: number;
   pageSize?: number;
-}): Promise<PagedResponse<Rotation>> => {
+} & RotationFilter): Promise<PagedResponse<Rotation>> => {
   const sp = new URLSearchParams();
   if (params?.status) sp.set("status", params.status);
   if (params?.scope) sp.set("scope", params.scope);
   if (params?.programId) sp.set("programId", params.programId);
   if (params?.q) sp.set("q", params.q);
+  if (params?.startFrom) sp.set("startFrom", params.startFrom);
+  if (params?.endTo) sp.set("endTo", params.endTo);
+  if (params?.retailMin !== undefined) sp.set("retailMin", String(params.retailMin));
+  if (params?.retailMax !== undefined) sp.set("retailMax", String(params.retailMax));
+  if (params?.needsVisa) sp.set("needsVisa", "true");
+  if (params?.rotationNumber !== undefined) sp.set("rotationNumber", String(params.rotationNumber));
   if (params?.page) sp.set("page", String(params.page));
   if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
   const suffix = sp.toString();

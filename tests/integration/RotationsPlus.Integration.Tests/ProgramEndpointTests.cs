@@ -30,6 +30,14 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         return client;
     }
 
+    private HttpClient AdminClient()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Oid", "oid-admin");
+        client.DefaultRequestHeaders.Add("X-Test-Roles", RoleNames.Admin);
+        return client;
+    }
+
     private HttpClient StudentClient()
     {
         var client = factory.CreateClient();
@@ -72,6 +80,47 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     }
 
     [Fact]
+    public async Task Admin_list_filters_by_specialty_approval_honorarium_number_tag_and_city()
+    {
+        // Creating a program is AdminOnly; the list filters are exercised as a non-admin staff member
+        // (Coordinator) — proving staff can both filter and see the honorarium.
+        var adminClient = AdminClient();
+        var staff = StaffClient();
+
+        // A distinctive program: open, a known honorarium, a tag, and a location, so each filter can isolate it.
+        var created = await (await adminClient.PostAsJsonAsync("/api/programs",
+                new CreateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 777m,
+                    "Filterable", null, IsOpen: true, City: "Filterville", State: "TX", Tags: ["Research"]), JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+
+        async Task<List<ProgramSummaryResponse>> ListAsync(string queryString)
+        {
+            var page = await staff.GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+                $"/api/programs?{queryString}&pageSize=100", JsonOptions);
+            return page!.Items.ToList();
+        }
+
+        try
+        {
+            (await ListAsync($"specialtyId={InternalMedicineId}")).Select(p => p.Id).Should().Contain(created!.Id);
+            (await ListAsync("instantApproval=true")).Select(p => p.Id).Should().Contain(created!.Id);
+            (await ListAsync("instantApproval=false")).Select(p => p.Id).Should().NotContain(created.Id);
+            (await ListAsync("honorariumMin=700&honorariumMax=800")).Select(p => p.Id).Should().Contain(created.Id);
+            (await ListAsync("honorariumMin=900")).Select(p => p.Id).Should().NotContain(created.Id);
+            (await ListAsync($"programNumber={created.ProgramNumber}")).Select(p => p.Id).Should().Equal(created.Id);
+            (await ListAsync("tags=Research")).Select(p => p.Id).Should().Contain(created.Id);
+            (await ListAsync("tags=Faculty")).Select(p => p.Id).Should().NotContain(created.Id);
+            (await ListAsync("city=Filterville, TX")).Select(p => p.Id).Should().Contain(created.Id);
+        }
+        finally
+        {
+            // Clean up the created program so it doesn't inflate the shared-DB specialty/program counts that
+            // other tests assert on (the integration tests share one Postgres instance).
+            await adminClient.DeleteAsync($"/api/programs/{created!.Id}");
+        }
+    }
+
+    [Fact]
     public async Task Customer_program_list_and_catalog_hide_the_honorarium()
     {
         // GET /api/programs and /catalog are both MarketplaceViewer (students can call them); the honorarium
@@ -85,6 +134,21 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         list.Items.Should().OnlyContain(p => p.WeeklyHonorarium == null);
         catalog!.Should().NotBeEmpty();
         catalog.Should().OnlyContain(p => p.WeeklyHonorarium == null);
+    }
+
+    [Fact]
+    public async Task Customer_cannot_infer_the_honorarium_by_probing_the_filter()
+    {
+        // The seeded IM InPerson program's honorarium is 500. A staff caller filtering honorariumMin=1000
+        // correctly excludes it; a CUSTOMER's honorarium filter is IGNORED (else probing leaks the margin).
+        var staffFiltered = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?honorariumMin=1000&pageSize=100", JsonOptions);
+        staffFiltered!.Items.Select(p => p.Id).Should().NotContain(Guid.Parse(SeededInternalMedicineInPerson));
+
+        var customerFiltered = await StudentClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?honorariumMin=1000&pageSize=100", JsonOptions);
+        // The filter is a no-op for the customer, so the program they could otherwise see is still present.
+        customerFiltered!.Items.Select(p => p.Id).Should().Contain(Guid.Parse(SeededInternalMedicineInPerson));
     }
 
     // The catalog (full filtered list) backs the customer browse + form picker; its filters are

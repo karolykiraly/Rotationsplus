@@ -8,15 +8,18 @@ import {
   updateProgram,
   type PagedResponse,
   type Program,
+  type ProgramFilter,
   type ProgramInput,
   type ProgramType,
   type Preceptor,
   type Specialty
 } from "../api";
 
-/** Server-paginated program list (program-type tabs + name search + page) + create/update/delete mutations.
- *  keepPreviousData keeps the current page visible while the next loads (no flash on tab/page/search). */
-export function usePrograms(programTypes: ProgramType[], search: string, page: number, pageSize: number) {
+/** Server-paginated program list (program-type tabs + name search + Filter modal + page) + create/update/
+ *  delete mutations. keepPreviousData keeps the current page visible while the next loads. */
+export function usePrograms(
+  programTypes: ProgramType[], search: string, page: number, pageSize: number, filter: ProgramFilter
+) {
   const qc = useQueryClient();
   // Invalidate every program list (all tabs/pages) AND the full catalog (browse + form picker), not just one.
   const invalidate = () => {
@@ -25,8 +28,8 @@ export function usePrograms(programTypes: ProgramType[], search: string, page: n
   };
 
   const list = useQuery<PagedResponse<Program>>({
-    queryKey: ["programs", { programTypes, search: search || null, page, pageSize }],
-    queryFn: () => getPrograms({ programType: programTypes, q: search || undefined, page, pageSize }),
+    queryKey: ["programs", { programTypes, search: search || null, page, pageSize, filter }],
+    queryFn: () => getPrograms({ programType: programTypes, q: search || undefined, page, pageSize, ...filter }),
     placeholderData: keepPreviousData
   });
 

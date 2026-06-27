@@ -5,9 +5,10 @@ import { Tabs } from "../components/Tabs";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { useDebouncedValue } from "../useDebouncedValue";
-import { getProgram, type Program, type ProgramInput, type ProgramType } from "../api";
+import { getProgram, type Program, type ProgramFilter, type ProgramInput, type ProgramType } from "../api";
 import { usePrograms, useProgramFormOptions } from "./usePrograms";
 import { ProgramFormModal, type ProgramFormInitial } from "./ProgramFormModal";
+import { FilterProgramModal } from "./FilterProgramModal";
 import { ProgramDocumentsModal } from "./ProgramDocumentsModal";
 import { programCode, programDisplayName, programTypeLabel } from "./programTypes";
 import noImage from "../assets/images/no_image.webp";
@@ -47,8 +48,13 @@ export function ProgramsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search.trim());
+  const [filter, setFilter] = useState<ProgramFilter>({});
+  const [showFilter, setShowFilter] = useState(false);
+  const filterCount = Object.values(filter).filter(
+    (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)
+  ).length;
 
-  const { list, create, update, remove } = usePrograms(TAB_TYPES[tab], debouncedSearch, page, PAGE_SIZE);
+  const { list, create, update, remove } = usePrograms(TAB_TYPES[tab], debouncedSearch, page, PAGE_SIZE, filter);
   const { specialties, preceptors } = useProgramFormOptions();
 
   const [editId, setEditId] = useState<EditId>(null);
@@ -57,8 +63,8 @@ export function ProgramsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  // Reset to the first page whenever the tab or (debounced) search changes (matches legacy paging behaviour).
-  useEffect(() => setPage(1), [tab, debouncedSearch]);
+  // Reset to the first page whenever the tab, (debounced) search, or filter changes (legacy paging behaviour).
+  useEffect(() => setPage(1), [tab, debouncedSearch, filter]);
 
   // Server returns one page + the full filtered count for the pager. If the set shrinks past the current
   // page, step back. Gate on fresh (non-placeholder) data; declared before the admin guard so hooks are stable.
@@ -130,8 +136,9 @@ export function ProgramsPage() {
           <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setEditId("new"); }}>
             Add program
           </button>
-          <button className="filter-btn" type="button" title="Filter" aria-label="Filter programs">
+          <button className="filter-btn" type="button" title="Filter" aria-label="Filter programs" onClick={() => setShowFilter(true)}>
             <img src={filterIcon} alt="" />
+            {filterCount > 0 && <span className="filter-count">{filterCount}</span>}
           </button>
           <div className="search-form2">
             <img src={searchIcon} alt="" />
@@ -271,6 +278,16 @@ export function ProgramsPage() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {showFilter && (
+        <FilterProgramModal
+          initial={filter}
+          specialties={specialties.data ?? []}
+          onApply={(f) => { setFilter(f); setShowFilter(false); }}
+          onClear={() => { setFilter({}); setShowFilter(false); }}
+          onClose={() => setShowFilter(false)}
+        />
       )}
     </>
   );

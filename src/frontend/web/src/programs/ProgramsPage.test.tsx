@@ -141,6 +141,23 @@ describe("ProgramsPage", () => {
     expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
   });
 
+  it("applies the Filter modal (specialty + instant approval + a tag) to the program query and shows the count", async () => {
+    renderPage();
+    await screen.findByText("Program ID");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Specialty"), "s2");
+    // "Instant Approval" is also a tag checkbox — target the select by combobox role to disambiguate.
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Instant Approval" }), "yes");
+    await userEvent.click(within(dialog).getByLabelText("Research"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ specialtyId: "s2", instantApproval: true, tags: ["Research"] })));
+    expect(screen.getByText("3")).toBeInTheDocument(); // filter-count badge
+  });
+
   it("blocks non-admins", async () => {
     h.getMe.mockResolvedValue({ ...ADMIN, roles: ["Coordinator"] });
     renderPage();

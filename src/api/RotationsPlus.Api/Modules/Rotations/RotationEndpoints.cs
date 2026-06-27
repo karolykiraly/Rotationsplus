@@ -24,7 +24,9 @@ public static class RotationEndpoints
             .WithTags("Rotations");
 
         group.MapGet("/", async (
-            RotationStatus? status, Guid? programId, string? q, string? scope, int? page, int? pageSize,
+            RotationStatus? status, Guid? programId, string? q, string? scope,
+            DateOnly? startFrom, DateOnly? endTo, decimal? retailMin, decimal? retailMax,
+            bool? needsVisa, int? rotationNumber, int? page, int? pageSize,
             RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
@@ -42,6 +44,16 @@ public static class RotationEndpoints
                 query = query.Where(r => !CurrentScopeStatuses.Contains(r.Status));
             if (status is { } s) query = query.Where(r => r.Status == s);
             if (programId is { } pid) query = query.Where(r => r.ProgramId == pid);
+
+            // FilterRotation modal: date range, retail-amount range, needs-visa, and an exact rotation number.
+            if (startFrom is { } sf) query = query.Where(r => r.StartDate >= sf);
+            if (endTo is { } et) query = query.Where(r => r.EndDate <= et);
+            if (retailMin is { } rmin) query = query.Where(r => r.Program.RetailAmountPerWeek * r.Weeks >= rmin);
+            if (retailMax is { } rmax) query = query.Where(r => r.Program.RetailAmountPerWeek * r.Weeks <= rmax);
+            // Checked → only rotations whose student needs visa help (legacy applies the filter only when on).
+            if (needsVisa == true)
+                query = query.Where(r => db.Students.Any(st => st.Id == r.StudentId && st.VisaStatus == VisaStatus.NeedsVisaHelp));
+            if (rotationNumber is { } rn) query = query.Where(r => r.RotationNumber == rn);
             if (pattern is not null)
             {
                 // Mirrors the old client-side search: rotation number (with/without the "R" prefix), student

@@ -580,6 +580,43 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task List_filters_by_needs_visa_date_range_amount_and_rotation_number()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A fresh program isolates the assertions. Sam Rivera needs visa help; Dana Cole does not.
+        var program = await (await admin.PostAsJsonAsync("/api/programs",
+                new CreateProgramRequest(InternalMedicineSpecialtyId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Filter set", null), JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        var sam = await (await PostAsync(admin, ValidCreate(programId: program!.Id, studentId: SamRiveraStudentId,
+                start: new DateOnly(2028, 3, 6), end: new DateOnly(2028, 4, 3))))   // 4 weeks → retail 6000
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+        var dana = await (await PostAsync(admin, ValidCreate(programId: program.Id, studentId: DanaColeStudentId,
+                start: new DateOnly(2028, 3, 6), end: new DateOnly(2028, 4, 3))))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var url = $"/api/rotations?programId={program.Id}&pageSize=100";
+
+        // needsVisa=true → only Sam.
+        var visa = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{url}&needsVisa=true", JsonOptions);
+        visa!.Items.Select(r => r.Id).Should().Contain(sam!.Id).And.NotContain(dana!.Id);
+
+        // Exact rotation number → just that one.
+        var byNumber = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{url}&rotationNumber={dana!.RotationNumber}", JsonOptions);
+        byNumber!.Items.Select(r => r.Id).Should().Equal(dana.Id);
+
+        // Retail range straddling 6000 includes them; a range below excludes them.
+        var inRange = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{url}&retailMin=5000&retailMax=7000", JsonOptions);
+        inRange!.Items.Select(r => r.Id).Should().Contain(sam.Id);
+        var belowRange = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{url}&retailMax=100", JsonOptions);
+        belowRange!.Items.Select(r => r.Id).Should().NotContain(sam.Id);
+
+        // Date range: startFrom after the bookings' start excludes them.
+        var afterStart = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>($"{url}&startFrom=2029-01-01", JsonOptions);
+        afterStart!.Items.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Detail_paid_amount_reflects_a_captured_deposit()
     {
         var admin = Client(RoleNames.Admin);

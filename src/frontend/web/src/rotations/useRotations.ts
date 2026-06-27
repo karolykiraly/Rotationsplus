@@ -8,6 +8,7 @@ import {
   type PagedResponse,
   type Program,
   type Rotation,
+  type RotationFilter,
   type RotationInput,
   type Student
 } from "../api";
@@ -16,14 +17,17 @@ import {
  *  free-text search + page. `keepPreviousData` keeps the current page visible while the next loads, so
  *  paging/searching doesn't flash an empty table. Mutations live in {@link useRotationMutations} so the
  *  two sections + the detail panel share one create/update path. */
-export function useRotationsList(scope: "current" | "historical", search: string, page: number, pageSize: number) {
+export function useRotationsList(
+  scope: "current" | "historical", search: string, page: number, pageSize: number, filter: RotationFilter
+) {
   return useQuery<PagedResponse<Rotation>>({
-    queryKey: ["rotations", { scope, search: search || null, page, pageSize }],
+    queryKey: ["rotations", { scope, search: search || null, page, pageSize, filter }],
     queryFn: () => getRotations({
       scope,
       q: search || undefined,
       page,
-      pageSize
+      pageSize,
+      ...filter
     }),
     placeholderData: keepPreviousData
   });

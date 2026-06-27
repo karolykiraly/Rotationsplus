@@ -281,6 +281,47 @@ describe("RotationsPage", () => {
     await waitFor(() => expect(screen.getAllByText("There is no data available.")).toHaveLength(2));
   });
 
+  it("applies the Filter modal to both sections (status + needs-visa + rotation number) and shows the count", async () => {
+    renderPage();
+    await screen.findByText("Sam Rivera");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Status"), "Completed");
+    await userEvent.click(within(dialog).getByLabelText("Needs Visa"));
+    await userEvent.type(within(dialog).getByLabelText("Rotation Number"), "1001");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => expect(h.getRotations).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "current", status: "Completed", needsVisa: true, rotationNumber: 1001 })));
+    // The historical section gets the same filter.
+    expect(h.getRotations).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "historical", status: "Completed", needsVisa: true }));
+    // The filter-count badge reflects the 3 active filters.
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("clears the rotation filter back to an unfiltered query", async () => {
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
+    let dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByLabelText("Needs Visa"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(h.getRotations).toHaveBeenCalledWith(expect.objectContaining({ needsVisa: true })));
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
+    dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear filters" }));
+
+    // After clearing, the most recent query for each section carries no needs-visa filter (ordering of the
+    // two sections' refetches isn't deterministic, so find the latest current-scope call rather than assume).
+    await waitFor(() => {
+      const latestCurrent = [...h.getRotations.mock.calls].reverse().find((c) => c[0]?.scope === "current");
+      expect(latestCurrent?.[0]?.needsVisa).toBeUndefined();
+    });
+  });
+
   it("blocks non-admins", async () => {
     h.getMe.mockResolvedValue({ ...ADMIN, roles: ["Coordinator"] });
     renderPage();

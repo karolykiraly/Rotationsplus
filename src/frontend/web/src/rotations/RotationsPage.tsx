@@ -3,12 +3,19 @@ import { useQuery } from "@tanstack/react-query";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
 import { useDebouncedValue } from "../useDebouncedValue";
-import { getRotation, type RotationInput } from "../api";
+import { getRotation, type RotationFilter, type RotationInput } from "../api";
 import searchIcon from "../assets/icons/search.png";
+import filterIcon from "../assets/images/filter.svg";
 import { useRotationsList, useRotationMutations, useRotationPrograms, useRotationStudents } from "./useRotations";
 import { RotationFormModal, type RotationFormInitial } from "./RotationFormModal";
 import { SelectedRotationPanel } from "./SelectedRotationPanel";
+import { FilterRotationModal } from "./FilterRotationModal";
 import { ROTATION_STATUSES, rotationStatusLabel, rotationStatusClass } from "./rotationStatuses";
+
+/** Number of active (set) keys in a rotation filter — drives the filter-count badge. */
+function rotationFilterCount(f: RotationFilter): number {
+  return Object.values(f).filter((v) => v !== undefined && v !== "" && v !== false).length;
+}
 
 const DEFAULTS: RotationFormInitial = {
   programId: "",
@@ -38,20 +45,23 @@ function RotationsSection({
   scope,
   selectedId,
   onView,
+  filter,
   headerExtra
 }: {
   title: string;
   scope: "current" | "historical";
   selectedId: string | null;
   onView: (id: string) => void;
+  filter: RotationFilter;
   headerExtra?: React.ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search.trim());
-  const list = useRotationsList(scope, debouncedSearch, page, PAGE_SIZE);
+  const list = useRotationsList(scope, debouncedSearch, page, PAGE_SIZE, filter);
 
-  useEffect(() => setPage(1), [debouncedSearch]);
+  // Back to page 1 whenever the search or the shared filter changes.
+  useEffect(() => setPage(1), [debouncedSearch, filter]);
 
   const totalItems = list.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -157,6 +167,10 @@ export function RotationsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  // One filter shared by BOTH sections (legacy applies the FilterRotation modal to current + historical).
+  const [filter, setFilter] = useState<RotationFilter>({});
+  const [showFilter, setShowFilter] = useState(false);
+  const filterCount = rotationFilterCount(filter);
 
   const detail = useQuery({
     queryKey: ["rotation", selectedId],
@@ -204,10 +218,17 @@ export function RotationsPage() {
         scope="current"
         selectedId={selectedId}
         onView={onView}
+        filter={filter}
         headerExtra={
-          <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setAdding(true); }}>
-            Add New Rotation
-          </button>
+          <>
+            <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setAdding(true); }}>
+              Add New Rotation
+            </button>
+            <button className="filter-btn" type="button" aria-label="Filter rotations" title="Filter" onClick={() => setShowFilter(true)}>
+              <img src={filterIcon} alt="" />
+              {filterCount > 0 && <span className="filter-count">{filterCount}</span>}
+            </button>
+          </>
         }
       />
 
@@ -232,6 +253,7 @@ export function RotationsPage() {
         scope="historical"
         selectedId={selectedId}
         onView={onView}
+        filter={filter}
       />
 
       {adding && (
@@ -245,6 +267,15 @@ export function RotationsPage() {
           serverError={formError}
           onSubmit={submitAdd}
           onClose={() => setAdding(false)}
+        />
+      )}
+
+      {showFilter && (
+        <FilterRotationModal
+          initial={filter}
+          onApply={(f) => { setFilter(f); setShowFilter(false); }}
+          onClear={() => { setFilter({}); setShowFilter(false); }}
+          onClose={() => setShowFilter(false)}
         />
       )}
     </>

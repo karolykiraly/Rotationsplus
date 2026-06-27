@@ -26,7 +26,8 @@ public static class ProgramEndpoints
         // the Consultation tab spans Consultation + ConsultationSub) and a name search over specialty +
         // preceptor. Returns a PagedResponse; the customer marketplace browse uses /catalog (below) instead.
         group.MapGet("/", async (
-            ProgramType[]? programType, string? q, int? page, int? pageSize,
+            ProgramType[]? programType, string? q, Guid? specialtyId, string? city, bool? instantApproval,
+            decimal? honorariumMin, decimal? honorariumMax, int? programNumber, string[]? tags, int? page, int? pageSize,
             ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             // Honorarium (preceptor pay → platform margin) is staff-only; null it for customer callers.
@@ -45,6 +46,29 @@ public static class ProgramEndpoints
                 query = query.Where(p =>
                     EF.Functions.ILike(p.Specialty.Name, pattern) ||
                     (p.Preceptor != null && EF.Functions.ILike(p.Preceptor.FirstName + " " + p.Preceptor.LastName, pattern)));
+            }
+
+            // FilterProgram modal: specialty, location, instant-approval, honorarium range, program number, tags.
+            if (specialtyId is { } sid) query = query.Where(p => p.SpecialtyId == sid);
+            if (instantApproval is { } open) query = query.Where(p => p.IsOpen == open);
+            // Honorarium is staff-only data — only honour the honorarium FILTER for staff, else a customer
+            // could probe the filter (e.g. honorariumMin=500) to INFER the margin the response nulls out.
+            if (includeHonorarium && honorariumMin is { } hmin) query = query.Where(p => p.WeeklyHonorarium >= hmin);
+            if (includeHonorarium && honorariumMax is { } hmax) query = query.Where(p => p.WeeklyHonorarium <= hmax);
+            if (programNumber is { } pn) query = query.Where(p => p.ProgramNumber == pn);
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                // Case-insensitive CONTAINS over the "City, State" the filter dropdown shows (EscapeLike
+                // neutralises caller wildcards and wraps as %…%; the dropdown sends the full "City, State").
+                var cityPattern = PaginationExtensions.EscapeLike(city.Trim());
+                query = query.Where(p => EF.Functions.ILike((p.City ?? "") + ", " + (p.State ?? ""), cityPattern));
+            }
+            // A program matches if it carries ANY of the requested tags (Postgres text[] overlap). Bound the
+            // tag list (mirrors the create-path MaxTags) so an oversized array can't bloat the query.
+            if (tags is { Length: > 0 })
+            {
+                var tagFilter = tags.Take(MaxTags).ToArray();
+                query = query.Where(p => p.Tags.Any(t => tagFilter.Contains(t)));
             }
 
             var paged = await query
