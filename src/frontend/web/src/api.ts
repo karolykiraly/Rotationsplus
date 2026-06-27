@@ -172,6 +172,10 @@ export interface Rotation {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** Retail cost of the booking (program retail/week × weeks) — the "Retail Amount" column. */
+  retailAmount: number;
+  /** True when the booked student needs visa help — drives the "Needs Visa" checkbox. */
+  needsVisa: boolean;
 }
 
 /** Mirror of the API's RotationDetailResponse contract — the editable shape. The student name/email/oid
@@ -192,6 +196,12 @@ export interface RotationDetail {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** The program's sequential number — the "Program ID" shown in the Selected Rotation panel. */
+  programNumber: number;
+  /** The booking's retail cost (program retail/week × weeks) — the panel's "Rotation Cost". */
+  retailAmount: number;
+  /** Sum of the rotation's captured (Succeeded) payments — the panel's "Paid Amount". */
+  paidAmount: number;
   /** Statuses this rotation may transition to (excludes the current one); the edit form offers the
    *  current status plus these, and the server enforces the same lifecycle state machine. */
   allowedNextStatuses: RotationStatus[];
@@ -672,6 +682,8 @@ export interface PagedResponse<T> {
 // ---- Rotations (AdminOnly — reads + writes) ----
 export const getRotations = (params?: {
   status?: RotationStatus;
+  /** "current" (non-terminal lifecycle) or "historical" (terminal) — the two admin sections. */
+  scope?: "current" | "historical";
   programId?: string;
   q?: string;
   page?: number;
@@ -679,6 +691,7 @@ export const getRotations = (params?: {
 }): Promise<PagedResponse<Rotation>> => {
   const sp = new URLSearchParams();
   if (params?.status) sp.set("status", params.status);
+  if (params?.scope) sp.set("scope", params.scope);
   if (params?.programId) sp.set("programId", params.programId);
   if (params?.q) sp.set("q", params.q);
   if (params?.page) sp.set("page", String(params.page));

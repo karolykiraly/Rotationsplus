@@ -758,6 +758,18 @@ table.data { width: 100%; border-collapse: collapse; }
 .text-center { text-align: center; }
 .ok-text { color: var(--ok); font-weight: 700; }
 .brand-text { color: var(--brand-dark); font-weight: 700; }
+/* List header actions (search + an optional Add button), pushed to the right of the title/count. */
+.list-head-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+
+/* ---- Rotations "Selected Rotation" detail panel ---- */
+.rotation-detail { border: 1px solid var(--brand); }
+.rotation-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin: 8px 0 20px; }
+.detail-col { margin: 0; }
+.detail-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line, #eef0f2); }
+.detail-row dt { margin: 0; }
+.detail-row dd { margin: 0; text-align: right; }
+.date-range-edit { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.rot-row.selected { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /* ---- Pagination (First/Prev/1..N/Next/Last) ---- */
 .pager { display: flex; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap; }

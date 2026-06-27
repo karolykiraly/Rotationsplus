@@ -1,38 +1,40 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRotation,
-  deleteRotation,
   getProgramCatalog,
   getRotations,
   getStudentOptions,
-  refundRotation,
   updateRotation,
   type PagedResponse,
   type Program,
   type Rotation,
   type RotationInput,
-  type RotationStatus,
   type Student
 } from "../api";
 
-/** Server-paginated rotation list (status filter + free-text search + page) plus create/update/delete
- *  mutations. `keepPreviousData` keeps the current page visible while the next loads, so paging/searching
- *  doesn't flash an empty table. */
-export function useRotations(status: RotationStatus | "", search: string, page: number, pageSize: number) {
-  const qc = useQueryClient();
-  // Invalidate every rotation list (all filters/pages), not just the active one.
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["rotations"] });
-
-  const list = useQuery<PagedResponse<Rotation>>({
-    queryKey: ["rotations", { status: status || null, search: search || null, page, pageSize }],
+/** One server-paginated rotation section (Current or Historical, selected by `scope`) with its own
+ *  free-text search + page. `keepPreviousData` keeps the current page visible while the next loads, so
+ *  paging/searching doesn't flash an empty table. Mutations live in {@link useRotationMutations} so the
+ *  two sections + the detail panel share one create/update path. */
+export function useRotationsList(scope: "current" | "historical", search: string, page: number, pageSize: number) {
+  return useQuery<PagedResponse<Rotation>>({
+    queryKey: ["rotations", { scope, search: search || null, page, pageSize }],
     queryFn: () => getRotations({
-      status: status || undefined,
+      scope,
       q: search || undefined,
       page,
       pageSize
     }),
     placeholderData: keepPreviousData
   });
+}
+
+/** The shared rotation create/update mutations (the Add modal + the Selected Rotation panel). Both
+ *  invalidate every rotation list so the Current/Historical sections refetch (a status change can move a
+ *  row between them); update also seeds the detail cache so the panel re-reads fresh, not the pre-save snapshot. */
+export function useRotationMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["rotations"] });
 
   const create = useMutation({
     mutationFn: (input: RotationInput) => createRotation(input),
@@ -41,31 +43,13 @@ export function useRotations(status: RotationStatus | "", search: string, page: 
 
   const update = useMutation({
     mutationFn: ({ id, input }: { id: string; input: RotationInput }) => updateRotation(id, input),
-    // Refresh the list AND seed the detail cache with the server's response, so a re-edit pre-fills
-    // from fresh data instead of the pre-save snapshot the form captured at mount.
     onSuccess: (data, vars) => {
       invalidate();
       qc.setQueryData(["rotation", vars.id], data);
     }
   });
 
-  const remove = useMutation({
-    mutationFn: (id: string) => deleteRotation(id),
-    onSuccess: (_data, id) => {
-      invalidate();
-      qc.removeQueries({ queryKey: ["rotation", id] });
-    }
-  });
-
-  const refund = useMutation({
-    mutationFn: (id: string) => refundRotation(id),
-    onSuccess: (_data, id) => {
-      invalidate();
-      qc.invalidateQueries({ queryKey: ["rotation", id] });
-    }
-  });
-
-  return { list, create, update, remove, refund };
+  return { create, update };
 }
 
 /** Program option list for the rotation form's program dropdown (the unpaginated catalog endpoint). */

@@ -6,6 +6,7 @@ using FluentAssertions;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
+using RotationsPlus.Contracts.Payments;
 using RotationsPlus.Contracts.Rotations;
 using RotationsPlus.Contracts.Students;
 
@@ -513,5 +514,93 @@ public class RotationEndpointTests(RotationsApiFactory factory) : IClassFixture<
         var response = await admin.GetAsync($"/api/rotations?q={new string('x', 101)}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // ---- Production-parity columns (PR-3): Retail Amount, Needs Visa, Current/Historical scope ----
+
+    [Fact]
+    public async Task Admin_list_carries_the_retail_amount_and_needs_visa_flag()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var list = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            "/api/rotations?q=R1001&pageSize=100", JsonOptions);
+        var seeded = list!.Items.Single(r => r.Id == SeededRotationId);
+        seeded.RetailAmount.Should().Be(6000m);  // seeded IM program retail 1500/wk × 4 weeks
+        seeded.NeedsVisa.Should().BeTrue();        // Sam Rivera's visa status is NeedsVisaHelp
+
+        // A Dana Cole booking (no visa help) → NeedsVisa false.
+        var created = await (await PostAsync(admin, ValidCreate(studentId: DanaColeStudentId)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+        var danaList = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            $"/api/rotations?q={created!.RotationNumber}&pageSize=100", JsonOptions);
+        danaList!.Items.Single(r => r.Id == created.Id).NeedsVisa.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task List_scope_splits_current_and_historical_by_status()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A fresh program isolates the assertion from the shared DB's other rows (programId + scope filter).
+        var program = await (await admin.PostAsJsonAsync("/api/programs",
+                new CreateProgramRequest(InternalMedicineSpecialtyId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Scope set", null), JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        var current = await (await PostAsync(admin, ValidCreate(programId: program!.Id, studentId: DanaColeStudentId,
+                start: new DateOnly(2027, 5, 3), end: new DateOnly(2027, 5, 31), status: RotationStatus.NotStarted)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+        var historical = await (await PostAsync(admin, ValidCreate(programId: program.Id, studentId: DanaColeStudentId,
+                start: new DateOnly(2027, 6, 7), end: new DateOnly(2027, 7, 5), status: RotationStatus.Rejected)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var currentList = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            $"/api/rotations?programId={program.Id}&scope=current&pageSize=100", JsonOptions);
+        var historicalList = await admin.GetFromJsonAsync<PagedResponse<RotationSummaryResponse>>(
+            $"/api/rotations?programId={program.Id}&scope=historical&pageSize=100", JsonOptions);
+
+        currentList!.Items.Select(r => r.Id).Should().Contain(current!.Id).And.NotContain(historical!.Id);
+        historicalList!.Items.Select(r => r.Id).Should().Contain(historical.Id).And.NotContain(current.Id);
+
+        var terminal = new[] { RotationStatus.Completed, RotationStatus.Cancelled, RotationStatus.Refunded, RotationStatus.Abandoned, RotationStatus.Rejected };
+        currentList.Items.Should().OnlyContain(r => !terminal.Contains(r.Status));
+        historicalList.Items.Should().OnlyContain(r => terminal.Contains(r.Status));
+    }
+
+    [Fact]
+    public async Task Detail_carries_program_number_retail_cost_and_zero_paid_amount_for_a_new_booking()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var created = await (await PostAsync(admin, ValidCreate(studentId: DanaColeStudentId)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        created!.ProgramNumber.Should().BeGreaterThan(0);
+        created.RetailAmount.Should().Be(6000m);  // 1500/wk × 4 weeks
+        created.PaidAmount.Should().Be(0m);         // brand-new booking — nothing captured yet
+    }
+
+    [Fact]
+    public async Task Detail_paid_amount_reflects_a_captured_deposit()
+    {
+        var admin = Client(RoleNames.Admin);
+        var oid = $"ciam-{Guid.NewGuid():N}";
+        var student = await (await admin.PostAsJsonAsync("/api/students",
+                new CreateStudentRequest("Paid", "Learner", $"paid.{Guid.NewGuid():N}@example.com", null,
+                    AcademicStatus.MdStudent, null, null, null, null, null, StudentStatus.MemberActivated, oid), JsonOptions))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+        var rotation = await (await PostAsync(admin, ValidCreate(studentId: student!.Id)))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        // Drive the deposit to success via the DEV simulate endpoint (fake gateway) as the booking's student.
+        var customer = factory.CreateClient();
+        customer.DefaultRequestHeaders.Add("X-Test-Oid", oid);
+        customer.DefaultRequestHeaders.Add("X-Test-Roles", RoleNames.Student);
+        var paymentId = (await (await customer.PostAsync($"/api/rotations/{rotation!.Id}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+        (await customer.PostAsJsonAsync($"/api/dev/payments/{paymentId}/simulate", new { outcome = "succeeded" }, JsonOptions))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var fetched = await admin.GetFromJsonAsync<RotationDetailResponse>($"/api/rotations/{rotation.Id}", JsonOptions);
+        fetched!.PaidAmount.Should().BeGreaterThan(0m); // the captured deposit shows as Paid Amount
     }
 }
