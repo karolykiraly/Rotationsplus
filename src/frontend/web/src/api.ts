@@ -46,6 +46,9 @@ export interface Program {
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
+  /** Staff-only (preceptor pay / platform margin); null for customer callers. The admin Programs list
+   *  shows it under the "Retail Amount" column, mirroring the legacy admin screen. */
+  weeklyHonorarium?: number | null;
   preceptorName?: string | null;
   city?: string | null;
   state?: string | null;

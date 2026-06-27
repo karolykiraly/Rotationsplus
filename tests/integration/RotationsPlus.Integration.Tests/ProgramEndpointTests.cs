@@ -60,6 +60,33 @@ public class ProgramEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         program.WeeklyHonorarium.Should().BeNull();         // preceptor pay / margin — hidden from customers
     }
 
+    [Fact]
+    public async Task Admin_program_list_shows_the_weekly_honorarium()
+    {
+        // The admin Programs screen shows the weekly honorarium (under its "Retail Amount" column). Staff see it.
+        var page = await StaffClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?pageSize=100", JsonOptions);
+
+        page.Should().NotBeNull();
+        page!.Items.Should().Contain(p => p.SpecialtyName == "Internal Medicine" && p.WeeklyHonorarium == 500m);
+    }
+
+    [Fact]
+    public async Task Customer_program_list_and_catalog_hide_the_honorarium()
+    {
+        // GET /api/programs and /catalog are both MarketplaceViewer (students can call them); the honorarium
+        // (preceptor pay / margin) must be stripped for customer callers, mirroring the detail endpoint.
+        var list = await StudentClient().GetFromJsonAsync<PagedResponse<ProgramSummaryResponse>>(
+            "/api/programs?pageSize=100", JsonOptions);
+        var catalog = await StudentClient().GetFromJsonAsync<List<ProgramSummaryResponse>>(
+            "/api/programs/catalog", JsonOptions);
+
+        list!.Items.Should().NotBeEmpty();
+        list.Items.Should().OnlyContain(p => p.WeeklyHonorarium == null);
+        catalog!.Should().NotBeEmpty();
+        catalog.Should().OnlyContain(p => p.WeeklyHonorarium == null);
+    }
+
     // The catalog (full filtered list) backs the customer browse + form picker; its filters are
     // specialtyId/preceptorId/programType/maxRetailPerWeek and a q over specialty + description.
     private Task<List<ProgramSummaryResponse>?> Search(string queryString) =>

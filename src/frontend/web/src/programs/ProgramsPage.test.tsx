@@ -44,6 +44,7 @@ const PROGRAM_ROW = {
   maxStudentsPerRotation: 2,
   minWeeksPerRotation: 4,
   retailAmountPerWeek: 1500,
+  weeklyHonorarium: 500,
   preceptorName: "Jane Carter",
   city: "Los Angeles",
   state: "CA",
@@ -97,12 +98,22 @@ describe("ProgramsPage", () => {
     h.getPreceptorOptions.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
   });
 
-  it("lists programs in the active type tab with the retail amount", async () => {
+  it("lists programs with a derived name, a distinct specialty, and the honorarium under Retail Amount", async () => {
     renderPage();
-    // Default tab is InPerson; the row's labelled fields + retail render (name/ID/location are placeholders).
-    expect(await screen.findByText("Program ID")).toBeInTheDocument();
-    expect(screen.getByText("$1,500")).toBeInTheDocument();
-    expect(screen.getAllByText("Internal Medicine").length).toBeGreaterThan(0);
+    await screen.findByText("Program ID");
+    // Program Name column derives "{Specialty} Physician"; the Specialty column shows the bare specialty
+    // (no longer a duplicate). The "Retail Amount" column shows the weekly honorarium (matching production).
+    expect(screen.getByText("Internal Medicine Physician")).toBeInTheDocument();
+    expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
+    expect(screen.getByText("$500")).toBeInTheDocument();
+    expect(screen.queryByText("$1,500")).not.toBeInTheDocument(); // retail value is no longer the column shown
+  });
+
+  it("renders a dash under Retail Amount when the honorarium is absent (e.g. a customer-stripped row)", async () => {
+    h.getPrograms.mockResolvedValue(paged([{ ...PROGRAM_ROW, weeklyHonorarium: null }]));
+    renderPage();
+    await screen.findByText("Program ID");
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("drives the program-type tab and search server-side", async () => {

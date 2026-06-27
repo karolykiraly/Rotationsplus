@@ -9,7 +9,7 @@ import { getProgram, type Program, type ProgramInput, type ProgramType } from ".
 import { usePrograms, useProgramFormOptions } from "./usePrograms";
 import { ProgramFormModal, type ProgramFormInitial } from "./ProgramFormModal";
 import { ProgramDocumentsModal } from "./ProgramDocumentsModal";
-import { programCode, programTypeLabel } from "./programTypes";
+import { programCode, programDisplayName, programTypeLabel } from "./programTypes";
 import noImage from "../assets/images/no_image.webp";
 import filterIcon from "../assets/images/filter.svg";
 import searchIcon from "../assets/icons/search.png";
@@ -172,7 +172,7 @@ export function ProgramsPage() {
                       <img className="hospital-img" src={noImage} alt="" />
                     </td>
                     <td className="hospital-name">
-                      <div className="heading-xxxs">{p.specialtyName}</div>
+                      <div className="heading-xxxs">{programDisplayName(p.specialtyName)}</div>
                     </td>
                     <td>
                       <div className="place-holder">Program ID</div>
@@ -192,7 +192,11 @@ export function ProgramsPage() {
                     </td>
                     <td className="last-td">
                       <div className="place-holder">Retail Amount</div>
-                      <div className="heading-xxxs-normal">${p.retailAmountPerWeek.toLocaleString()}</div>
+                      {/* The legacy admin Programs list shows the weekly honorarium under its "Retail Amount"
+                          column (owner-confirmed 2026-06-26 to match production); staff-only, "—" when unset. */}
+                      <div className="heading-xxxs-normal">
+                        {p.weeklyHonorarium ? `$${p.weeklyHonorarium.toLocaleString()}` : "—"}
+                      </div>
                     </td>
                   </tr>
                   );

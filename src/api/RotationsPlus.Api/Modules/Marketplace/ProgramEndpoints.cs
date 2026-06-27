@@ -27,8 +27,11 @@ public static class ProgramEndpoints
         // preceptor. Returns a PagedResponse; the customer marketplace browse uses /catalog (below) instead.
         group.MapGet("/", async (
             ProgramType[]? programType, string? q, int? page, int? pageSize,
-            RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
+            ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
+            // Honorarium (preceptor pay → platform margin) is staff-only; null it for customer callers.
+            var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
+
             if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
             {
                 return Results.BadRequest(searchError);
@@ -51,8 +54,15 @@ public static class ProgramEndpoints
                 .Select(Summary)
                 .ToPagedResponseAsync(page, pageSize, cancellationToken);
 
-            // Sign the image read URLs on the page (can't sign a SAS inside SQL).
-            var items = paged.Items.Select(p => p with { ImageUrl = imageStore.GetReadUrl(p.ImageUrl) }).ToList();
+            // Sign the image read URLs on the page (can't sign a SAS inside SQL) and strip honorarium for
+            // customer callers (the value is fetched but never leaves the API for non-staff).
+            var items = paged.Items
+                .Select(p => p with
+                {
+                    ImageUrl = imageStore.GetReadUrl(p.ImageUrl),
+                    WeeklyHonorarium = includeHonorarium ? p.WeeklyHonorarium : null,
+                })
+                .ToList();
             return Results.Ok(new PagedResponse<ProgramSummaryResponse>(items, paged.Page, paged.PageSize, paged.TotalCount));
         })
         .WithName("ListPrograms");
@@ -62,8 +72,11 @@ public static class ProgramEndpoints
         // description (the marketplace's fields). Same MarketplaceViewer audience as the paged list.
         group.MapGet("/catalog", async (
             Guid? specialtyId, Guid? preceptorId, ProgramType? programType, decimal? maxRetailPerWeek, string? q,
-            RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
+            ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
+            // Honorarium (preceptor pay → platform margin) is staff-only; null it for customer callers.
+            var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
+
             var query = db.Programs.AsQueryable();
 
             if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
@@ -91,7 +104,11 @@ public static class ProgramEndpoints
                 .ToListAsync(cancellationToken);
 
             var withUrls = programs
-                .Select(p => p with { ImageUrl = imageStore.GetReadUrl(p.ImageUrl) })
+                .Select(p => p with
+                {
+                    ImageUrl = imageStore.GetReadUrl(p.ImageUrl),
+                    WeeklyHonorarium = includeHonorarium ? p.WeeklyHonorarium : null,
+                })
                 .ToList();
 
             return Results.Ok(withUrls);
@@ -267,6 +284,7 @@ public static class ProgramEndpoints
             p.MaxStudentsPerRotation,
             p.MinWeeksPerRotation,
             p.RetailAmountPerWeek,
+            p.WeeklyHonorarium, // staff-only; the endpoints null it for customer callers after materialization
             p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
             p.City,
             p.State,
