@@ -1,6 +1,11 @@
 import { createBrowserRouter } from "react-router-dom";
+import { PublicLayout } from "./public/PublicLayout";
+import { LandingPage } from "./public/LandingPage";
+import { PublicComingSoon } from "./public/PublicComingSoon";
 import { StaffMsalShell } from "./components/StaffMsalShell";
-import { HomePage } from "./pages/HomePage";
+import { StaffLoginLauncher } from "./components/StaffLoginLauncher";
+import { PostLoginRedirect } from "./components/PostLoginRedirect";
+import { AppLayout } from "./components/AppLayout";
 import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
 import { DashboardPage } from "./dashboard/DashboardPage";
@@ -14,22 +19,53 @@ import { BrowsePage } from "./portal/BrowsePage";
 import { ProgramDetailPage } from "./portal/ProgramDetailPage";
 import { MyRotationsPage } from "./portal/MyRotationsPage";
 
-/** Routes. "/" + "/admin/*" are the staff console (workforce MSAL, from main.tsx). "/portal/*" is the
- *  customer-facing portal, rooted on the CIAM MSAL instance via CustomerMsalShell. */
+/** Three independent top-level branches, each with its own (or no) MSAL provider:
+ *  - "/"            PUBLIC marketing site — anonymous, NO MsalProvider (PublicLayout).
+ *  - staff          WORKFORCE MSAL (StaffMsalShell → Outlet): the /rotationsplusadmin|sales|sdr login
+ *                   launchers + the authenticated "/admin/*" console (the workforce redirect target).
+ *  - "/portal"      CUSTOMER (CIAM) MSAL — Student/Preceptor portal.
+ *  The two MSAL instances never share a redirect hash: workforce lands on /admin, customer on /portal,
+ *  and the public root never mounts a provider (see main.tsx + authConfig.ts). */
 export const router = createBrowserRouter([
   {
     path: "/",
+    element: <PublicLayout />,
+    children: [
+      { index: true, element: <LandingPage /> },
+      // Marketing pages built in later PRs (LP-2…LP-6); placeholders keep the nav/footer links live.
+      { path: "about", element: <PublicComingSoon title="About" /> },
+      { path: "our-process", element: <PublicComingSoon title="Our Process" /> },
+      { path: "our-team", element: <PublicComingSoon title="Our Team" /> },
+      { path: "for-preceptors", element: <PublicComingSoon title="For Preceptors" /> },
+      { path: "consulting-services", element: <PublicComingSoon title="Consulting Services" /> },
+      { path: "faq", element: <PublicComingSoon title="Frequently Asked Questions" /> },
+      { path: "blog", element: <PublicComingSoon title="Blog" /> },
+      { path: "resources", element: <PublicComingSoon title="Resources" /> },
+      { path: "privacy-policy", element: <PublicComingSoon title="Privacy Policy" /> },
+      { path: "terms", element: <PublicComingSoon title="Terms of Service" /> }
+    ]
+  },
+  {
     element: <StaffMsalShell />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: "admin/dashboard", element: <DashboardPage /> },
-      { path: "admin/specialties", element: <SpecialtiesPage /> },
-      { path: "admin/programs", element: <ProgramsPage /> },
-      { path: "admin/preceptors", element: <PreceptorsPage /> },
-      { path: "admin/permission", element: <PermissionPage /> },
-      { path: "admin/rotations", element: <RotationsPage /> },
-      { path: "admin/honorarium", element: <HonorariumPage /> },
-      { path: "admin/students", element: <StudentsPage /> }
+      { path: "rotationsplusadmin", element: <StaffLoginLauncher entry="admin" /> },
+      { path: "rotationsplussales", element: <StaffLoginLauncher entry="sales" /> },
+      { path: "rotationsplussdr", element: <StaffLoginLauncher entry="sdr" /> },
+      {
+        path: "admin",
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <PostLoginRedirect /> },
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "specialties", element: <SpecialtiesPage /> },
+          { path: "programs", element: <ProgramsPage /> },
+          { path: "preceptors", element: <PreceptorsPage /> },
+          { path: "permission", element: <PermissionPage /> },
+          { path: "rotations", element: <RotationsPage /> },
+          { path: "honorarium", element: <HonorariumPage /> },
+          { path: "students", element: <StudentsPage /> }
+        ]
+      }
     ]
   },
   {

@@ -10,7 +10,16 @@ const tenantId = import.meta.env.VITE_AAD_TENANT_ID ?? "36486bcb-8a3f-4499-b0fc-
 const clientId = import.meta.env.VITE_AAD_CLIENT_ID ?? "f874b196-89e2-4216-88fc-e7c92f05e6b7";
 const authority =
   import.meta.env.VITE_AAD_AUTHORITY ?? `https://login.microsoftonline.com/${tenantId}`;
-const redirectUri = import.meta.env.VITE_AAD_REDIRECT_URI ?? window.location.origin;
+// The workforce instance redirects to /admin (NOT the site root). The root "/" is now the public,
+// anonymous landing page with no MsalProvider, so a login-response hash must land on a route that
+// IS inside the staff MsalProvider — /admin is that route. This also keeps the staff + customer
+// instances from ever contending for the same auth-response hash (customer redirects to /portal).
+// This /admin URI must be registered on the rplus-web app registration per environment.
+const redirectUri =
+  import.meta.env.VITE_AAD_REDIRECT_URI ?? `${window.location.origin}/admin`;
+// Staff sign-out lands on the public landing page.
+const postLogoutRedirectUri =
+  import.meta.env.VITE_AAD_POST_LOGOUT_URI ?? `${window.location.origin}/`;
 
 /** Delegated scope exposed by rplus-api; requested when acquiring an access token for the API. */
 export const apiScope =
@@ -30,7 +39,7 @@ export const msalConfig: Configuration = {
     clientId,
     authority,
     redirectUri,
-    postLogoutRedirectUri: redirectUri
+    postLogoutRedirectUri
   },
   cache: {
     cacheLocation: "sessionStorage"

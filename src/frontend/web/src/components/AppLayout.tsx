@@ -3,6 +3,7 @@ import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useMe } from "../useMe";
 import { SignIn } from "../pages/SignIn";
+import { Footer } from "./Footer";
 
 import logo from "../assets/images/logo.png";
 import searchIcon from "../assets/icons/search2.png";
@@ -45,7 +46,6 @@ const NAV: { label: string; icon: string; iconSel?: string; to?: string }[] = [
 
 /** Page title shown in the header bar, keyed by route (the live app shows the screen name here). */
 const TITLES: Record<string, string> = {
-  "/": "Overview",
   "/admin/dashboard": "Dashboard",
   "/admin/programs": "Programs",
   "/admin/rotations": "Rotations",
@@ -91,7 +91,7 @@ export function AppLayout() {
       <AuthenticatedTemplate>
         <div className="admin-shell">
           <aside className="admin-aside">
-            <NavLink to="/" aria-label="Rotations Plus home">
+            <NavLink to="/admin" aria-label="Rotations Plus home">
               <img className="admin-logo" src={logo} alt="Rotations Plus" />
             </NavLink>
 
@@ -148,16 +148,7 @@ export function AppLayout() {
               <Outlet />
             </main>
 
-            <footer className="admin-footer">
-              <img className="foot-logo" src={logo} alt="Rotations Plus" />
-              <nav>
-                <span>Home</span><span>Our Process</span><span>Our Team</span>
-                <span>For Preceptors</span><span>Consulting Services</span><span>Blog</span><span>FAQ</span>
-              </nav>
-              <div className="foot-contact">info@rotationsplus.com · +1 (657) 214-7174</div>
-              <div>711 South Figueroa Street Ste 4602, Los Angeles CA 90017</div>
-              <div>© 2026 RotationsPlus LLC. All rights reserved.</div>
-            </footer>
+            <Footer />
           </div>
         </div>
       </AuthenticatedTemplate>
