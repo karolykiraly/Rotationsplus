@@ -32,6 +32,12 @@ public sealed class Honorarium : AuditableEntity
     public int RotationNumber { get; set; }
     public DateOnly RotationStartDate { get; set; }
 
+    /// <summary>The evaluation due date shown on the Evaluation-tab column (legacy <c>rotation.due_date</c>):
+    /// a snapshot of the rotation end date plus the legacy 7-day grace (end_date + 7d), captured at
+    /// generation like the other snapshots. Nullable so honorarium rows generated before this column existed
+    /// render "-" (matching the legacy fallback) rather than a wrong date.</summary>
+    public DateOnly? EvaluationDueDate { get; set; }
+
     public required HonorariumStage Stage { get; set; }
 
     public required decimal Amount { get; set; }

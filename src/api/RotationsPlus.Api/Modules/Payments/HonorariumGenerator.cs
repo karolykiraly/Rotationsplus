@@ -45,7 +45,7 @@ internal static class HonorariumGenerator
 
         var rotation = await db.Rotations
             .Where(r => r.Id == rotationId)
-            .Select(r => new { r.Id, r.RotationNumber, r.StartDate, r.StudentName, r.Weeks, r.ProgramId })
+            .Select(r => new { r.Id, r.RotationNumber, r.StartDate, r.EndDate, r.StudentName, r.Weeks, r.ProgramId })
             .FirstOrDefaultAsync(cancellationToken);
         if (rotation is null)
         {
@@ -69,6 +69,9 @@ internal static class HonorariumGenerator
         }
 
         var total = decimal.Round(program.WeeklyHonorarium * rotation.Weeks, 2, MidpointRounding.AwayFromZero);
+
+        // Evaluation-tab due date snapshot: rotation end date + the legacy 7-day grace (end_date + 7d).
+        var evaluationDueDate = rotation.EndDate.AddDays(7);
 
         // Defense-in-depth: a total that would overflow the Amount column's numeric(10,2) ceiling is NOT
         // inserted — this runs inside the deposit-fulfilment transaction, so an overflow here would throw
@@ -99,6 +102,7 @@ internal static class HonorariumGenerator
                 StudentName = rotation.StudentName,
                 RotationNumber = rotation.RotationNumber,
                 RotationStartDate = rotation.StartDate,
+                EvaluationDueDate = evaluationDueDate,
                 Stage = stage,
                 Amount = amount,
                 Currency = PricingService.Currency,

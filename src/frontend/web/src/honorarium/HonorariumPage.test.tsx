@@ -49,6 +49,7 @@ const ROW = {
   status: "Pending" as const,
   refunded: false,
   rotationStartDate: "2026-09-07",
+  evaluationDueDate: "2026-10-12",
   paidAtUtc: null
 };
 
@@ -174,6 +175,37 @@ describe("HonorariumPage", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Evaluation tab's upload-status and due-date columns in place of the start date", async () => {
+    renderPage();
+    await screen.findByText("Jane Carter");
+
+    await userEvent.click(screen.getByText("Honorarium Evaluation"));
+    await waitFor(() =>
+      expect(h.getHonorariums).toHaveBeenLastCalledWith(expect.objectContaining({ stage: "Evaluation" }))
+    );
+
+    expect(await screen.findByText("Evaluation Upload Status")).toBeInTheDocument();
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Evaluation Due Date")).toBeInTheDocument();
+    expect(screen.getByText(new Date("2026-10-12T00:00:00").toLocaleDateString())).toBeInTheDocument();
+    // The Evaluation tab drops the Rotation Start Date column.
+    expect(screen.queryByText("Rotation Start Date")).not.toBeInTheDocument();
+  });
+
+  it("renders a dash when an evaluation row has no due date", async () => {
+    h.getHonorariums.mockResolvedValue(paged([{ ...ROW, stage: "Evaluation", evaluationDueDate: null }]));
+    renderPage();
+    await screen.findByText("Jane Carter");
+
+    await userEvent.click(screen.getByText("Honorarium Evaluation"));
+    await waitFor(() =>
+      expect(h.getHonorariums).toHaveBeenLastCalledWith(expect.objectContaining({ stage: "Evaluation" }))
+    );
+
+    expect(await screen.findByText("Evaluation Due Date")).toBeInTheDocument();
+    expect(screen.getByText("-")).toBeInTheDocument();
   });
 
   it("shows the empty state when a stage has no rows", async () => {

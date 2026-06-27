@@ -129,6 +129,8 @@ public class HonorariumEndpointTests(RotationsApiFactory factory) : IClassFixtur
         honorariums.Should().OnlyContain(h => h.Status == HonorariumStatus.Pending && !h.Refunded);
         honorariums.Should().OnlyContain(h => h.PreceptorName == "Jane Carter" && h.Currency == "USD");
         honorariums.Should().OnlyContain(h => h.StudentName == "Hon Student");
+        // Evaluation due date snapshot = rotation end date (2026-10-05) + the legacy 7-day grace.
+        honorariums.Should().OnlyContain(h => h.EvaluationDueDate == new DateOnly(2026, 10, 12));
     }
 
     [Fact]

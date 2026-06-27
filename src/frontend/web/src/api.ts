@@ -770,6 +770,8 @@ export interface Honorarium {
   status: HonorariumStatus;
   refunded: boolean;
   rotationStartDate: string;
+  /** Evaluation-tab due date (rotation end date + 7-day grace); null on rows generated before the column existed. */
+  evaluationDueDate?: string | null;
   paidAtUtc?: string | null;
 }
 

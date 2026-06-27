@@ -19,6 +19,7 @@ public sealed record HonorariumResponse(
     HonorariumStatus Status,
     bool Refunded,
     DateOnly RotationStartDate,
+    DateOnly? EvaluationDueDate,
     DateTimeOffset? PaidAtUtc);
 
 /// <summary>Toggles the independent "refunded" bookkeeping flag on a honorarium row (legacy checkbox).</summary>

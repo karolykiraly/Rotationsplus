@@ -53,6 +53,7 @@ export function HonorariumPage() {
 
   const rows = list.data?.items ?? [];
   const isDepositTab = stage === "Deposit";
+  const isEvaluationTab = stage === "Evaluation";
 
   const switchTab = (index: number) => {
     setTab(index);
@@ -127,10 +128,25 @@ export function HonorariumPage() {
                         <div className="place-holder">Honorarium Amount</div>
                         <div className="heading-xxxs-normal">{money(h.amount)}</div>
                       </td>
-                      <td>
-                        <div className="place-holder">Rotation Start Date</div>
-                        <div className="heading-xxxs-normal">{formatDate(h.rotationStartDate)}</div>
-                      </td>
+                      {isEvaluationTab ? (
+                        <>
+                          <td>
+                            <div className="place-holder">Evaluation Upload Status</div>
+                            <div className="heading-xxxs-normal">Completed</div>
+                          </td>
+                          <td>
+                            <div className="place-holder">Evaluation Due Date</div>
+                            <div className="heading-xxxs-normal">
+                              {h.evaluationDueDate ? formatDate(h.evaluationDueDate) : "-"}
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <td>
+                          <div className="place-holder">Rotation Start Date</div>
+                          <div className="heading-xxxs-normal">{formatDate(h.rotationStartDate)}</div>
+                        </td>
+                      )}
                       {isDepositTab && (
                         <td>
                           <div className="place-holder">Refunded</div>

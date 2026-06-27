@@ -141,12 +141,12 @@ public static class HonorariumEndpoints
 
     private static HonorariumResponse ToResponse(Honorarium h) =>
         new(h.Id, h.RotationId, h.RotationNumber, h.PreceptorId, h.PreceptorName, h.StudentName,
-            h.Stage, h.Amount, h.Currency, h.Status, h.Refunded, h.RotationStartDate, h.PaidAtUtc);
+            h.Stage, h.Amount, h.Currency, h.Status, h.Refunded, h.RotationStartDate, h.EvaluationDueDate, h.PaidAtUtc);
 
     // List projection. A plain expression over scalar columns (no navigations), so a compiled
     // Expression keeps the projection in SQL and there's no client-eval surprise.
     private static readonly Expression<Func<Honorarium, HonorariumResponse>> Summary =
         h => new HonorariumResponse(
             h.Id, h.RotationId, h.RotationNumber, h.PreceptorId, h.PreceptorName, h.StudentName,
-            h.Stage, h.Amount, h.Currency, h.Status, h.Refunded, h.RotationStartDate, h.PaidAtUtc);
+            h.Stage, h.Amount, h.Currency, h.Status, h.Refunded, h.RotationStartDate, h.EvaluationDueDate, h.PaidAtUtc);
 }
