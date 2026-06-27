@@ -23,6 +23,114 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("RotationsPlus.Api.Modules.Crm.CampaignRecipient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampaignId", "Email")
+                        .IsUnique();
+
+                    b.HasIndex("CampaignId", "Status");
+
+                    b.ToTable("campaign_recipients", "crm");
+                });
+
+            modelBuilder.Entity("RotationsPlus.Api.Modules.Crm.EmailCampaign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("SendStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("email_campaigns", "crm");
+                });
+
             modelBuilder.Entity("RotationsPlus.Api.Modules.Documents.DocumentType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -484,6 +592,9 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<bool>("CallScheduled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("City")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -528,6 +639,10 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("MobilePhone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -537,6 +652,17 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
 
                     b.Property<Guid>("PrimarySpecialtyId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("State")
                         .HasMaxLength(50)
@@ -560,6 +686,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("dddddddd-0000-0000-0000-000000000001"),
+                            CallScheduled = true,
                             City = "Chicago",
                             CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 6, 15, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             CreatedBy = "seed",
@@ -568,6 +695,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             IsDeleted = false,
                             LastName = "Carter",
                             LicenseState = "IL",
+                            MobilePhone = "+1 312-555-0101",
                             PrimarySpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000001"),
                             State = "IL",
                             Status = "MemberActivated"
@@ -575,6 +703,7 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("dddddddd-0000-0000-0000-000000000002"),
+                            CallScheduled = false,
                             City = "Houston",
                             CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 6, 15, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             CreatedBy = "seed",
@@ -583,9 +712,27 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             IsDeleted = false,
                             LastName = "Reyes",
                             LicenseState = "TX",
+                            MobilePhone = "+1 713-555-0102",
                             PrimarySpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000007"),
                             State = "TX",
                             Status = "MemberValidated"
+                        },
+                        new
+                        {
+                            Id = new Guid("dddddddd-0000-0000-0000-000000000003"),
+                            CallScheduled = false,
+                            City = "New York",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 6, 15, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedBy = "seed",
+                            Email = "nadia.khan@example.com",
+                            FirstName = "Nadia",
+                            IsDeleted = false,
+                            LastName = "Khan",
+                            LicenseState = "NY",
+                            MobilePhone = "+1 212-555-0103",
+                            PrimarySpecialtyId = new Guid("aaaaaaaa-0000-0000-0000-000000000001"),
+                            State = "NY",
+                            Status = "Pending"
                         });
                 });
 
@@ -936,6 +1083,104 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                             IsDeleted = false,
                             Name = "All Core Rotations"
                         });
+                });
+
+            modelBuilder.Entity("RotationsPlus.Api.Modules.Payments.Honorarium", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateOnly?>("EvaluationDueDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaidBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("PreceptorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PreceptorName")
+                        .IsRequired()
+                        .HasMaxLength(201)
+                        .HasColumnType("character varying(201)");
+
+                    b.Property<bool>("Refunded")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("RotationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RotationNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("RotationStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("StudentName")
+                        .IsRequired()
+                        .HasMaxLength(201)
+                        .HasColumnType("character varying(201)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RotationId", "Stage")
+                        .IsUnique()
+                        .HasDatabaseName("UX_honorariums_RotationId_Stage_live")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("Stage", "RotationStartDate", "Id")
+                        .HasDatabaseName("IX_honorariums_Stage_RotationStartDate_Id_live")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("honorariums", "payments");
                 });
 
             modelBuilder.Entity("RotationsPlus.Api.Modules.Payments.Payment", b =>
@@ -1344,6 +1589,17 @@ namespace RotationsPlus.Api.Infrastructure.Migrations
                     b.Navigation("Preceptor");
 
                     b.Navigation("Specialty");
+                });
+
+            modelBuilder.Entity("RotationsPlus.Api.Modules.Payments.Honorarium", b =>
+                {
+                    b.HasOne("RotationsPlus.Api.Modules.Rotations.Rotation", "Rotation")
+                        .WithMany()
+                        .HasForeignKey("RotationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Rotation");
                 });
 
             modelBuilder.Entity("RotationsPlus.Api.Modules.Payments.Payment", b =>

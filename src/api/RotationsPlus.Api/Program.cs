@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Identity.Web;
 using RotationsPlus.Api.Endpoints;
 using RotationsPlus.Api.Infrastructure;
+using RotationsPlus.Api.Modules.Crm;
 using RotationsPlus.Api.Modules.Dashboard;
 using RotationsPlus.Api.Modules.Documents;
 using RotationsPlus.Api.Modules.Identity;
@@ -139,6 +142,22 @@ builder.AddNpgsqlDbContext<RotationsDbContext>(
     "rotationsdb",
     configureDbContextOptions: options => options.AddInterceptors(auditInterceptor));
 
+// --- Hangfire CLIENT (enqueue only — the Worker is the sole server). Shares the rotationsdb Postgres
+// (Hangfire's own schema). Used to dispatch the campaign-send job to the Worker. Skipped in the
+// integration-test host (env "Testing"), which overrides ICampaignDispatcher with a recorder — so tests
+// never stand up Hangfire storage. ---
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var hangfireConnectionString = builder.Configuration.GetConnectionString("rotationsdb")
+        ?? throw new InvalidOperationException("Connection string 'rotationsdb' is required for the Hangfire client.");
+    builder.Services.AddHangfire(config => config
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(hangfireConnectionString)));
+}
+builder.Services.AddScoped<ICampaignDispatcher, HangfireCampaignDispatcher>();
+
 // --- CORS for the SPA. Origins come from config (localhost in Development; the SWA host on DEV). ---
 const string spaCorsPolicy = "spa";
 builder.Services.AddCors(options => options.AddPolicy(spaCorsPolicy, policy =>
@@ -189,10 +208,15 @@ app.MapProgramImageEndpoints();
 app.MapPaymentEndpoints();
 app.MapPaymentWebhookEndpoints();
 app.MapPaymentRefundEndpoints();
+app.MapHonorariumEndpoints();
 app.MapPreceptorEndpoints();
 app.MapRotationEndpoints();
 app.MapStudentEndpoints();
 app.MapDashboardEndpoints();
+app.MapDashboardTodosEndpoints();
+app.MapDashboardRevenueEndpoints();
+app.MapDashboardReportsEndpoints();
+app.MapCampaignEndpoints();
 
 app.Run();
 

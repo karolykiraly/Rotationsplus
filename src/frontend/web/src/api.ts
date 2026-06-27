@@ -46,6 +46,9 @@ export interface Program {
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
   retailAmountPerWeek: number;
+  /** Staff-only (preceptor pay / platform margin); null for customer callers. The admin Programs list
+   *  shows it under the "Retail Amount" column, mirroring the legacy admin screen. */
+  weeklyHonorarium?: number | null;
   preceptorName?: string | null;
   city?: string | null;
   state?: string | null;
@@ -107,6 +110,8 @@ export interface Preceptor {
   primarySpecialtyName: string;
   city?: string | null;
   state?: string | null;
+  mobilePhone?: string | null;
+  callScheduled: boolean;
   status: PreceptorStatus;
 }
 
@@ -124,6 +129,8 @@ export interface PreceptorDetail {
   state?: string | null;
   status: PreceptorStatus;
   bio?: string | null;
+  reviewedAtUtc?: string | null;
+  rejectionReason?: string | null;
 }
 
 /** Admin create/update payload (mirrors Create/UpdatePreceptorRequest). */
@@ -165,6 +172,10 @@ export interface Rotation {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** Retail cost of the booking (program retail/week × weeks) — the "Retail Amount" column. */
+  retailAmount: number;
+  /** True when the booked student needs visa help — drives the "Needs Visa" checkbox. */
+  needsVisa: boolean;
 }
 
 /** Mirror of the API's RotationDetailResponse contract — the editable shape. The student name/email/oid
@@ -185,6 +196,12 @@ export interface RotationDetail {
   endDate: string;
   weeks: number;
   status: RotationStatus;
+  /** The program's sequential number — the "Program ID" shown in the Selected Rotation panel. */
+  programNumber: number;
+  /** The booking's retail cost (program retail/week × weeks) — the panel's "Rotation Cost". */
+  retailAmount: number;
+  /** Sum of the rotation's captured (Succeeded) payments — the panel's "Paid Amount". */
+  paidAmount: number;
   /** Statuses this rotation may transition to (excludes the current one); the edit form offers the
    *  current status plus these, and the server enforces the same lifecycle state machine. */
   allowedNextStatuses: RotationStatus[];
@@ -308,6 +325,97 @@ export interface Dashboard {
   rotationsByStatus: RotationStatusCount[];
   upcomingStarts: UpcomingRotation[];
   today: TodayMetrics;
+}
+
+/** Mirror of the API's TodoBucket<T> — a work queue: full outstanding count + a capped preview. */
+export interface TodoBucket<T> {
+  count: number;
+  items: T[];
+}
+
+/** A document submitted by a student and awaiting admin review. */
+export interface DocumentTodoItem {
+  documentId: string;
+  rotationId: string;
+  rotationNumber: number;
+  studentId?: string | null;
+  studentName: string;
+  documentTypeName: string;
+  dueDate: string;
+  submittedAtUtc?: string | null;
+}
+
+/** A booked rotation whose deposit hasn't been received yet (Pending). */
+export interface PaymentTodoItem {
+  rotationId: string;
+  rotationNumber: number;
+  studentName: string;
+  specialtyName: string;
+  startDate: string;
+}
+
+/** A preceptor awaiting admin approval. */
+export interface PreceptorTodoItem {
+  preceptorId: string;
+  fullName: string;
+  specialtyName: string;
+  email: string;
+  createdAtUtc: string;
+}
+
+/** Mirror of the API's DashboardTodosResponse — the admin hub's "ToDo's" tab queues. */
+export interface DashboardTodos {
+  documentsToReview: TodoBucket<DocumentTodoItem>;
+  awaitingPayment: TodoBucket<PaymentTodoItem>;
+  preceptorApprovals: TodoBucket<PreceptorTodoItem>;
+}
+
+/** Collected revenue for one program delivery type. */
+export interface RevenueByType {
+  type: ProgramType;
+  amount: number;
+}
+
+/** Collected revenue within one business month, for the trend series. */
+export interface RevenueByMonth {
+  year: number;
+  month: number;
+  amount: number;
+}
+
+/** Mirror of the API's DashboardRevenueResponse — the admin hub's "Revenue" tab. All figures are
+ *  platform revenue (deposits captured); a refund nets out of `collected` and is shown via `refunded`. */
+export interface DashboardRevenue {
+  currency: string;
+  collected: number;
+  refunded: number;
+  outstandingReceivable: number;
+  collectedThisMonth: number;
+  byProgramType: RevenueByType[];
+  monthlyTrend: RevenueByMonth[];
+}
+
+/** New students + preceptors who registered within one business month. */
+export interface RegistrationsByMonth {
+  year: number;
+  month: number;
+  students: number;
+  preceptors: number;
+}
+
+/** How many rotations belong to a given specialty (busiest first). */
+export interface RotationsBySpecialty {
+  specialtyName: string;
+  rotationCount: number;
+}
+
+/** Mirror of the API's DashboardReportsResponse — the admin hub's "Reports" tab. */
+export interface DashboardReports {
+  totalStudents: number;
+  studentsWithBooking: number;
+  totalRotations: number;
+  registrations: RegistrationsByMonth[];
+  topSpecialties: RotationsBySpecialty[];
 }
 
 /** Mirror of the API's RotationQuoteResponse — the server-computed price for a booking of N weeks.
@@ -495,8 +603,45 @@ export const updateSpecialty = (id: string, name: string): Promise<Specialty> =>
 export const deleteSpecialty = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/specialties/${id}`);
 
-// ---- Programs (read: StaffOnly; writes: AdminOnly) ----
-export const getPrograms = (): Promise<Program[]> => request<Program[]>("GET", "/api/programs");
+// ---- Programs (read: MarketplaceViewer; writes: AdminOnly) ----
+// Paged admin list — program-type tabs (multi) + name search over specialty/preceptor.
+/** FilterProgram modal selections (all optional; AND-combined server-side). */
+export interface ProgramFilter {
+  specialtyId?: string;
+  /** The "City, State" string the location dropdown lists. */
+  city?: string;
+  /** Instant Approval: true (Yes) / false (No) / undefined (Both). */
+  instantApproval?: boolean;
+  honorariumMin?: number;
+  honorariumMax?: number;
+  programNumber?: number;
+  tags?: string[];
+}
+
+export const getPrograms = (params?: {
+  programType?: ProgramType[];
+  q?: string;
+  page?: number;
+  pageSize?: number;
+} & ProgramFilter): Promise<PagedResponse<Program>> => {
+  const sp = new URLSearchParams();
+  for (const t of params?.programType ?? []) sp.append("programType", t);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.specialtyId) sp.set("specialtyId", params.specialtyId);
+  if (params?.city) sp.set("city", params.city);
+  if (params?.instantApproval !== undefined) sp.set("instantApproval", String(params.instantApproval));
+  if (params?.honorariumMin !== undefined) sp.set("honorariumMin", String(params.honorariumMin));
+  if (params?.honorariumMax !== undefined) sp.set("honorariumMax", String(params.honorariumMax));
+  if (params?.programNumber !== undefined) sp.set("programNumber", String(params.programNumber));
+  for (const tag of params?.tags ?? []) sp.append("tags", tag);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Program>>("GET", `/api/programs${suffix ? `?${suffix}` : ""}`);
+};
+/** Full program catalog (unpaginated) — the rotation form's program picker needs every option. */
+export const getProgramCatalog = (): Promise<Program[]> =>
+  request<Program[]>("GET", "/api/programs/catalog");
 export const getProgram = (id: string): Promise<ProgramDetail> =>
   request<ProgramDetail>("GET", `/api/programs/${id}`);
 export const createProgram = (input: ProgramInput): Promise<ProgramDetail> =>
@@ -507,7 +652,23 @@ export const deleteProgram = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/programs/${id}`);
 
 // ---- Preceptors (read: StaffOnly; writes: AdminOnly) ----
-export const getPreceptors = (): Promise<Preceptor[]> => request<Preceptor[]>("GET", "/api/preceptors");
+export const getPreceptors = (params?: {
+  status?: PreceptorStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Preceptor>> => {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Preceptor>>("GET", `/api/preceptors${suffix ? `?${suffix}` : ""}`);
+};
+/** Unpaginated preceptor list for form pickers (the program form's preceptor dropdown needs every option). */
+export const getPreceptorOptions = (): Promise<Preceptor[]> =>
+  request<Preceptor[]>("GET", "/api/preceptors/options");
 export const getPreceptor = (id: string): Promise<PreceptorDetail> =>
   request<PreceptorDetail>("GET", `/api/preceptors/${id}`);
 export const createPreceptor = (input: PreceptorInput): Promise<PreceptorDetail> =>
@@ -516,14 +677,66 @@ export const updatePreceptor = (id: string, input: PreceptorInput): Promise<Prec
   request<PreceptorDetail>("PUT", `/api/preceptors/${id}`, input);
 export const deletePreceptor = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/preceptors/${id}`);
+/** Result of a Permission save (mirror of SavePreceptorPermissionsResponse). */
+export interface SavePermissionsResult {
+  activated: number;
+  rejected: number;
+}
+/** Permission screen batch save: activate the checked preceptors, reject the others (Pending only). */
+export const savePreceptorPermissions = (
+  activateIds: string[],
+  rejectIds: string[]
+): Promise<SavePermissionsResult> =>
+  request<SavePermissionsResult>("POST", "/api/preceptors/permissions", { activateIds, rejectIds });
+
+/** One page of a server-paginated list (mirror of the API's PagedResponse<T>). `totalCount` is the full
+ *  filtered row count across all pages, for the pager. */
+export interface PagedResponse<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
 
 // ---- Rotations (AdminOnly — reads + writes) ----
-export const getRotations = (params?: { status?: RotationStatus; programId?: string }): Promise<Rotation[]> => {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.programId) q.set("programId", params.programId);
-  const suffix = q.toString();
-  return request<Rotation[]>("GET", `/api/rotations${suffix ? `?${suffix}` : ""}`);
+/** FilterRotation modal selections (all optional; AND-combined server-side). */
+export interface RotationFilter {
+  status?: RotationStatus;
+  /** start_date >= startFrom (YYYY-MM-DD). */
+  startFrom?: string;
+  /** end_date <= endTo (YYYY-MM-DD). */
+  endTo?: string;
+  retailMin?: number;
+  retailMax?: number;
+  /** Only rotations whose student needs visa help (the "Needs Visa" checkbox). */
+  needsVisa?: boolean;
+  rotationNumber?: number;
+}
+
+export const getRotations = (params?: {
+  /** "current" (non-terminal lifecycle) or "historical" (terminal) — the two admin sections. */
+  scope?: "current" | "historical";
+  programId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+} & RotationFilter): Promise<PagedResponse<Rotation>> => {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.scope) sp.set("scope", params.scope);
+  if (params?.programId) sp.set("programId", params.programId);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.startFrom) sp.set("startFrom", params.startFrom);
+  if (params?.endTo) sp.set("endTo", params.endTo);
+  if (params?.retailMin !== undefined) sp.set("retailMin", String(params.retailMin));
+  if (params?.retailMax !== undefined) sp.set("retailMax", String(params.retailMax));
+  if (params?.needsVisa) sp.set("needsVisa", "true");
+  if (params?.rotationNumber !== undefined) sp.set("rotationNumber", String(params.rotationNumber));
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Rotation>>("GET", `/api/rotations${suffix ? `?${suffix}` : ""}`);
 };
 export const getRotation = (id: string): Promise<RotationDetail> =>
   request<RotationDetail>("GET", `/api/rotations/${id}`);
@@ -540,15 +753,132 @@ export const refundRotation = (id: string): Promise<RefundResult> =>
 
 // ---- Dashboard (AdminOnly) ----
 export const getDashboard = (): Promise<Dashboard> => request<Dashboard>("GET", "/api/dashboard");
+export const getDashboardTodos = (): Promise<DashboardTodos> =>
+  request<DashboardTodos>("GET", "/api/dashboard/todos");
+export const getDashboardRevenue = (): Promise<DashboardRevenue> =>
+  request<DashboardRevenue>("GET", "/api/dashboard/revenue");
+export const getDashboardReports = (): Promise<DashboardReports> =>
+  request<DashboardReports>("GET", "/api/dashboard/reports");
+
+// ---- Email campaigns (AdminOnly) ----
+/** Mirror of the API's EmailAudience enum. */
+export type EmailAudience = "AllStudents" | "StudentsWithBooking" | "StudentsWithoutBooking" | "AllPreceptors";
+
+/** Mirror of the API's CampaignStatus enum. */
+export type CampaignStatus = "Draft" | "Queued" | "Sending" | "Sent" | "Failed";
+
+/** Mirror of the API's CampaignSummaryResponse (list row — no body). */
+export interface CampaignSummary {
+  id: string;
+  subject: string;
+  audience: EmailAudience;
+  status: CampaignStatus;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAtUtc: string;
+  sentAtUtc?: string | null;
+}
+
+/** Mirror of the API's CampaignDetailResponse (with body). */
+export interface CampaignDetail extends CampaignSummary {
+  body: string;
+}
+
+export const getCampaigns = (params?: {
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<CampaignSummary>> => {
+  const sp = new URLSearchParams();
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<CampaignSummary>>("GET", `/api/campaigns${suffix ? `?${suffix}` : ""}`);
+};
+
+/** Composes a campaign as a draft. */
+export const createCampaign = (subject: string, body: string, audience: EmailAudience): Promise<CampaignDetail> =>
+  request<CampaignDetail>("POST", "/api/campaigns", { subject, body, audience });
+
+/** Queues a draft campaign for sending (the Worker fans out + tallies). */
+export const sendCampaign = (id: string): Promise<CampaignDetail> =>
+  request<CampaignDetail>("POST", `/api/campaigns/${id}/send`);
+
+// ---- Honorarium (preceptor payouts — AdminOnly) ----
+/** Mirror of the API's HonorariumStage enum (the three payout-screen tabs). */
+export type HonorariumStage = "Deposit" | "Start" | "Evaluation";
+
+/** Mirror of the API's HonorariumStatus enum. */
+export type HonorariumStatus = "Pending" | "Paid" | "Cancelled";
+
+/** Mirror of the API's HonorariumResponse (one payout row). */
+export interface Honorarium {
+  id: string;
+  rotationId: string;
+  rotationNumber: number;
+  preceptorId?: string | null;
+  preceptorName: string;
+  studentName: string;
+  stage: HonorariumStage;
+  amount: number;
+  currency: string;
+  status: HonorariumStatus;
+  refunded: boolean;
+  rotationStartDate: string;
+  /** Evaluation-tab due date (rotation end date + 7-day grace); null on rows generated before the column existed. */
+  evaluationDueDate?: string | null;
+  paidAtUtc?: string | null;
+}
+
+export const getHonorariums = (params?: {
+  stage?: HonorariumStage;
+  status?: HonorariumStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Honorarium>> => {
+  const sp = new URLSearchParams();
+  if (params?.stage) sp.set("stage", params.stage);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Honorarium>>("GET", `/api/honorariums${suffix ? `?${suffix}` : ""}`);
+};
+
+/** Marks a honorarium stage paid (bookkeeping; stages must be paid in order — the server gates this). */
+export const payHonorarium = (id: string): Promise<Honorarium> =>
+  request<Honorarium>("POST", `/api/honorariums/${id}/pay`);
+
+/** Toggles the independent "refunded" bookkeeping flag on a honorarium row. */
+export const setHonorariumRefund = (id: string, refunded: boolean): Promise<Honorarium> =>
+  request<Honorarium>("POST", `/api/honorariums/${id}/refund-flag`, { refunded });
+
+/** Removes an erroneously-generated payout row (soft-delete). Server refuses (409) if it is already Paid. */
+export const deleteHonorarium = (id: string): Promise<void> =>
+  request<void>("DELETE", `/api/honorariums/${id}`);
 
 // ---- Students (read: StaffOnly; writes: AdminOnly) ----
-export const getStudents = (params?: { status?: StudentStatus; academicStatus?: AcademicStatus }): Promise<Student[]> => {
-  const q = new URLSearchParams();
-  if (params?.status) q.set("status", params.status);
-  if (params?.academicStatus) q.set("academicStatus", params.academicStatus);
-  const suffix = q.toString();
-  return request<Student[]>("GET", `/api/students${suffix ? `?${suffix}` : ""}`);
+export const getStudents = (params?: {
+  status?: StudentStatus;
+  academicStatus?: AcademicStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PagedResponse<Student>> => {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.academicStatus) sp.set("academicStatus", params.academicStatus);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+  const suffix = sp.toString();
+  return request<PagedResponse<Student>>("GET", `/api/students${suffix ? `?${suffix}` : ""}`);
 };
+/** Unpaginated student list for form pickers (the rotation form's student dropdown needs every option). */
+export const getStudentOptions = (): Promise<Student[]> =>
+  request<Student[]>("GET", "/api/students/options");
 export const getStudent = (id: string): Promise<StudentDetail> =>
   request<StudentDetail>("GET", `/api/students/${id}`);
 export const createStudent = (input: StudentInput): Promise<StudentDetail> =>

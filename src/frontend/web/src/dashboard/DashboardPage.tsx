@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useMe } from "../useMe";
 import { useDashboard } from "./useDashboard";
+import { DashboardTodosPanel } from "./DashboardTodosPanel";
+import { DashboardRevenuePanel } from "./DashboardRevenuePanel";
+import { DashboardReportsPanel } from "./DashboardReportsPanel";
+import { DashboardCampaignPanel } from "./DashboardCampaignPanel";
 import { Tabs } from "../components/Tabs";
 import { rotationStatusLabel } from "../rotations/rotationStatuses";
 import { programFamilyCount } from "../programs/programTypes";
@@ -128,8 +132,14 @@ export function DashboardPage() {
 
       <Tabs labels={["Results", "ToDo's", "Campaign", "Reports", "Revenue"]} active={tab} onChange={setTab} />
 
-      {tab !== 0 ? (
-        <section className="dash-card state">This section is coming soon.</section>
+      {tab === 1 ? (
+        <DashboardTodosPanel />
+      ) : tab === 2 ? (
+        <DashboardCampaignPanel />
+      ) : tab === 3 ? (
+        <DashboardReportsPanel />
+      ) : tab === 4 ? (
+        <DashboardRevenuePanel />
       ) : (
         <>
           <section className="dash-card">

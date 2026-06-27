@@ -57,7 +57,7 @@ describe("customerApi", () => {
 
     await browsePrograms("?q=internal&specialtyId=s1");
 
-    expect(h.apiFetch).toHaveBeenCalledWith("GET", "/api/programs?q=internal&specialtyId=s1", "ctok", undefined);
+    expect(h.apiFetch).toHaveBeenCalledWith("GET", "/api/programs/catalog?q=internal&specialtyId=s1", "ctok", undefined);
   });
 
   it("redirects to re-authenticate when the customer's silent token needs interaction", async () => {

@@ -124,6 +124,9 @@ a.link, .link { color: var(--link); }
 .btn-danger:hover:not(:disabled) { background: #a02a40; }
 .btn-link { background: none; border: none; color: var(--brand-dark); font-weight: 600; cursor: pointer; padding: 4px 6px; }
 .btn-link.danger { color: var(--danger); }
+/* Outline action (white fill, brand border + text) — the legacy "Pay" / primary-outline button. */
+.btn-outline { background: var(--surface); color: var(--brand-dark); border-color: var(--brand); }
+.btn-outline:hover:not(:disabled) { background: var(--brand-tint); }
 
 /* ---- Card / table ---- */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -606,6 +609,12 @@ table.data { width: 100%; border-collapse: collapse; }
   background: var(--brand); color: #fff; border-radius: 50%;
   text-align: center; line-height: 16px; font-size: 11px; font-weight: 700;
 }
+/* ---- Filter modals (FilterRotation / FilterProgram) ---- */
+.filter-modal-body { display: flex; flex-direction: column; gap: 16px; }
+.filter-panel { display: flex; flex-direction: column; gap: 6px; }
+.filter-label { font-size: 13px; font-weight: 600; color: #4b5159; }
+.filter-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.filter-tags { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px 14px; }
 .search-form2 { position: relative; width: 320px; max-width: 100%; }
 .search-form2 input {
   width: 100%; height: 48px; padding: 0 14px 0 42px;
@@ -688,6 +697,51 @@ table.data { width: 100%; border-collapse: collapse; }
 }
 @media (max-width: 900px) { .score-grid { grid-template-columns: 1fr; } }
 
+/* ---- Dashboard ToDo's tab ---- */
+.todo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+@media (max-width: 900px) { .todo-grid { grid-template-columns: 1fr; } }
+.todo-queue { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.todo-queue-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.todo-queue-title { font-size: 15px; font-weight: 700; margin: 0; }
+.todo-count { min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--line); color: var(--ink-soft); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+.todo-count.has { background: var(--brand); color: #fff; }
+.todo-empty { color: var(--ink-soft); font-size: 14px; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.todo-item { display: flex; flex-direction: column; gap: 2px; }
+.todo-primary { font-weight: 600; font-size: 14px; }
+.todo-secondary { color: var(--ink-soft); font-size: 13px; }
+.todo-more a { font-size: 13px; font-weight: 600; color: var(--brand-dark); }
+
+/* ---- Dashboard Revenue tab ---- */
+.rev-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+@media (max-width: 900px) { .rev-stats { grid-template-columns: repeat(2, 1fr); } }
+.rev-stat { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.rev-stat-label { font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+.rev-stat-value { font-family: var(--font-head); font-weight: 700; font-size: 22px; }
+.rev-stat-value.muted { color: var(--ink-soft); }
+.rev-cols { display: grid; grid-template-columns: 1fr 1.3fr; gap: 28px; }
+@media (max-width: 900px) { .rev-cols { grid-template-columns: 1fr; } }
+.rev-block-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.rev-empty { color: var(--ink-soft); font-size: 14px; }
+.rev-type-list, .rev-trend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rev-type-row { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+.rev-type-amount { font-weight: 700; }
+.rev-trend-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.rev-trend-label { color: var(--ink-soft); }
+.rev-trend-bar-track { background: var(--line); border-radius: 6px; height: 12px; overflow: hidden; }
+.rev-trend-bar { display: block; height: 100%; background: var(--brand); border-radius: 6px; min-width: 2px; }
+.rev-trend-amount { font-weight: 600; white-space: nowrap; }
+.rep-spec-label { width: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Dashboard Campaign tab ---- */
+.campaign-compose { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 24px; }
+@media (max-width: 700px) { .campaign-compose { grid-template-columns: 1fr; } }
+.campaign-compose .field.span-2 { grid-column: 1 / -1; }
+.campaign-compose .field { display: flex; flex-direction: column; gap: 6px; }
+.campaign-compose label { font-weight: 600; font-size: 14px; }
+.campaign-compose-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.campaign-table td { vertical-align: middle; }
+
 /* ---- Program rows (image cards) ---- */
 .program-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
 .program-table tr.program-row { cursor: pointer; }
@@ -700,6 +754,28 @@ table.data { width: 100%; border-collapse: collapse; }
 .place-holder { font-family: var(--font); font-weight: 400; font-size: 13px; line-height: 22px; color: #7f848b; }
 .heading-xxxs { font-family: var(--font-head); font-weight: 700; font-size: 16px; line-height: 28px; }
 .heading-xxxs-normal { font-family: var(--font-head); font-weight: 400; font-size: 16px; line-height: 28px; }
+.heading-xxs { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 30px; margin: 0; }
+/* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
+.list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.list-count { font-size: 13px; color: #7f848b; }
+/* List footer: pager on the left, a primary Save on the right (legacy Permission screen). */
+.list-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.list-foot .pager { margin-top: 0; }
+.text-center { text-align: center; }
+.ok-text { color: var(--ok); font-weight: 700; }
+.brand-text { color: var(--brand-dark); font-weight: 700; }
+/* List header actions (search + an optional Add button), pushed to the right of the title/count. */
+.list-head-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+
+/* ---- Rotations "Selected Rotation" detail panel ---- */
+.rotation-detail { border: 1px solid var(--brand); }
+.rotation-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin: 8px 0 20px; }
+.detail-col { margin: 0; }
+.detail-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line, #eef0f2); }
+.detail-row dt { margin: 0; }
+.detail-row dd { margin: 0; text-align: right; }
+.date-range-edit { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.rot-row.selected { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /* ---- Pagination (First/Prev/1..N/Next/Last) ---- */
 .pager { display: flex; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap; }

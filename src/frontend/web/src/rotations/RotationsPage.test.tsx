@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+/** Wraps rows in the server's PagedResponse envelope (single page). */
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -9,10 +12,8 @@ const h = vi.hoisted(() => ({
   getRotation: vi.fn(),
   createRotation: vi.fn(),
   updateRotation: vi.fn(),
-  deleteRotation: vi.fn(),
-  refundRotation: vi.fn(),
-  getPrograms: vi.fn(),
-  getStudents: vi.fn()
+  getProgramCatalog: vi.fn(),
+  getStudentOptions: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -21,10 +22,8 @@ vi.mock("../api", () => ({
   getRotation: (id: string) => h.getRotation(id),
   createRotation: (input: unknown) => h.createRotation(input),
   updateRotation: (id: string, input: unknown) => h.updateRotation(id, input),
-  deleteRotation: (id: string) => h.deleteRotation(id),
-  refundRotation: (id: string) => h.refundRotation(id),
-  getPrograms: () => h.getPrograms(),
-  getStudents: (params: unknown) => h.getStudents(params),
+  getProgramCatalog: () => h.getProgramCatalog(),
+  getStudentOptions: () => h.getStudentOptions(),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -47,7 +46,9 @@ const ROTATION_ROW = {
   startDate: "2026-07-06",
   endDate: "2026-08-03",
   weeks: 4,
-  status: "Active"
+  status: "Active",
+  retailAmount: 6000,
+  needsVisa: true
 };
 const ROTATION_DETAIL = {
   id: "r1",
@@ -64,10 +65,14 @@ const ROTATION_DETAIL = {
   endDate: "2026-08-03",
   weeks: 4,
   status: "Active",
+  programNumber: 1042,
+  retailAmount: 6000,
+  paidAmount: 500,
   allowedNextStatuses: ["ToBeEvaluated", "Completed", "Abandoned", "Cancelled"]
 };
 const PROGRAM = {
   id: "prog1",
+  programNumber: 1042,
   specialtyName: "Internal Medicine",
   programType: "InPerson",
   maxStudentsPerRotation: 2,
@@ -79,6 +84,10 @@ const STUDENTS = [
   { id: "stud1", fullName: "Sam Rivera", email: "sam@x.com", academicStatus: "InternationalMedicalGraduate", status: "MemberActivated" },
   { id: "stud2", fullName: "Dana Cole", email: "dana@x.com", academicStatus: "MdStudent", status: "Registered" }
 ];
+
+/** Default: the row lives in the Current section; Historical is empty (so "Sam Rivera" is unambiguous). */
+const currentOnly = (params?: { scope?: string }) =>
+  Promise.resolve(paged(params?.scope === "current" ? [ROTATION_ROW] : []));
 
 function newClient() {
   return new QueryClient({
@@ -98,50 +107,157 @@ describe("RotationsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getRotations.mockResolvedValue([ROTATION_ROW]);
+    h.getRotations.mockImplementation(currentOnly);
     h.getRotation.mockResolvedValue(ROTATION_DETAIL);
-    h.getPrograms.mockResolvedValue([PROGRAM]);
-    h.getStudents.mockResolvedValue(STUDENTS);
+    h.getProgramCatalog.mockResolvedValue([PROGRAM]);
+    h.getStudentOptions.mockResolvedValue(STUDENTS);
   });
 
-  it("lists rotations with student, type label, weeks and status", async () => {
+  it("renders two sections and requests both scopes", async () => {
+    renderPage();
+    expect(await screen.findByText("Current Rotations")).toBeInTheDocument();
+    expect(screen.getByText("Historical Rotations")).toBeInTheDocument();
+    await waitFor(() => {
+      const scopes = h.getRotations.mock.calls.map((c) => c[0]?.scope);
+      expect(scopes).toContain("current");
+      expect(scopes).toContain("historical");
+    });
+  });
+
+  it("shows the production columns on a Current row (no Specialty/Type/Weeks, no inline Edit/Delete/Refund)", async () => {
     renderPage();
     expect(await screen.findByText("Sam Rivera")).toBeInTheDocument();
-    expect(screen.getByText("sam@x.com")).toBeInTheDocument();
-    expect(screen.getByText("In person")).toBeInTheDocument();
-    expect(screen.getByText("Jane Carter")).toBeInTheDocument();
-    // The rotation number renders as "R{number}".
     expect(screen.getByText("R1001")).toBeInTheDocument();
-    // Status "Active" renders as its badge (scoped: "Active" is also a filter-dropdown option).
-    expect(screen.getByText("Active", { selector: ".badge" })).toBeInTheDocument();
+    expect(screen.getByText("Jane Carter")).toBeInTheDocument();
+    expect(screen.getByText("$6,000")).toBeInTheDocument(); // Retail Amount column
+    // Needs Visa checkbox reflects the flag.
+    expect(screen.getByLabelText("R1001 needs visa")).toBeChecked();
+    // Status text is colour-coded (Active → green ok-text).
+    expect(screen.getByText("Active")).toHaveClass("ok-text");
+    // Production replaces inline actions with a single View; no Edit/Delete/Refund, no status filter, no Type/Weeks.
+    expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
+    expect(screen.queryByText("In person")).not.toBeInTheDocument();
   });
 
-  it("filters by rotation number via the search box", async () => {
-    h.getRotations.mockResolvedValue([
-      ROTATION_ROW,
-      { ...ROTATION_ROW, id: "r2", rotationNumber: 2002, studentName: "Dana Cole", studentEmail: "dana@x.com" }
-    ]);
+  it("leaves the Needs Visa box unchecked when the student doesn't need a visa", async () => {
+    h.getRotations.mockImplementation((params?: { scope?: string }) =>
+      Promise.resolve(paged(params?.scope === "current" ? [{ ...ROTATION_ROW, needsVisa: false }] : []))
+    );
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    expect(screen.getByLabelText("R1001 needs visa")).not.toBeChecked();
+  });
+
+  it("searches a section server-side via its own debounced box (carrying the scope)", async () => {
+    h.getRotations.mockImplementation((params?: { scope?: string; q?: string }) =>
+      Promise.resolve(paged(
+        params?.scope === "current" && !params?.q ? [ROTATION_ROW, { ...ROTATION_ROW, id: "r2", rotationNumber: 2002, studentName: "Dana Cole" }]
+          : params?.scope === "current" ? [ROTATION_ROW] : []
+      ))
+    );
+    renderPage();
+    await screen.findByText("Dana Cole");
+
+    await userEvent.type(screen.getByLabelText("Search current rotations"), "R1001");
+
+    await waitFor(() => expect(h.getRotations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scope: "current", q: "R1001" })));
+    await waitFor(() => expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument());
+  });
+
+  it("opens the Selected Rotation panel on View with the money + program fields", async () => {
     renderPage();
     await screen.findByText("Sam Rivera");
 
-    await userEvent.type(screen.getByPlaceholderText("Search for Number/Preceptor/Student"), "R1001");
-    expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
-    expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+
+    const panel = await screen.findByLabelText("Selected rotation");
+    expect(h.getRotation).toHaveBeenCalledWith("r1");
+    expect(within(panel).getByText("Paid Amount")).toBeInTheDocument();
+    expect(within(panel).getByText("$500")).toBeInTheDocument();      // paid amount
+    expect(within(panel).getByText("Rotation Cost")).toBeInTheDocument();
+    expect(within(panel).getByText("$6,000")).toBeInTheDocument();    // rotation cost
+    expect(within(panel).getByText("IP1042")).toBeInTheDocument();    // Program ID (program code)
+    expect(within(panel).getByLabelText("Current status")).toHaveValue("Active");
   });
 
-  it("blocks non-admins", async () => {
-    h.getMe.mockResolvedValue({ ...ADMIN, roles: ["Coordinator"] });
+  it("limits the panel status dropdown to the current status plus allowed transitions (no Refunded)", async () => {
+    h.getRotation.mockResolvedValue({ ...ROTATION_DETAIL, allowedNextStatuses: ["ToBeEvaluated", "Completed", "Refunded"] });
     renderPage();
-    expect(await screen.findByText(/need the Admin role/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add rotation" })).not.toBeInTheDocument();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+
+    const panel = await screen.findByLabelText("Selected rotation");
+    const options = within(within(panel).getByLabelText("Current status") as HTMLSelectElement)
+      .getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["Active", "To be evaluated", "Completed"]);
+    expect(options).not.toContain("Refunded");
   });
 
-  it("creates a rotation by picking a program and a directory student", async () => {
+  it("reveals the program picker on Replace and the date inputs on Change", async () => {
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    const panel = await screen.findByLabelText("Selected rotation");
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Replace" }));
+    expect(within(panel).getByLabelText("Replace program")).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Change" }));
+    expect(within(panel).getByLabelText("Start date")).toHaveValue("2026-07-06");
+    expect(within(panel).getByLabelText("End date")).toHaveValue("2026-08-03");
+  });
+
+  it("saves the panel via the update endpoint and shows a banner", async () => {
+    h.updateRotation.mockResolvedValue(ROTATION_DETAIL);
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    const panel = await screen.findByLabelText("Selected rotation");
+
+    await userEvent.selectOptions(within(panel).getByLabelText("Current status"), "Completed");
+    await userEvent.click(within(panel).getByRole("button", { name: "Save" }));
+
+    expect(h.updateRotation).toHaveBeenCalledWith("r1", {
+      programId: "prog1",
+      studentId: "stud1",
+      startDate: "2026-07-06",
+      endDate: "2026-08-03",
+      status: "Completed"
+    });
+    expect(await screen.findByText("Rotation updated.")).toBeInTheDocument();
+  });
+
+  it("surfaces a server error from the panel save without closing it", async () => {
+    h.updateRotation.mockRejectedValue(new ApiError(400, "Can't change a rotation from Active to Pending."));
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    const panel = await screen.findByLabelText("Selected rotation");
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Save" }));
+
+    expect(await within(panel).findByText(/Can't change a rotation/)).toBeInTheDocument();
+  });
+
+  it("shows a loading/error state for the panel while detail loads / fails", async () => {
+    h.getRotation.mockRejectedValue(new ApiError(500, "boom"));
+    renderPage();
+    await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(await screen.findByText(/Couldn.t load rotation: boom/)).toBeInTheDocument();
+  });
+
+  it("adds a rotation via the Add New Rotation modal", async () => {
     h.createRotation.mockResolvedValue({ ...ROTATION_DETAIL, id: "r2" });
     renderPage();
     await screen.findByText("Sam Rivera");
 
-    await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add New Rotation" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
     await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
@@ -159,216 +275,57 @@ describe("RotationsPage", () => {
     expect(await screen.findByText(/Booked/)).toBeInTheDocument();
   });
 
-  it("requires a program and a student before calling the API", async () => {
+  it("shows the empty state in both sections when there are no rows", async () => {
+    h.getRotations.mockResolvedValue(paged([]));
     renderPage();
-    await screen.findByText("Sam Rivera");
-
-    await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
-    await userEvent.type(within(dialog).getByLabelText("End date"), "2026-10-05");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-
-    expect(await within(dialog).findByText("Select a program.")).toBeInTheDocument();
-    expect(within(dialog).getByText("Select a student.")).toBeInTheDocument();
-    expect(h.createRotation).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getAllByText("There is no data available.")).toHaveLength(2));
   });
 
-  it("rejects an end date on or before the start date (no API call)", async () => {
+  it("applies the Filter modal to both sections (status + needs-visa + rotation number) and shows the count", async () => {
     renderPage();
     await screen.findByText("Sam Rivera");
 
-    await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
-    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
-    await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
-    await userEvent.type(within(dialog).getByLabelText("End date"), "2026-09-07");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Status"), "Completed");
+    await userEvent.click(within(dialog).getByLabelText("Needs Visa"));
+    await userEvent.type(within(dialog).getByLabelText("Rotation Number"), "1001");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
 
-    expect(await within(dialog).findByText("End date must be after the start date.")).toBeInTheDocument();
-    expect(h.createRotation).not.toHaveBeenCalled();
+    await waitFor(() => expect(h.getRotations).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "current", status: "Completed", needsVisa: true, rotationNumber: 1001 })));
+    // The historical section gets the same filter.
+    expect(h.getRotations).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "historical", status: "Completed", needsVisa: true }));
+    // The filter-count badge reflects the 3 active filters.
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  it("surfaces a server validation error in the form", async () => {
-    h.createRotation.mockRejectedValue(new ApiError(400, "Student does not exist."));
+  it("clears the rotation filter back to an unfiltered query", async () => {
     renderPage();
     await screen.findByText("Sam Rivera");
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
+    let dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByLabelText("Needs Visa"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(h.getRotations).toHaveBeenCalledWith(expect.objectContaining({ needsVisa: true })));
 
-    await userEvent.click(screen.getByRole("button", { name: "Add rotation" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.selectOptions(within(dialog).getByLabelText("Program"), "prog1");
-    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
-    await userEvent.type(within(dialog).getByLabelText("Start date"), "2026-09-07");
-    await userEvent.type(within(dialog).getByLabelText("End date"), "2026-10-05");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Filter rotations" }));
+    dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear filters" }));
 
-    expect(await within(dialog).findByText("Student does not exist.")).toBeInTheDocument();
-  });
-
-  it("loads detail and pre-fills the edit form (incl. the student link), then updates", async () => {
-    h.updateRotation.mockResolvedValue(ROTATION_DETAIL);
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
-
-    expect(await screen.findByLabelText("Program")).toHaveValue("prog1");
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByLabelText("Student")).toHaveValue("stud1");
-    expect(within(dialog).getByLabelText("Start date")).toHaveValue("2026-07-06");
-    expect(within(dialog).getByLabelText("Status")).toHaveValue("Active");
-    expect(h.getRotation).toHaveBeenCalledWith("r1");
-
-    // Re-point to a different student and save.
-    await userEvent.selectOptions(within(dialog).getByLabelText("Student"), "stud2");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(h.updateRotation).toHaveBeenCalledWith("r1", {
-      programId: "prog1",
-      studentId: "stud2",
-      startDate: "2026-07-06",
-      endDate: "2026-08-03",
-      status: "Active"
+    // After clearing, the most recent query for each section carries no needs-visa filter (ordering of the
+    // two sections' refetches isn't deterministic, so find the latest current-scope call rather than assume).
+    await waitFor(() => {
+      const latestCurrent = [...h.getRotations.mock.calls].reverse().find((c) => c[0]?.scope === "current");
+      expect(latestCurrent?.[0]?.needsVisa).toBeUndefined();
     });
-    expect(await screen.findByText("Rotation updated.")).toBeInTheDocument();
   });
 
-  it("limits the edit status dropdown to the current status plus allowed transitions", async () => {
+  it("blocks non-admins", async () => {
+    h.getMe.mockResolvedValue({ ...ADMIN, roles: ["Coordinator"] });
     renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
-
-    const dialog = await screen.findByRole("dialog");
-    const status = within(dialog).getByLabelText("Status");
-    const options = within(status as HTMLSelectElement).getAllByRole("option").map((o) => o.textContent);
-    // Current (Active) + its allowed transitions, in canonical lifecycle order; "Pending" is NOT
-    // reachable from Active.
-    expect(options).toEqual(["Active", "To be evaluated", "Completed", "Cancelled", "Abandoned"]);
-    expect(options).not.toContain("Pending");
-  });
-
-  it("deletes a rotation after confirmation", async () => {
-    h.deleteRotation.mockResolvedValue(undefined);
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
-
-    expect(h.deleteRotation).toHaveBeenCalledWith("r1");
-    expect(await screen.findByText(/Deleted/)).toBeInTheDocument();
-  });
-
-  it("offers Refund only on a refundable rotation and refunds after confirmation", async () => {
-    // A Cancelled rotation is refundable; the default Active row is not.
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
-    h.refundRotation.mockResolvedValue({ rotationId: "r1", status: "Refunded", paymentsRefunded: 1 });
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Refund" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Refund" }));
-
-    expect(h.refundRotation).toHaveBeenCalledWith("r1");
-    expect(await screen.findByText(/Refunded Sam Rivera.s deposit \(1 payment\)/)).toBeInTheDocument();
-  });
-
-  it("does not offer Refund on a non-refundable rotation", async () => {
-    // The default row is Active → no refund action (only Cancelled/Completed are refundable).
-    renderPage();
-    await screen.findByText("Sam Rivera");
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    expect(within(row).queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
-  });
-
-  it("does not offer Refund on an already-refunded rotation", async () => {
-    // Refunded is terminal — no further refund action (guards the off-by-one).
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Refunded" }]);
-    renderPage();
-    await screen.findByText("Sam Rivera");
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    expect(within(row).queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
-  });
-
-  it("shows a page banner when a refund fails", async () => {
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
-    h.refundRotation.mockRejectedValue(new ApiError(409, "This rotation has already been refunded."));
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Refund" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Refund" }));
-
-    expect(await screen.findByText("This rotation has already been refunded.")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); // dialog closed
-  });
-
-  it("omits Refunded from the edit-form transitions (it's a money action, not a status edit)", async () => {
-    // A Cancelled rotation's only forward edge is Refunded — which the form must NOT offer.
-    h.getRotations.mockResolvedValue([{ ...ROTATION_ROW, status: "Cancelled" }]);
-    h.getRotation.mockResolvedValue({ ...ROTATION_DETAIL, status: "Cancelled", allowedNextStatuses: ["Refunded"] });
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
-
-    const dialog = await screen.findByRole("dialog");
-    const status = within(dialog).getByLabelText("Status");
-    const options = within(status as HTMLSelectElement).getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["Cancelled"]); // current only; Refunded stripped
-    expect(options).not.toContain("Refunded");
-  });
-
-  it("filters the list by status and re-renders the filtered rows", async () => {
-    h.getRotations.mockImplementation((params?: { status?: string }) =>
-      Promise.resolve(
-        params?.status === "Completed"
-          ? [{ ...ROTATION_ROW, id: "r9", studentName: "Dana Cole", status: "Completed" }]
-          : [ROTATION_ROW]
-      )
-    );
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    await userEvent.selectOptions(screen.getByLabelText("Status"), "Completed");
-
-    expect(h.getRotations).toHaveBeenLastCalledWith({ status: "Completed" });
-    expect(await screen.findByText("Dana Cole")).toBeInTheDocument();
-    expect(screen.queryByText("Sam Rivera")).not.toBeInTheDocument();
-  });
-
-  it("shows an error modal when the rotation detail fails to load", async () => {
-    h.getRotation.mockRejectedValue(new ApiError(500, "boom"));
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
-
-    expect(await screen.findByText(/Couldn.t load rotation: boom/)).toBeInTheDocument();
-  });
-
-  it("shows a page banner when a delete fails", async () => {
-    h.deleteRotation.mockRejectedValue(new ApiError(409, "Rotation is locked."));
-    renderPage();
-    await screen.findByText("Sam Rivera");
-
-    const row = screen.getByText("Sam Rivera").closest("tr")!;
-    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
-
-    expect(await screen.findByText("Rotation is locked.")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await screen.findByText(/need the Admin role/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add New Rotation" })).not.toBeInTheDocument();
   });
 });

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -15,7 +17,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("../api", () => ({
   getMe: () => h.getMe(),
-  getPreceptors: () => h.getPreceptors(),
+  getPreceptors: (params: unknown) => h.getPreceptors(params),
   getPreceptor: (id: string) => h.getPreceptor(id),
   createPreceptor: (input: unknown) => h.createPreceptor(input),
   updatePreceptor: (id: string, input: unknown) => h.updatePreceptor(id, input),
@@ -81,7 +83,7 @@ describe("PreceptorsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getPreceptors.mockResolvedValue([ROW]);
+    h.getPreceptors.mockResolvedValue(paged([ROW]));
     h.getPreceptor.mockResolvedValue(DETAIL);
     h.getSpecialties.mockResolvedValue([
       { id: "s1", name: "Internal Medicine" },
@@ -95,6 +97,70 @@ describe("PreceptorsPage", () => {
     expect(screen.getByText("jane@x.com")).toBeInTheDocument();
     expect(screen.getByText("Activated")).toBeInTheDocument();
     expect(screen.getByText("Chicago, IL")).toBeInTheDocument();
+  });
+
+  it("searches server-side via the debounced search box", async () => {
+    h.getPreceptors.mockImplementation((params?: { q?: string }) =>
+      Promise.resolve(paged(
+        params?.q
+          ? [ROW]
+          : [ROW, { ...ROW, id: "pr2", fullName: "Dana Cole", email: "dana@x.com" }]
+      ))
+    );
+    renderPage();
+    await screen.findByText("Dana Cole");
+
+    await userEvent.type(screen.getByPlaceholderText("Search for Name/Email/Location"), "Carter");
+
+    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ q: "Carter" })));
+    await waitFor(() => expect(screen.queryByText("Dana Cole")).not.toBeInTheDocument());
+    expect(screen.getByText("Jane Carter")).toBeInTheDocument();
+  });
+
+  it("pages server-side: clicking Next requests page 2", async () => {
+    h.getPreceptors.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve({
+        items: params?.page === 2
+          ? [{ ...ROW, id: "p2", fullName: "Page Two" }]
+          : [ROW],
+        page: params?.page ?? 1, pageSize: 10, totalCount: 11, totalPages: 2
+      })
+    );
+    renderPage();
+    await screen.findByText("Jane Carter");
+
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+    expect(await screen.findByText("Page Two")).toBeInTheDocument();
+  });
+
+  it("steps back a page when deleting the last row shrinks the set past the current page", async () => {
+    // Two pages initially; after the delete-triggered refetch the total drops to one page → clamp to 1.
+    let total = 11;
+    h.getPreceptors.mockImplementation((params?: { page?: number }) =>
+      Promise.resolve({
+        items: [{ ...ROW, id: `pg${params?.page ?? 1}` }],
+        page: params?.page ?? 1,
+        pageSize: 10,
+        totalCount: total,
+        totalPages: Math.max(1, Math.ceil(total / 10))
+      })
+    );
+    h.deletePreceptor.mockResolvedValue(undefined);
+    renderPage();
+    await screen.findByText("Jane Carter");
+    await userEvent.click(screen.getByRole("button", { name: "Next" })); // → page 2
+    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+
+    // Delete the (only) row on page 2; the success invalidates the list, the refetch reports one page, and
+    // the clamp effect steps the page back to 1.
+    total = 1;
+    const row = screen.getByText("Jane Carter").closest("tr")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(h.getPreceptors).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
   });
 
   it("blocks non-admins", async () => {

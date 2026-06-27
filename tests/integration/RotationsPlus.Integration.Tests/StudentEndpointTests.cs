@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Rotations;
 using RotationsPlus.Contracts.Students;
 
@@ -55,9 +56,11 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
     {
         var coordinator = Client(RoleNames.Coordinator);
 
-        var list = await coordinator.GetFromJsonAsync<List<StudentSummaryResponse>>("/api/students", JsonOptions);
+        // Narrow to the seeded student by name so the assertion is deterministic in the shared, growing DB.
+        var list = await coordinator.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            "/api/students?q=Rivera&pageSize=100", JsonOptions);
 
-        var sam = list!.SingleOrDefault(s => s.Id == SamRiveraId);
+        var sam = list!.Items.SingleOrDefault(s => s.Id == SamRiveraId);
         sam.Should().NotBeNull();
         sam!.FullName.Should().Be("Sam Rivera");
         sam.AcademicStatus.Should().Be(AcademicStatus.InternationalMedicalGraduate);
@@ -106,10 +109,10 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         var created = await (await PostAsync(admin, ValidCreate(academicStatus: AcademicStatus.PhysicianAssistantStudent)))
             .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
 
-        var pas = await admin.GetFromJsonAsync<List<StudentSummaryResponse>>(
-            "/api/students?academicStatus=PhysicianAssistantStudent", JsonOptions);
-        pas!.Select(s => s.Id).Should().Contain(created!.Id);
-        pas.Should().OnlyContain(s => s.AcademicStatus == AcademicStatus.PhysicianAssistantStudent);
+        var pas = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            "/api/students?academicStatus=PhysicianAssistantStudent&pageSize=100", JsonOptions);
+        pas!.Items.Select(s => s.Id).Should().Contain(created!.Id);
+        pas.Items.Should().OnlyContain(s => s.AcademicStatus == AcademicStatus.PhysicianAssistantStudent);
     }
 
     [Fact]
@@ -120,10 +123,81 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         var created = await (await PostAsync(admin, ValidCreate(status: StudentStatus.TurnedIntoContact)))
             .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
 
-        var contacts = await admin.GetFromJsonAsync<List<StudentSummaryResponse>>(
-            "/api/students?status=TurnedIntoContact", JsonOptions);
-        contacts!.Select(s => s.Id).Should().Contain(created!.Id);
-        contacts.Should().OnlyContain(s => s.Status == StudentStatus.TurnedIntoContact);
+        var contacts = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            "/api/students?status=TurnedIntoContact&pageSize=100", JsonOptions);
+        contacts!.Items.Select(s => s.Id).Should().Contain(created!.Id);
+        contacts.Items.Should().OnlyContain(s => s.Status == StudentStatus.TurnedIntoContact);
+    }
+
+    [Fact]
+    public async Task List_paginates_and_searches_by_name_and_email()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // Three students sharing a unique surname token → a q on it returns exactly those three, deterministic.
+        var token = $"Pagington{Guid.NewGuid():N}";
+        for (var i = 0; i < 3; i++)
+        {
+            (await PostAsync(admin, ValidCreate(firstName: $"P{i}", lastName: token))).EnsureSuccessStatusCode();
+        }
+
+        var page1 = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            $"/api/students?q={token}&page=1&pageSize=2", JsonOptions);
+        var page2 = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            $"/api/students?q={token}&page=2&pageSize=2", JsonOptions);
+
+        page1!.TotalCount.Should().Be(3);
+        page1.Items.Should().HaveCount(2);
+        page2!.Items.Should().HaveCount(1);
+        page1.Items.Select(s => s.Id).Should().NotIntersectWith(page2.Items.Select(s => s.Id)); // no overlap
+        page1.Items.Concat(page2.Items).Should().OnlyContain(s => s.FullName.Contains(token));
+    }
+
+    [Fact]
+    public async Task List_search_matches_email()
+    {
+        var admin = Client(RoleNames.Admin);
+        var email = UniqueEmail();
+        var created = await (await PostAsync(admin, ValidCreate(email: email)))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        // Search by a distinctive fragment of the email.
+        var frag = email.Split('@')[0];
+        var found = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            $"/api/students?q={frag}&pageSize=100", JsonOptions);
+
+        found!.Items.Should().ContainSingle(s => s.Id == created!.Id);
+    }
+
+    [Fact]
+    public async Task List_search_over_the_length_limit_is_rejected()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await admin.GetAsync($"/api/students?q={new string('x', 101)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Options_returns_the_unpaginated_picker_list_including_the_seeded_student()
+    {
+        var staff = Client(RoleNames.Coordinator);
+
+        // The options endpoint is for form pickers — it returns the full list, not a page.
+        var options = await staff.GetFromJsonAsync<List<StudentSummaryResponse>>("/api/students/options", JsonOptions);
+
+        options!.Should().Contain(s => s.Id == SamRiveraId);
+    }
+
+    [Fact]
+    public async Task Customer_cannot_list_student_options()
+    {
+        var student = Client(RoleNames.Student);
+
+        var response = await student.GetAsync("/api/students/options");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     // ---- Admin writes ----
@@ -418,7 +492,7 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         var getAfter = await admin.GetAsync($"/api/students/{created.Id}");
         getAfter.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await admin.GetFromJsonAsync<List<StudentSummaryResponse>>("/api/students", JsonOptions);
-        list!.Select(s => s.Id).Should().NotContain(created.Id);
+        var list = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>("/api/students?pageSize=100", JsonOptions);
+        list!.Items.Select(s => s.Id).Should().NotContain(created.Id);
     }
 }

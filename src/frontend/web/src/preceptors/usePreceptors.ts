@@ -1,23 +1,31 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createPreceptor,
   deletePreceptor,
   getPreceptors,
   getSpecialties,
   updatePreceptor,
+  type PagedResponse,
   type Preceptor,
   type PreceptorInput,
   type Specialty
 } from "../api";
 
-const KEY = ["preceptors"];
-
-/** List query + create/update/delete mutations for the preceptor directory. */
-export function usePreceptors() {
+/** Server-paginated preceptor list (free-text search + page) + create/update/delete mutations.
+ *  keepPreviousData keeps the current page visible while the next loads (no flash on page/search). */
+export function usePreceptors(search: string, page: number, pageSize: number) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: KEY });
+  // Invalidate every preceptor list (all filters/pages) AND the picker options, not just the active one.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["preceptors"] });
+    qc.invalidateQueries({ queryKey: ["preceptor-options"] });
+  };
 
-  const list = useQuery<Preceptor[]>({ queryKey: KEY, queryFn: getPreceptors });
+  const list = useQuery<PagedResponse<Preceptor>>({
+    queryKey: ["preceptors", { search: search || null, page, pageSize }],
+    queryFn: () => getPreceptors({ q: search || undefined, page, pageSize }),
+    placeholderData: keepPreviousData
+  });
 
   const create = useMutation({
     mutationFn: (input: PreceptorInput) => createPreceptor(input),

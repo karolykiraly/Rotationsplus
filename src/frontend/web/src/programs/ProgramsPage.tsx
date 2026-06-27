@@ -4,11 +4,13 @@ import { Modal } from "../components/Modal";
 import { Tabs } from "../components/Tabs";
 import { Pagination } from "../components/Pagination";
 import { useMe } from "../useMe";
-import { getProgram, type Program, type ProgramInput, type ProgramType } from "../api";
+import { useDebouncedValue } from "../useDebouncedValue";
+import { getProgram, type Program, type ProgramFilter, type ProgramInput, type ProgramType } from "../api";
 import { usePrograms, useProgramFormOptions } from "./usePrograms";
 import { ProgramFormModal, type ProgramFormInitial } from "./ProgramFormModal";
+import { FilterProgramModal } from "./FilterProgramModal";
 import { ProgramDocumentsModal } from "./ProgramDocumentsModal";
-import { programCode, programTypeLabel } from "./programTypes";
+import { programCode, programDisplayName, programTypeLabel } from "./programTypes";
 import noImage from "../assets/images/no_image.webp";
 import filterIcon from "../assets/images/filter.svg";
 import searchIcon from "../assets/icons/search.png";
@@ -42,7 +44,17 @@ type EditId = string | "new" | null;
 
 export function ProgramsPage() {
   const { user } = useMe();
-  const { list, create, update, remove } = usePrograms();
+  const [tab, setTab] = useState(0);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [filter, setFilter] = useState<ProgramFilter>({});
+  const [showFilter, setShowFilter] = useState(false);
+  const filterCount = Object.values(filter).filter(
+    (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)
+  ).length;
+
+  const { list, create, update, remove } = usePrograms(TAB_TYPES[tab], debouncedSearch, page, PAGE_SIZE, filter);
   const { specialties, preceptors } = useProgramFormOptions();
 
   const [editId, setEditId] = useState<EditId>(null);
@@ -50,12 +62,18 @@ export function ProgramsPage() {
   const [deleting, setDeleting] = useState<Program | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const [tab, setTab] = useState(0);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
 
-  // Reset to the first page whenever the tab or search changes (matches legacy paging behaviour).
-  useEffect(() => setPage(1), [tab, search]);
+  // Reset to the first page whenever the tab, (debounced) search, or filter changes (legacy paging behaviour).
+  useEffect(() => setPage(1), [tab, debouncedSearch, filter]);
+
+  // Server returns one page + the full filtered count for the pager. If the set shrinks past the current
+  // page, step back. Gate on fresh (non-placeholder) data; declared before the admin guard so hooks are stable.
+  const totalItems = list.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const settled = !list.isPlaceholderData;
+  useEffect(() => {
+    if (settled && page > totalPages) setPage(totalPages);
+  }, [settled, page, totalPages]);
 
   // For edit, load the full detail (the list row lacks honorarium/description/ids).
   const detail = useQuery({
@@ -106,17 +124,8 @@ export function ProgramsPage() {
     description: d.description ?? ""
   });
 
-  const programs = list.data ?? [];
   const opts = { specialties: specialties.data ?? [], preceptors: preceptors.data ?? [] };
-
-  // Tab + search filter, then client-side paginate (the live app filters/pages on the client too).
-  const q = search.trim().toLowerCase();
-  const filtered = programs
-    .filter((p) => TAB_TYPES[tab].includes(p.programType))
-    .filter((p) => !q || `${p.specialtyName} ${p.preceptorName ?? ""}`.toLowerCase().includes(q));
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const rows = list.data?.items ?? [];
 
   return (
     <>
@@ -127,8 +136,9 @@ export function ProgramsPage() {
           <button className="btn btn-primary spacer" onClick={() => { setFormError(null); setEditId("new"); }}>
             Add program
           </button>
-          <button className="filter-btn" type="button" title="Filter" aria-label="Filter programs">
+          <button className="filter-btn" type="button" title="Filter" aria-label="Filter programs" onClick={() => setShowFilter(true)}>
             <img src={filterIcon} alt="" />
+            {filterCount > 0 && <span className="filter-count">{filterCount}</span>}
           </button>
           <div className="search-form2">
             <img src={searchIcon} alt="" />
@@ -145,12 +155,13 @@ export function ProgramsPage() {
 
         {list.isLoading && <div className="state">Loading programs…</div>}
         {list.isError && <div className="state">Couldn’t load programs: {(list.error as Error).message}</div>}
+        {!list.isLoading && list.isFetching && <div className="state subtle" role="status">Updating…</div>}
 
         {!list.isLoading && !list.isError && (
           rows.length === 0 ? (
             <div className="state">There is no data available.</div>
           ) : (
-            <table className="program-table">
+            <table className="program-table" aria-busy={list.isFetching}>
               <tbody>
                 {rows.map((p) => {
                   const openEdit = () => { setFormError(null); setEditId(p.id); };
@@ -168,7 +179,7 @@ export function ProgramsPage() {
                       <img className="hospital-img" src={noImage} alt="" />
                     </td>
                     <td className="hospital-name">
-                      <div className="heading-xxxs">{p.specialtyName}</div>
+                      <div className="heading-xxxs">{programDisplayName(p.specialtyName)}</div>
                     </td>
                     <td>
                       <div className="place-holder">Program ID</div>
@@ -188,7 +199,11 @@ export function ProgramsPage() {
                     </td>
                     <td className="last-td">
                       <div className="place-holder">Retail Amount</div>
-                      <div className="heading-xxxs-normal">${p.retailAmountPerWeek.toLocaleString()}</div>
+                      {/* The legacy admin Programs list shows the weekly honorarium under its "Retail Amount"
+                          column (owner-confirmed 2026-06-26 to match production); staff-only, "—" when unset. */}
+                      <div className="heading-xxxs-normal">
+                        {p.weeklyHonorarium ? `$${p.weeklyHonorarium.toLocaleString()}` : "—"}
+                      </div>
                     </td>
                   </tr>
                   );
@@ -198,7 +213,7 @@ export function ProgramsPage() {
           )
         )}
 
-        <Pagination page={safePage} pageSize={PAGE_SIZE} totalItems={filtered.length} onChange={setPage} />
+        <Pagination page={page} pageSize={PAGE_SIZE} totalItems={totalItems} onChange={setPage} />
       </div>
 
       {editId === "new" && (
@@ -225,7 +240,7 @@ export function ProgramsPage() {
           onSubmit={submitForm}
           onClose={closeForm}
           onDelete={() => {
-            const prog = programs.find((p) => p.id === editId);
+            const prog = rows.find((p) => p.id === editId);
             if (prog) { closeForm(); setDeleting(prog); }
           }}
           onConfigureDocuments={() => {
@@ -263,6 +278,16 @@ export function ProgramsPage() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {showFilter && (
+        <FilterProgramModal
+          initial={filter}
+          specialties={specialties.data ?? []}
+          onApply={(f) => { setFilter(f); setShowFilter(false); }}
+          onClear={() => { setFilter({}); setShowFilter(false); }}
+          onClose={() => setShowFilter(false)}
+        />
       )}
     </>
   );

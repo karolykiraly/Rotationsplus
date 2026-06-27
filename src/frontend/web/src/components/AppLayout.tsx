@@ -32,9 +32,9 @@ function initials(name?: string | null, username?: string | null): string {
 const NAV: { label: string; icon: string; iconSel?: string; to?: string }[] = [
   { label: "Dashboard", icon: homeIcon, iconSel: homeSel, to: "/admin/dashboard" },
   { label: "Analytics", icon: analyticsIcon },
-  { label: "Permissions", icon: permissionIcon },
+  { label: "Permissions", icon: permissionIcon, to: "/admin/permission" },
   { label: "Rotations", icon: rotationsIcon, iconSel: rotationsSel, to: "/admin/rotations" },
-  { label: "Honorarium", icon: honorariumIcon },
+  { label: "Honorarium", icon: honorariumIcon, to: "/admin/honorarium" },
   { label: "Contacts", icon: contactsIcon },
   { label: "Programs", icon: programIcon, iconSel: programSel, to: "/admin/programs" },
   { label: "Leads", icon: leadIcon },
@@ -51,6 +51,8 @@ const TITLES: Record<string, string> = {
   "/admin/rotations": "Rotations",
   "/admin/specialties": "Specialties",
   "/admin/preceptors": "Preceptors",
+  "/admin/permission": "Permission",
+  "/admin/honorarium": "Honorarium",
   "/admin/students": "Students"
 };
 

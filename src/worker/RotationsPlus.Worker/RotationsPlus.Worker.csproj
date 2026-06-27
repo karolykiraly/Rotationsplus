@@ -13,6 +13,23 @@
     <ProjectReference Include="..\..\shared\RotationsPlus.ServiceDefaults\RotationsPlus.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\shared\RotationsPlus.Common\RotationsPlus.Common.csproj" />
     <ProjectReference Include="..\..\shared\RotationsPlus.Contracts\RotationsPlus.Contracts.csproj" />
+    <!-- The Worker reuses the API's RotationsDbContext + entities for job data access. Pragmatic until a
+         shared RotationsPlus.Data project is extracted; the API never references the Worker (the job seam
+         is the ICampaignSendJob interface in Common), so there's no cycle. -->
+    <ProjectReference Include="..\..\api\RotationsPlus.Api\RotationsPlus.Api.csproj" />
   </ItemGroup>
+
+  <!-- That API reference transitively drags the API's appsettings*.json into the Worker's publish output,
+       colliding with the Worker's own at the same relative path (NETSDK1152, breaks the container publish).
+       Drop the API-sourced appsettings only — the Worker keeps ITS config and the API assembly is retained.
+       (Runtime config on DEV/PROD comes from env/Key Vault regardless; this just unblocks publish.) -->
+  <Target Name="DropReferencedApiAppSettings" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.json'
+                   and $([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').StartsWith('appsettings'))
+                   and $([System.String]::Copy('%(ResolvedFileToPublish.FullPath)').Contains('RotationsPlus.Api'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>

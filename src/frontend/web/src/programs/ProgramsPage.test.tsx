@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const paged = <T,>(items: T[]) => ({ items, page: 1, pageSize: 10, totalCount: items.length, totalPages: 1 });
 
 const h = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -11,18 +13,18 @@ const h = vi.hoisted(() => ({
   updateProgram: vi.fn(),
   deleteProgram: vi.fn(),
   getSpecialties: vi.fn(),
-  getPreceptors: vi.fn()
+  getPreceptorOptions: vi.fn()
 }));
 
 vi.mock("../api", () => ({
   getMe: () => h.getMe(),
-  getPrograms: () => h.getPrograms(),
+  getPrograms: (params: unknown) => h.getPrograms(params),
   getProgram: (id: string) => h.getProgram(id),
   createProgram: (input: unknown) => h.createProgram(input),
   updateProgram: (id: string, input: unknown) => h.updateProgram(id, input),
   deleteProgram: (id: string) => h.deleteProgram(id),
   getSpecialties: () => h.getSpecialties(),
-  getPreceptors: () => h.getPreceptors(),
+  getPreceptorOptions: () => h.getPreceptorOptions(),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -42,6 +44,7 @@ const PROGRAM_ROW = {
   maxStudentsPerRotation: 2,
   minWeeksPerRotation: 4,
   retailAmountPerWeek: 1500,
+  weeklyHonorarium: 500,
   preceptorName: "Jane Carter",
   city: "Los Angeles",
   state: "CA",
@@ -86,34 +89,73 @@ describe("ProgramsPage", () => {
   beforeEach(() => {
     Object.values(h).forEach((m) => m.mockReset());
     h.getMe.mockResolvedValue(ADMIN);
-    h.getPrograms.mockResolvedValue([PROGRAM_ROW]);
+    h.getPrograms.mockResolvedValue(paged([PROGRAM_ROW]));
     h.getProgram.mockResolvedValue(PROGRAM_DETAIL);
     h.getSpecialties.mockResolvedValue([
       { id: "s1", name: "Internal Medicine" },
       { id: "s2", name: "Pediatrics" }
     ]);
-    h.getPreceptors.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
+    h.getPreceptorOptions.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
   });
 
-  it("lists programs in the active type tab with the retail amount", async () => {
-    renderPage();
-    // Default tab is InPerson; the row's labelled fields + retail render (name/ID/location are placeholders).
-    expect(await screen.findByText("Program ID")).toBeInTheDocument();
-    expect(screen.getByText("$1,500")).toBeInTheDocument();
-    expect(screen.getAllByText("Internal Medicine").length).toBeGreaterThan(0);
-  });
-
-  it("filters to an empty tab and by search text", async () => {
+  it("lists programs with a derived name, a distinct specialty, and the honorarium under Retail Amount", async () => {
     renderPage();
     await screen.findByText("Program ID");
-    // Consultation tab has no matching program -> empty state.
+    // Program Name column derives "{Specialty} Physician"; the Specialty column shows the bare specialty
+    // (no longer a duplicate). The "Retail Amount" column shows the weekly honorarium (matching production).
+    expect(screen.getByText("Internal Medicine Physician")).toBeInTheDocument();
+    expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
+    expect(screen.getByText("$500")).toBeInTheDocument();
+    expect(screen.queryByText("$1,500")).not.toBeInTheDocument(); // retail value is no longer the column shown
+  });
+
+  it("renders a dash under Retail Amount when the honorarium is absent (e.g. a customer-stripped row)", async () => {
+    h.getPrograms.mockResolvedValue(paged([{ ...PROGRAM_ROW, weeklyHonorarium: null }]));
+    renderPage();
+    await screen.findByText("Program ID");
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("drives the program-type tab and search server-side", async () => {
+    // The server answers per params: the InPerson tab (default) returns the row; the Consultation tab
+    // (Consultation + ConsultationSub) and any q return empty here.
+    h.getPrograms.mockImplementation((params?: { programType?: string[]; q?: string }) => {
+      const onInPerson = !params?.programType || params.programType.includes("InPerson");
+      const noSearch = !params?.q;
+      return Promise.resolve(paged(onInPerson && noSearch ? [PROGRAM_ROW] : []));
+    });
+    renderPage();
+    await screen.findByText("Program ID");
+
+    // Consultation tab requests both Consultation variants and shows the empty state.
     await userEvent.click(screen.getByRole("tab", { name: "Consultation" }));
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ programType: ["Consultation", "ConsultationSub"] })));
     expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
-    // Back to InPerson; a non-matching search clears the row.
+
+    // Back to InPerson; a (debounced) non-matching search requests q and clears the row.
     await userEvent.click(screen.getByRole("tab", { name: "InPerson" }));
     await screen.findByText("Program ID");
     await userEvent.type(screen.getByLabelText("Search for programs"), "zzzzz");
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(expect.objectContaining({ q: "zzzzz" })));
     expect(await screen.findByText("There is no data available.")).toBeInTheDocument();
+  });
+
+  it("applies the Filter modal (specialty + instant approval + a tag) to the program query and shows the count", async () => {
+    renderPage();
+    await screen.findByText("Program ID");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Specialty"), "s2");
+    // "Instant Approval" is also a tag checkbox — target the select by combobox role to disambiguate.
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Instant Approval" }), "yes");
+    await userEvent.click(within(dialog).getByLabelText("Research"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ specialtyId: "s2", instantApproval: true, tags: ["Research"] })));
+    expect(screen.getByText("3")).toBeInTheDocument(); // filter-count badge
   });
 
   it("blocks non-admins", async () => {

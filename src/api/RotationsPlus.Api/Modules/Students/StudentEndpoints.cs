@@ -22,30 +22,54 @@ public static class StudentEndpoints
             .WithTags("Students");
 
         group.MapGet("/", async (
-            StudentStatus? status, AcademicStatus? academicStatus, RotationsDbContext db, CancellationToken cancellationToken) =>
+            StudentStatus? status, AcademicStatus? academicStatus, string? q, int? page, int? pageSize,
+            RotationsDbContext db, CancellationToken cancellationToken) =>
         {
+            if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
+            {
+                return Results.BadRequest(searchError);
+            }
+
             var query = db.Students.AsQueryable();
             if (status is { } s) query = query.Where(x => x.Status == s);
             if (academicStatus is { } a) query = query.Where(x => x.AcademicStatus == a);
+            if (pattern is not null)
+            {
+                // Mirrors the old client-side search: name, email, and location (city/state). ILIKE = ci contains.
+                query = query.Where(x =>
+                    EF.Functions.ILike(x.FirstName + " " + x.LastName, pattern) ||
+                    EF.Functions.ILike(x.Email, pattern) ||
+                    (x.City != null && EF.Functions.ILike(x.City, pattern)) ||
+                    (x.State != null && EF.Functions.ILike(x.State, pattern)));
+            }
 
             var students = await query
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
-                .Select(x => new StudentSummaryResponse(
-                    x.Id,
-                    x.FirstName + " " + x.LastName,
-                    x.Email,
-                    x.MobilePhone,
-                    x.AcademicStatus,
-                    x.VisaStatus,
-                    x.City,
-                    x.State,
-                    x.Status))
-                .ToListAsync(cancellationToken);
+                .ThenBy(x => x.Id) // tie-break so paging is deterministic when names collide
+                .Select(x => ToSummary(x))
+                .ToPagedResponseAsync(page, pageSize, cancellationToken);
 
             return Results.Ok(students);
         })
         .WithName("ListStudents");
+
+        // Unpaginated lightweight list for form pickers (e.g. the rotation form's student dropdown), which
+        // need every option, not a page. Same DTO + StaffOnly as the paginated list (no new data/audience),
+        // ordered by name. Deliberately unbounded: fine at directory scale; if the student directory ever
+        // grows past a comfortable dropdown, switch the picker to a server-side typeahead reusing the list's
+        // `q` search and retire this. (Plan_Student.md.)
+        group.MapGet("/options", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            var options = await db.Students
+                .OrderBy(x => x.LastName)
+                .ThenBy(x => x.FirstName)
+                .Select(x => ToSummary(x))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(options);
+        })
+        .WithName("ListStudentOptions");
 
         group.MapGet("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
@@ -306,4 +330,8 @@ public static class StudentEndpoints
     private static StudentDetailResponse ToDetail(Student x) =>
         new(x.Id, x.FirstName, x.LastName, x.Email, x.MobilePhone, x.AcademicStatus, x.VisaStatus,
             x.MedicalSchool, x.MedicalSchoolCountry, x.City, x.State, x.Status, x.StudentOid);
+
+    private static StudentSummaryResponse ToSummary(Student x) =>
+        new(x.Id, x.FirstName + " " + x.LastName, x.Email, x.MobilePhone,
+            x.AcademicStatus, x.VisaStatus, x.City, x.State, x.Status);
 }

@@ -4,7 +4,10 @@ namespace RotationsPlus.Contracts.Marketplace;
 /// when no preceptor is assigned yet. <c>ProgramNumber</c> is the server-assigned sequential number
 /// the client formats into a typed code (e.g. "IP1042"); <c>IsOpen</c> drives the "Instant Approval"
 /// chip; <c>Tags</c> are free-form marketplace chips. <c>ImageUrl</c> is a short-lived read URL for
-/// the hospital image (null when none) — the client falls back to a placeholder.</summary>
+/// the hospital image (null when none) — the client falls back to a placeholder.
+/// <c>WeeklyHonorarium</c> (preceptor pay / platform margin) is staff-only — the endpoints null it for
+/// customer callers, matching the detail endpoint, so students/preceptors can't infer margin. The admin
+/// list surfaces it (the legacy admin Programs screen shows it under its "Retail Amount" column).</summary>
 public sealed record ProgramSummaryResponse(
     Guid Id,
     int ProgramNumber,
@@ -13,6 +16,7 @@ public sealed record ProgramSummaryResponse(
     int MaxStudentsPerRotation,
     int MinWeeksPerRotation,
     decimal RetailAmountPerWeek,
+    decimal? WeeklyHonorarium,
     string? PreceptorName,
     string? City,
     string? State,

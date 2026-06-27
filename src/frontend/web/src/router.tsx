@@ -5,7 +5,9 @@ import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { PreceptorsPage } from "./preceptors/PreceptorsPage";
+import { PermissionPage } from "./preceptors/PermissionPage";
 import { RotationsPage } from "./rotations/RotationsPage";
+import { HonorariumPage } from "./honorarium/HonorariumPage";
 import { StudentsPage } from "./students/StudentsPage";
 import { CustomerMsalShell } from "./portal/CustomerMsalShell";
 import { BrowsePage } from "./portal/BrowsePage";
@@ -24,7 +26,9 @@ export const router = createBrowserRouter([
       { path: "admin/specialties", element: <SpecialtiesPage /> },
       { path: "admin/programs", element: <ProgramsPage /> },
       { path: "admin/preceptors", element: <PreceptorsPage /> },
+      { path: "admin/permission", element: <PermissionPage /> },
       { path: "admin/rotations", element: <RotationsPage /> },
+      { path: "admin/honorarium", element: <HonorariumPage /> },
       { path: "admin/students", element: <StudentsPage /> }
     ]
   },

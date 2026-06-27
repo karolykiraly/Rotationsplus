@@ -40,7 +40,8 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/specialties", [RoleNames.Admin], "Create specialty (admin)"),
         new("PUT", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update specialty (admin)"),
         new("DELETE", "/api/specialties/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete specialty (admin)"),
-        new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs"),
+        new("GET", "/api/programs", MarketplaceReaders, "List marketplace programs (paged admin list)"),
+        new("GET", "/api/programs/catalog", MarketplaceReaders, "Full program catalog (customer browse + form picker)"),
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001", MarketplaceReaders, "Get program by id"),
         // Server-computed price quote — open to marketplace viewers (students need pricing to book).
         new("GET", "/api/programs/cccccccc-0000-0000-0000-000000000001/quote?weeks=4", MarketplaceReaders, "Program price quote"),
@@ -54,10 +55,14 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/programs/00000000-0000-0000-0000-000000000000/image", [RoleNames.Admin], "Upload program image (admin)"),
         new("DELETE", "/api/programs/00000000-0000-0000-0000-000000000000/image", [RoleNames.Admin], "Delete program image (admin)"),
         new("GET", "/api/preceptors", RoleNames.Staff, "List marketplace preceptors"),
+        new("GET", "/api/preceptors/options", RoleNames.Staff, "List preceptor options for form pickers (staff)"),
         new("GET", "/api/preceptors/dddddddd-0000-0000-0000-000000000001", RoleNames.Staff, "Get preceptor by id"),
         new("POST", "/api/preceptors", [RoleNames.Admin], "Create preceptor (admin)"),
         new("PUT", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update preceptor (admin)"),
         new("DELETE", "/api/preceptors/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete preceptor (admin)"),
+        // Approval queue batch save (Permission screen). An empty body → an authorized admin gets 400
+        // (required body), which the authz-only matrix accepts; behaviour is covered by PreceptorAdminEndpointTests.
+        new("POST", "/api/preceptors/permissions", [RoleNames.Admin], "Save preceptor permissions (admin)"),
         // Rotation management is AdminOnly (reads too — students see their own via the portal later).
         new("GET", "/api/rotations", [RoleNames.Admin], "List rotations (admin)"),
         new("GET", "/api/rotations/eeeeeeee-0000-0000-0000-000000000001", [RoleNames.Admin], "Get rotation by id (admin)"),
@@ -78,8 +83,22 @@ public static class ApiAuthorizationMatrix
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),
         // Admin hub aggregate (totals + rotation pipeline + upcoming starts).
         new("GET", "/api/dashboard", [RoleNames.Admin], "Admin dashboard aggregate"),
+        new("GET", "/api/dashboard/todos", [RoleNames.Admin], "Admin dashboard to-do queues"),
+        new("GET", "/api/dashboard/revenue", [RoleNames.Admin], "Admin dashboard revenue"),
+        new("GET", "/api/dashboard/reports", [RoleNames.Admin], "Admin dashboard reports"),
+        // Honorarium (preceptor payouts) — AdminOnly. The list always authorizes-through (200); pay/refund
+        // on an unknown id give an authorized admin 404 (not 401/403), which the authz-only matrix accepts.
+        // Behaviour (generation, ordered pay, refund flag) is covered by HonorariumEndpointTests.
+        new("GET", "/api/honorariums", [RoleNames.Admin], "List honorariums (admin)"),
+        new("POST", "/api/honorariums/00000000-0000-0000-0000-000000000000/pay", [RoleNames.Admin], "Pay a honorarium stage (admin)"),
+        new("POST", "/api/honorariums/00000000-0000-0000-0000-000000000000/refund-flag", [RoleNames.Admin], "Toggle a honorarium refunded flag (admin)"),
+        new("DELETE", "/api/honorariums/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete a honorarium (admin)"),
+        // Email campaigns (compose/list/send) — AdminOnly.
+        new("GET", "/api/campaigns", [RoleNames.Admin], "List campaigns (admin)"),
+        new("POST", "/api/campaigns/00000000-0000-0000-0000-000000000000/send", [RoleNames.Admin], "Send campaign (admin)"),
         // Student directory: reads StaffOnly (sales/SDR/coordinator work the directory for CRM), writes AdminOnly.
         new("GET", "/api/students", RoleNames.Staff, "List students (staff)"),
+        new("GET", "/api/students/options", RoleNames.Staff, "List student options for form pickers (staff)"),
         new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001", RoleNames.Staff, "Get student by id (staff)"),
         new("POST", "/api/students", [RoleNames.Admin], "Create student (admin)"),
         new("PUT", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update student (admin)"),

@@ -1,29 +1,44 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRotation,
-  deleteRotation,
-  getPrograms,
+  getProgramCatalog,
   getRotations,
-  getStudents,
-  refundRotation,
+  getStudentOptions,
   updateRotation,
+  type PagedResponse,
   type Program,
   type Rotation,
+  type RotationFilter,
   type RotationInput,
-  type RotationStatus,
   type Student
 } from "../api";
 
-/** List query (optionally filtered by status) + create/update/delete mutations for rotations. */
-export function useRotations(status: RotationStatus | "") {
-  const qc = useQueryClient();
-  // Invalidate every rotation list (all status filters), not just the active one.
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["rotations"] });
-
-  const list = useQuery<Rotation[]>({
-    queryKey: ["rotations", { status: status || null }],
-    queryFn: () => getRotations(status ? { status } : undefined)
+/** One server-paginated rotation section (Current or Historical, selected by `scope`) with its own
+ *  free-text search + page. `keepPreviousData` keeps the current page visible while the next loads, so
+ *  paging/searching doesn't flash an empty table. Mutations live in {@link useRotationMutations} so the
+ *  two sections + the detail panel share one create/update path. */
+export function useRotationsList(
+  scope: "current" | "historical", search: string, page: number, pageSize: number, filter: RotationFilter
+) {
+  return useQuery<PagedResponse<Rotation>>({
+    queryKey: ["rotations", { scope, search: search || null, page, pageSize, filter }],
+    queryFn: () => getRotations({
+      scope,
+      q: search || undefined,
+      page,
+      pageSize,
+      ...filter
+    }),
+    placeholderData: keepPreviousData
   });
+}
+
+/** The shared rotation create/update mutations (the Add modal + the Selected Rotation panel). Both
+ *  invalidate every rotation list so the Current/Historical sections refetch (a status change can move a
+ *  row between them); update also seeds the detail cache so the panel re-reads fresh, not the pre-save snapshot. */
+export function useRotationMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["rotations"] });
 
   const create = useMutation({
     mutationFn: (input: RotationInput) => createRotation(input),
@@ -32,39 +47,21 @@ export function useRotations(status: RotationStatus | "") {
 
   const update = useMutation({
     mutationFn: ({ id, input }: { id: string; input: RotationInput }) => updateRotation(id, input),
-    // Refresh the list AND seed the detail cache with the server's response, so a re-edit pre-fills
-    // from fresh data instead of the pre-save snapshot the form captured at mount.
     onSuccess: (data, vars) => {
       invalidate();
       qc.setQueryData(["rotation", vars.id], data);
     }
   });
 
-  const remove = useMutation({
-    mutationFn: (id: string) => deleteRotation(id),
-    onSuccess: (_data, id) => {
-      invalidate();
-      qc.removeQueries({ queryKey: ["rotation", id] });
-    }
-  });
-
-  const refund = useMutation({
-    mutationFn: (id: string) => refundRotation(id),
-    onSuccess: (_data, id) => {
-      invalidate();
-      qc.invalidateQueries({ queryKey: ["rotation", id] });
-    }
-  });
-
-  return { list, create, update, remove, refund };
+  return { create, update };
 }
 
-/** Program option list for the rotation form's program dropdown. */
+/** Program option list for the rotation form's program dropdown (the unpaginated catalog endpoint). */
 export function useRotationPrograms() {
-  return useQuery<Program[]>({ queryKey: ["programs"], queryFn: getPrograms });
+  return useQuery<Program[]>({ queryKey: ["program-catalog"], queryFn: getProgramCatalog });
 }
 
-/** Student option list for the rotation form's student picker. */
+/** Student option list for the rotation form's student picker (the unpaginated options endpoint). */
 export function useRotationStudents() {
-  return useQuery<Student[]>({ queryKey: ["students", { status: null }], queryFn: () => getStudents() });
+  return useQuery<Student[]>({ queryKey: ["student-options"], queryFn: getStudentOptions });
 }

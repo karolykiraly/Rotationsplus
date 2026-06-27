@@ -1,7 +1,9 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Common.Security;
+using RotationsPlus.Contracts.Common;
 using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Api.Modules.Marketplace;
@@ -20,29 +22,100 @@ public static class ProgramEndpoints
             .RequireAuthorization(AuthorizationPolicies.MarketplaceViewer)
             .WithTags("Marketplace");
 
+        // Paged admin management list. Mirrors the admin ProgramsPage: program-type tabs (multi-valued —
+        // the Consultation tab spans Consultation + ConsultationSub) and a name search over specialty +
+        // preceptor. Returns a PagedResponse; the customer marketplace browse uses /catalog (below) instead.
         group.MapGet("/", async (
-            Guid? specialtyId, Guid? preceptorId, ProgramType? programType, decimal? maxRetailPerWeek, string? q,
-            RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
+            ProgramType[]? programType, string? q, Guid? specialtyId, string? city, bool? instantApproval,
+            decimal? honorariumMin, decimal? honorariumMax, int? programNumber, string[]? tags, int? page, int? pageSize,
+            ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
-            // Catalog search/filter. All filters are optional and AND together; omitting one widens
-            // the result. Open to staff + signed-in customers (MarketplaceViewer).
+            // Honorarium (preceptor pay → platform margin) is staff-only; null it for customer callers.
+            var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
+
+            if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
+            {
+                return Results.BadRequest(searchError);
+            }
+
             var query = db.Programs.AsQueryable();
+            if (programType is { Length: > 0 }) query = query.Where(p => programType.Contains(p.ProgramType));
+            if (pattern is not null)
+            {
+                // Admin search is over specialty + preceptor name (the columns the admin list shows).
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.Specialty.Name, pattern) ||
+                    (p.Preceptor != null && EF.Functions.ILike(p.Preceptor.FirstName + " " + p.Preceptor.LastName, pattern)));
+            }
+
+            // FilterProgram modal: specialty, location, instant-approval, honorarium range, program number, tags.
+            if (specialtyId is { } sid) query = query.Where(p => p.SpecialtyId == sid);
+            if (instantApproval is { } open) query = query.Where(p => p.IsOpen == open);
+            // Honorarium is staff-only data — only honour the honorarium FILTER for staff, else a customer
+            // could probe the filter (e.g. honorariumMin=500) to INFER the margin the response nulls out.
+            if (includeHonorarium && honorariumMin is { } hmin) query = query.Where(p => p.WeeklyHonorarium >= hmin);
+            if (includeHonorarium && honorariumMax is { } hmax) query = query.Where(p => p.WeeklyHonorarium <= hmax);
+            if (programNumber is { } pn) query = query.Where(p => p.ProgramNumber == pn);
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                // Case-insensitive CONTAINS over the "City, State" the filter dropdown shows (EscapeLike
+                // neutralises caller wildcards and wraps as %…%; the dropdown sends the full "City, State").
+                var cityPattern = PaginationExtensions.EscapeLike(city.Trim());
+                query = query.Where(p => EF.Functions.ILike((p.City ?? "") + ", " + (p.State ?? ""), cityPattern));
+            }
+            // A program matches if it carries ANY of the requested tags (Postgres text[] overlap). Bound the
+            // tag list (mirrors the create-path MaxTags) so an oversized array can't bloat the query.
+            if (tags is { Length: > 0 })
+            {
+                var tagFilter = tags.Take(MaxTags).ToArray();
+                query = query.Where(p => p.Tags.Any(t => tagFilter.Contains(t)));
+            }
+
+            var paged = await query
+                .OrderBy(p => p.Specialty.Name)
+                .ThenBy(p => p.ProgramType)
+                .ThenBy(p => p.ProgramNumber) // unique tie-break so paging is deterministic
+                .Select(Summary)
+                .ToPagedResponseAsync(page, pageSize, cancellationToken);
+
+            // Sign the image read URLs on the page (can't sign a SAS inside SQL) and strip honorarium for
+            // customer callers (the value is fetched but never leaves the API for non-staff).
+            var items = paged.Items
+                .Select(p => p with
+                {
+                    ImageUrl = imageStore.GetReadUrl(p.ImageUrl),
+                    WeeklyHonorarium = includeHonorarium ? p.WeeklyHonorarium : null,
+                })
+                .ToList();
+            return Results.Ok(new PagedResponse<ProgramSummaryResponse>(items, paged.Page, paged.PageSize, paged.TotalCount));
+        })
+        .WithName("ListPrograms");
+
+        // Full marketplace catalog (customer browse + the rotation-form program picker), which need every
+        // matching program, not a page. All filters are optional and AND together; search is over specialty +
+        // description (the marketplace's fields). Same MarketplaceViewer audience as the paged list.
+        group.MapGet("/catalog", async (
+            Guid? specialtyId, Guid? preceptorId, ProgramType? programType, decimal? maxRetailPerWeek, string? q,
+            ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
+        {
+            // Honorarium (preceptor pay → platform margin) is staff-only; null it for customer callers.
+            var includeHonorarium = user.Roles.Any(RoleNames.Staff.Contains);
+
+            var query = db.Programs.AsQueryable();
+
+            if (!PaginationExtensions.TryBuildSearchPattern(q, out var pattern, out var searchError))
+            {
+                return Results.BadRequest(searchError);
+            }
 
             if (specialtyId is { } sid) query = query.Where(p => p.SpecialtyId == sid);
             if (preceptorId is { } pid) query = query.Where(p => p.PreceptorId == pid);
             if (programType is { } pt) query = query.Where(p => p.ProgramType == pt);
             if (maxRetailPerWeek is { } max) query = query.Where(p => p.RetailAmountPerWeek <= max);
-            if (!string.IsNullOrWhiteSpace(q))
+            if (pattern is not null)
             {
-                var term = q.Trim();
-                if (term.Length > MaxSearchLength)
-                {
-                    return Results.BadRequest($"q must be {MaxSearchLength} characters or fewer.");
-                }
-
-                // Escape ILIKE wildcards (\ % _) so user input matches literally; case-insensitive contains.
-                var escaped = term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
-                var pattern = $"%{escaped}%";
+                // Catalog search is over specialty + description (the marketplace's fields). The shared
+                // TryBuildSearchPattern escapes ILIKE wildcards (\ % _) and length-caps the term.
                 query = query.Where(p =>
                     EF.Functions.ILike(p.Specialty.Name, pattern) ||
                     (p.Description != null && EF.Functions.ILike(p.Description, pattern)));
@@ -51,29 +124,20 @@ public static class ProgramEndpoints
             var programs = await query
                 .OrderBy(p => p.Specialty.Name)
                 .ThenBy(p => p.ProgramType)
-                .Select(p => new ProgramSummaryResponse(
-                    p.Id,
-                    p.ProgramNumber,
-                    p.Specialty.Name,
-                    p.ProgramType,
-                    p.MaxStudentsPerRotation,
-                    p.MinWeeksPerRotation,
-                    p.RetailAmountPerWeek,
-                    p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
-                    p.City,
-                    p.State,
-                    p.IsOpen,
-                    p.Tags,
-                    p.ImageBlobName)) // raw blob name in SQL; rewritten to a read URL below (can't sign SAS in SQL)
+                .Select(Summary)
                 .ToListAsync(cancellationToken);
 
             var withUrls = programs
-                .Select(p => p with { ImageUrl = imageStore.GetReadUrl(p.ImageUrl) })
+                .Select(p => p with
+                {
+                    ImageUrl = imageStore.GetReadUrl(p.ImageUrl),
+                    WeeklyHonorarium = includeHonorarium ? p.WeeklyHonorarium : null,
+                })
                 .ToList();
 
             return Results.Ok(withUrls);
         })
-        .WithName("ListPrograms");
+        .WithName("ListProgramCatalog");
 
         group.MapGet("/{id:guid}", async (Guid id, ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
@@ -232,7 +296,25 @@ public static class ProgramEndpoints
     }
 
     private const int MaxDescriptionLength = 4000;
-    private const int MaxSearchLength = 100; // bound the free-text search term (cheap DoS guard).
+    // Shared list/catalog projection. An Expression (not a compiled method) so EF composes it into the SQL —
+    // the Specialty.Name / Preceptor.* navigations translate to JOINs. ImageBlobName is the raw blob name;
+    // each endpoint rewrites it to a signed read URL after materialization (can't sign a SAS inside SQL).
+    private static readonly Expression<Func<RotationProgram, ProgramSummaryResponse>> Summary =
+        p => new ProgramSummaryResponse(
+            p.Id,
+            p.ProgramNumber,
+            p.Specialty.Name,
+            p.ProgramType,
+            p.MaxStudentsPerRotation,
+            p.MinWeeksPerRotation,
+            p.RetailAmountPerWeek,
+            p.WeeklyHonorarium, // staff-only; the endpoints null it for customer callers after materialization
+            p.Preceptor != null ? p.Preceptor.FirstName + " " + p.Preceptor.LastName : null,
+            p.City,
+            p.State,
+            p.IsOpen,
+            p.Tags,
+            p.ImageBlobName);
 
     // Capacity sanity caps (the columns are int; these guard against absurd input).
     private const int MaxStudentsCap = 1000;
