@@ -2,7 +2,8 @@ import { useState } from "react";
 
 export interface FaqItem {
   q: string;
-  a: string;
+  /** A single answer paragraph, or several bullet points. */
+  a: string | string[];
 }
 
 /** A simple expand/collapse FAQ list (numbered), matching the legacy site's accordion. Reused by the
@@ -25,7 +26,16 @@ export function FaqAccordion({ items }: { items: FaqItem[] }) {
               <span className="faq-text">{item.q}</span>
               <span className="faq-sign" aria-hidden="true">{isOpen ? "–" : "+"}</span>
             </button>
-            {isOpen && <div className="faq-a">{item.a}</div>}
+            {isOpen &&
+              (Array.isArray(item.a) ? (
+                <ul className="faq-a faq-a-list">
+                  {item.a.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="faq-a">{item.a}</div>
+              ))}
           </div>
         );
       })}

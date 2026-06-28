@@ -3,6 +3,13 @@ import { PublicLayout } from "./public/PublicLayout";
 import { LandingPage } from "./public/LandingPage";
 import { ForPreceptorsPage } from "./public/ForPreceptorsPage";
 import { ConsultingServicesPage } from "./public/ConsultingServicesPage";
+import { AboutPage } from "./public/AboutPage";
+import { OurProcessPage } from "./public/OurProcessPage";
+import { OurTeamPage } from "./public/OurTeamPage";
+import { FaqPage } from "./public/FaqPage";
+import { ResourcesPage } from "./public/ResourcesPage";
+import { PrivacyPolicyPage } from "./public/PrivacyPolicyPage";
+import { TermsPage } from "./public/TermsPage";
 import { PublicComingSoon } from "./public/PublicComingSoon";
 import { StaffMsalShell } from "./components/StaffMsalShell";
 import { StaffLoginLauncher } from "./components/StaffLoginLauncher";
@@ -34,17 +41,17 @@ export const router = createBrowserRouter([
     element: <PublicLayout />,
     children: [
       { index: true, element: <LandingPage /> },
-      // Marketing pages built in later PRs (LP-2…LP-6); placeholders keep the nav/footer links live.
-      { path: "about", element: <PublicComingSoon title="About" /> },
-      { path: "our-process", element: <PublicComingSoon title="Our Process" /> },
-      { path: "our-team", element: <PublicComingSoon title="Our Team" /> },
+      { path: "about", element: <AboutPage /> },
+      { path: "our-process", element: <OurProcessPage /> },
+      { path: "our-team", element: <OurTeamPage /> },
       { path: "for-preceptors", element: <ForPreceptorsPage /> },
       { path: "consulting-services", element: <ConsultingServicesPage /> },
-      { path: "faq", element: <PublicComingSoon title="Frequently Asked Questions" /> },
+      { path: "faq", element: <FaqPage /> },
+      // Blog deferred (content-source TBD) — placeholder keeps the nav link live.
       { path: "blog", element: <PublicComingSoon title="Blog" /> },
-      { path: "resources", element: <PublicComingSoon title="Resources" /> },
-      { path: "privacy-policy", element: <PublicComingSoon title="Privacy Policy" /> },
-      { path: "terms", element: <PublicComingSoon title="Terms of Service" /> }
+      { path: "resources", element: <ResourcesPage /> },
+      { path: "privacy-policy", element: <PrivacyPolicyPage /> },
+      { path: "terms", element: <TermsPage /> }
     ]
   },
   {
