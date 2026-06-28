@@ -1,6 +1,8 @@
 import { createBrowserRouter } from "react-router-dom";
 import { PublicLayout } from "./public/PublicLayout";
 import { LandingPage } from "./public/LandingPage";
+import { ForPreceptorsPage } from "./public/ForPreceptorsPage";
+import { ConsultingServicesPage } from "./public/ConsultingServicesPage";
 import { PublicComingSoon } from "./public/PublicComingSoon";
 import { StaffMsalShell } from "./components/StaffMsalShell";
 import { StaffLoginLauncher } from "./components/StaffLoginLauncher";
@@ -36,8 +38,8 @@ export const router = createBrowserRouter([
       { path: "about", element: <PublicComingSoon title="About" /> },
       { path: "our-process", element: <PublicComingSoon title="Our Process" /> },
       { path: "our-team", element: <PublicComingSoon title="Our Team" /> },
-      { path: "for-preceptors", element: <PublicComingSoon title="For Preceptors" /> },
-      { path: "consulting-services", element: <PublicComingSoon title="Consulting Services" /> },
+      { path: "for-preceptors", element: <ForPreceptorsPage /> },
+      { path: "consulting-services", element: <ConsultingServicesPage /> },
       { path: "faq", element: <PublicComingSoon title="Frequently Asked Questions" /> },
       { path: "blog", element: <PublicComingSoon title="Blog" /> },
       { path: "resources", element: <PublicComingSoon title="Resources" /> },
