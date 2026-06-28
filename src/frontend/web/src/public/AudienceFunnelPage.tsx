@@ -4,6 +4,9 @@ import { FaqAccordion, type FaqItem } from "./FaqAccordion";
 export interface FunnelStep {
   title: string;
   text: string;
+  /** Step illustration — desktop + mobile variants, as the live "Process to Onboard" section uses. */
+  img: string;
+  mobileImg: string;
 }
 
 export interface AudienceFunnelContent {
@@ -16,6 +19,7 @@ export interface AudienceFunnelContent {
   aboutTitle: string;
   aboutText: string;
   aboutImg: string;
+  aboutMobileImg: string;
   /** Benefits band */
   benefitsTitle: string;
   benefitsText: string;
@@ -24,6 +28,7 @@ export interface AudienceFunnelContent {
   /** Process */
   processTitle: string;
   processLead: string;
+  processCta: string;
   steps: FunnelStep[];
   /** FAQ */
   faqs: FaqItem[];
@@ -48,7 +53,10 @@ export function AudienceFunnelPage({ content }: { content: AudienceFunnelContent
 
       {/* About band */}
       <section className="section funnel-about">
-        <img className="funnel-about-img" src={content.aboutImg} alt="" />
+        <picture className="funnel-about-img">
+          <source media="(max-width: 820px)" srcSet={content.aboutMobileImg} />
+          <img src={content.aboutImg} alt="" />
+        </picture>
         <div className="funnel-about-body">
           <div className="section-indicator" />
           <h2 className="section-title">{content.aboutTitle}</h2>
@@ -73,22 +81,28 @@ export function AudienceFunnelPage({ content }: { content: AudienceFunnelContent
 
       <img className="funnel-banner" src={content.bannerImg} alt="" />
 
-      {/* Process */}
+      {/* Process — 5 alternating image-paired onboarding blocks, cloning the live "Process to Onboard" */}
       <section className="section funnel-process">
         <div className="section-indicator" />
         <h2 className="section-title">{content.processTitle}</h2>
         <p className="section-lead">{content.processLead}</p>
         <div className="funnel-steps">
           {content.steps.map((s, i) => (
-            <div className="funnel-step" key={s.title}>
-              <div className="funnel-step-n">{String(i + 1).padStart(2, "0")}</div>
-              <h3 className="funnel-step-title">{s.title}</h3>
-              <p className="funnel-step-text">{s.text}</p>
+            <div className={`funnel-step-row${i % 2 ? " reverse" : ""}`} key={s.title}>
+              <picture className="funnel-step-media">
+                <source media="(max-width: 820px)" srcSet={s.mobileImg} />
+                <img src={s.img} alt="" />
+              </picture>
+              <div className="funnel-step-content">
+                <div className="funnel-step-n">{String(i + 1).padStart(2, "0")}</div>
+                <h3 className="funnel-step-title">{s.title}</h3>
+                <p className="funnel-step-text">{s.text}</p>
+              </div>
             </div>
           ))}
         </div>
         <div className="funnel-process-cta">
-          <Link to="/portal" className="btn btn-primary">Join Us Today</Link>
+          <Link to="/portal" className="btn btn-primary">{content.processCta}</Link>
         </div>
       </section>
 

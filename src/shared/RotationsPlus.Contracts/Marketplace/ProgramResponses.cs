@@ -49,3 +49,21 @@ public sealed record ProgramDetailResponse(
 /// <summary>Returned by the program image upload/delete endpoints. <c>ImageUrl</c> is the new
 /// short-lived read URL after an upload, or null after the image is removed.</summary>
 public sealed record ProgramImageResponse(string? ImageUrl);
+
+/// <summary>Public-safe projection of an open program for the ANONYMOUS marketing landing page (the
+/// hero search/map/results). Deliberately omits every sensitive field — no honorarium (preceptor pay /
+/// platform margin), no preceptor identity, no description — exposing only what the live site shows an
+/// anonymous visitor: specialty, type, location, retail price/week and minimum weeks. Only open
+/// (<c>IsOpen</c>) programs are returned. The actual search + program detail still require a signed-in
+/// customer; this feed only powers the public landing's map markers + results preview.</summary>
+public sealed record PublicProgramResponse(
+    Guid Id,
+    int ProgramNumber,
+    string SpecialtyName,
+    ProgramType ProgramType,
+    string? City,
+    string? State,
+    decimal RetailAmountPerWeek,
+    int MinWeeksPerRotation,
+    bool InstantApproval,
+    string? ImageUrl);

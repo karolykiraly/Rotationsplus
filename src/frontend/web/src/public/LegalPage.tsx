@@ -30,23 +30,25 @@ function Blocks({ blocks }: { blocks: LegalBlock[] }) {
     <>
       {blocks.map((b, i) =>
         b.clauses ? (
-          <dl className="legal-clauses" key={i}>
+          <div className="legal-clauses" key={i}>
             {b.clauses.map((c, j) => (
               <div className="legal-clause" key={j}>
-                {c.label && <dt>{c.label}</dt>}
-                <dd>
+                {/* Label renders INLINE with the text (as the live site does), so multi-word labels
+                    like "Rotation Fee." flow naturally instead of colliding in a fixed column. */}
+                <p>
+                  {c.label && <strong className="legal-label">{c.label} </strong>}
                   {c.text}
-                  {c.sub && (
-                    <ol className="legal-sub" type="i">
-                      {c.sub.map((s, k) => (
-                        <li key={k}>{s}</li>
-                      ))}
-                    </ol>
-                  )}
-                </dd>
+                </p>
+                {c.sub && (
+                  <ol className="legal-sub" type="i">
+                    {c.sub.map((s, k) => (
+                      <li key={k}>{s}</li>
+                    ))}
+                  </ol>
+                )}
               </div>
             ))}
-          </dl>
+          </div>
         ) : (
           <p key={i}>{b.text}</p>
         )

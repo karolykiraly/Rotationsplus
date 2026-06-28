@@ -14,7 +14,7 @@ describe("TermsPage", () => {
     expect(screen.getByRole("heading", { name: /11\. Contact/ })).toBeInTheDocument();
     // TOC anchor link to a section.
     expect(screen.getByRole("link", { name: "Fees" })).toHaveAttribute("href", "#fees");
-    expect(screen.getByText(/info@rotationsplus\.com/)).toBeInTheDocument();
+    expect(screen.getByText(/info@rotationsplus\.org/)).toBeInTheDocument();
   });
 });
 

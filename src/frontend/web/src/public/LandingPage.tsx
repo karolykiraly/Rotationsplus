@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { HeroSearch } from "./HeroSearch";
+import { CustomerReviews } from "./CustomerReviews";
 
 import trustImg from "../assets/images/marketing/trust.webp";
 import transparencyImg from "../assets/images/marketing/transparency.webp";
@@ -103,20 +105,11 @@ const PARTNERS = [
 export function LandingPage() {
   return (
     <div className="landing">
-      {/* Hero */}
-      <section className="hero">
-        <h1 className="hero-title">
-          Find Your Perfect <span className="hero-accent">Clinical Experience</span> Today
-        </h1>
-        <p className="hero-sub">
-          Gain Valuable Clinical Experience and Earn Letters of Recommendations to Make Your Medical
-          Residency, D.O. or Dental Goals a Reality!
-        </p>
-        <div className="hero-cta">
-          <Link to="/portal" className="btn btn-primary">Search Programs</Link>
-          <Link to="/for-preceptors" className="btn btn-ghost">For Preceptors</Link>
-        </div>
-      </section>
+      {/* Hero — program search + interactive map + results (login-gated search), cloning the live site */}
+      <HeroSearch />
+
+      {/* What Our Customers Say — Google reviews */}
+      <CustomerReviews />
 
       {/* Our Benefits */}
       <section className="section section-benefit">

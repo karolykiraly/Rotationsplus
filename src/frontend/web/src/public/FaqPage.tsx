@@ -171,7 +171,7 @@ const CATEGORIES: { key: string; label: string; items: FaqItem[] }[] = [
       },
       {
         q: "I need a specific specialty in a specific city, but I don't see it when I search. Can you help with that?",
-        a: "Yes, we can take a 10% refundable deposit and will find you a Preceptor within 5 business days or you'll get your money back. Please contact info@rotationsplus.com for a request."
+        a: "Yes, we can take a 10% refundable deposit and will find you a Preceptor within 5 business days or you'll get your money back. Please contact info@rotationsplus.org for a request."
       }
     ]
   },

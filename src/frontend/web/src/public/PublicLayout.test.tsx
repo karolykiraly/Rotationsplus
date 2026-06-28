@@ -22,7 +22,10 @@ describe("PublicLayout", () => {
   it("renders the nav, CTAs, the routed child and the footer", () => {
     renderLayout();
     expect(screen.getByText("HOME CHILD")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Blog" })).toHaveAttribute("href", "/blog");
+    // Blog appears in both the header nav and the footer nav — both point at /blog.
+    const blogLinks = screen.getAllByRole("link", { name: "Blog" });
+    expect(blogLinks.length).toBeGreaterThan(0);
+    blogLinks.forEach((l) => expect(l).toHaveAttribute("href", "/blog"));
     // CTAs: Login → staff entry, Sign Up → customer (CIAM) portal.
     expect(screen.getByRole("link", { name: "Login" })).toHaveAttribute("href", "/rotationsplusadmin");
     expect(screen.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/portal");

@@ -229,7 +229,7 @@ const TERMS: LegalContent = {
       title: "Contact",
       blocks: [
         {
-          text: "If you have any questions about this Terms of Service, please contact us immediately at info@rotationsplus.com or call +1.657.214.7174."
+          text: "If you have any questions about this Terms of Service, please contact us immediately at info@rotationsplus.org or call +1.657.214.7174."
         }
       ]
     }
