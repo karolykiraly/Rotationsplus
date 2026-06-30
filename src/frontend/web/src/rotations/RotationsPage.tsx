@@ -28,15 +28,14 @@ const DEFAULTS: RotationFormInitial = {
 const ALL_STATUS_VALUES = ROTATION_STATUSES.map((s) => s.value);
 const PAGE_SIZE = 10;
 
-/** Format a YYYY-MM-DD wire date for display without a timezone shift (parse the parts directly). */
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+/** Format a YYYY-MM-DD wire date as MM/DD/YY (or MM/DD/YYYY) — the legacy admin rotations format. The
+ *  wire parts are already zero-padded, so slice them directly (no Date() → no timezone shift). Legacy
+ *  shows a 2-digit year in the Current section and a 4-digit year in the Historical section. */
+function formatDate(iso: string, fourDigitYear = false): string {
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "-";
+  return `${m}/${d}/${fourDigitYear ? y : y.slice(-2)}`;
 }
-
-const money = (amount: number) =>
-  `$${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 /** One rotation table section (Current or Historical) — own search + pager, the production columns, and a
  *  View button that opens the shared Selected Rotation panel. */
@@ -71,6 +70,8 @@ function RotationsSection({
   }, [settled, page, totalPages]);
 
   const rows = list.data?.items ?? [];
+  // Legacy shows a 2-digit year in the Current section, a 4-digit year in the Historical section.
+  const fourDigitYear = scope === "historical";
 
   return (
     <div className="lead-page">
@@ -109,19 +110,22 @@ function RotationsSection({
                   </td>
                   <td>
                     <div className="place-holder">Preceptor Name</div>
-                    <div className="heading-xxxs-normal">{r.preceptorName ?? "—"}</div>
+                    {/* Production renders the name as a bold blue link to the member's profile page; the
+                        rewrite styles it to match but defers the navigation until the member-profile
+                        (Contacts) pages exist — see RotationsPage note. */}
+                    <div className="heading-xxxs rot-name">{r.preceptorName ?? "—"}</div>
                   </td>
                   <td>
                     <div className="place-holder">Student Name</div>
-                    <div className="heading-xxxs-normal">{r.studentName}</div>
+                    <div className="heading-xxxs rot-name">{r.studentName}</div>
                   </td>
                   <td>
                     <div className="place-holder">Start and End Date</div>
-                    <div className="heading-xxxs-normal">{formatDate(r.startDate)} – {formatDate(r.endDate)}</div>
+                    <div className="body-md">{formatDate(r.startDate, fourDigitYear)} to {formatDate(r.endDate, fourDigitYear)}</div>
                   </td>
                   <td>
                     <div className="place-holder">Retail Amount</div>
-                    <div className="heading-xxxs-normal">{money(r.retailAmount)}</div>
+                    <div className="body-md">{`$${r.retailAmount}`}</div>
                   </td>
                   <td className="text-center">
                     <div className="place-holder">Needs Visa</div>
@@ -134,7 +138,7 @@ function RotationsSection({
                   </td>
                   <td>
                     <div className="place-holder">Status</div>
-                    <div className={`heading-xxxs-normal ${rotationStatusClass(r.status)}`}>
+                    <div className={`body-md ${rotationStatusClass(r.status)}`}>
                       {rotationStatusLabel(r.status)}
                     </div>
                   </td>
@@ -155,7 +159,12 @@ function RotationsSection({
 
 /** The admin Rotations screen — two stacked sections (Current / Historical), each server-paginated with
  *  its own search, plus the Selected Rotation detail panel that opens on View (Replace program / Change
- *  dates / status, saved via the shared update endpoint). Matches the production layout. */
+ *  dates / status, saved via the shared update endpoint). Matches the production layout.
+ *
+ *  Deferred-parity note: production renders the Preceptor and Student names as links to the member's
+ *  profile page (`/admin/preceptors/:id`, `/admin/students/:id`). Those profile routes don't exist in
+ *  the rewrite yet (they're part of the upcoming Contacts work), so the names are styled to match
+ *  (bold blue) but are not yet clickable — wire them to the profile pages when those land. */
 export function RotationsPage() {
   const { user } = useMe();
   const { create, update } = useRotationMutations();

@@ -129,7 +129,12 @@ describe("RotationsPage", () => {
     expect(await screen.findByText("Sam Rivera")).toBeInTheDocument();
     expect(screen.getByText("R1001")).toBeInTheDocument();
     expect(screen.getByText("Jane Carter")).toBeInTheDocument();
-    expect(screen.getByText("$6,000")).toBeInTheDocument(); // Retail Amount column
+    expect(screen.getByText("$6000")).toBeInTheDocument(); // Retail Amount column — raw, no thousands separators (matches production)
+    // Start/End date is MM/DD/YY in the Current section (production format).
+    expect(screen.getByText("07/06/26 to 08/03/26")).toBeInTheDocument();
+    // Preceptor + Student names are styled as production's bold blue profile links.
+    expect(screen.getByText("Jane Carter")).toHaveClass("rot-name");
+    expect(screen.getByText("Sam Rivera")).toHaveClass("rot-name");
     // Needs Visa checkbox reflects the flag.
     expect(screen.getByLabelText("R1001 needs visa")).toBeChecked();
     // Status text is colour-coded (Active → green ok-text).
@@ -141,6 +146,20 @@ describe("RotationsPage", () => {
     expect(screen.queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
     expect(screen.queryByText("In person")).not.toBeInTheDocument();
+  });
+
+  it("formats Current dates as MM/DD/YY and Historical dates as MM/DD/YYYY (legacy per-section format)", async () => {
+    h.getRotations.mockImplementation((params?: { scope?: string }) =>
+      Promise.resolve(paged(
+        params?.scope === "current"
+          ? [ROTATION_ROW]
+          : [{ ...ROTATION_ROW, id: "h1", rotationNumber: 3003, studentName: "Pat Lee" }]
+      ))
+    );
+    renderPage();
+    await screen.findByText("Pat Lee");
+    expect(screen.getByText("07/06/26 to 08/03/26")).toBeInTheDocument();     // Current: 2-digit year
+    expect(screen.getByText("07/06/2026 to 08/03/2026")).toBeInTheDocument(); // Historical: 4-digit year
   });
 
   it("leaves the Needs Visa box unchecked when the student doesn't need a visa", async () => {

@@ -784,6 +784,12 @@ table.data { width: 100%; border-collapse: collapse; }
 .place-holder { font-family: var(--font); font-weight: 400; font-size: 13px; line-height: 22px; color: #7f848b; }
 .heading-xxxs { font-family: var(--font-head); font-weight: 700; font-size: 16px; line-height: 28px; }
 .heading-xxxs-normal { font-family: var(--font-head); font-weight: 400; font-size: 16px; line-height: 28px; }
+/* PT-Sans body text (legacy `.body-md`). Production renders the rotation date/amount/status cells in
+   this sans face, not the PT-Serif of `.heading-xxxs-normal`. */
+.body-md { font-family: var(--font); font-weight: 400; font-size: 16px; line-height: 28px; }
+/* Admin rotation Preceptor/Student names — production renders them as bold blue profile links
+   (Bootstrap link blue). Navigation to the member-profile page is deferred (Contacts slice). */
+.rot-name { color: #007bff; }
 .heading-xxs { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 30px; margin: 0; }
 /* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
 .list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
