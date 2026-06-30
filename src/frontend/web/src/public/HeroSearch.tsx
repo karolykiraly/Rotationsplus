@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -216,18 +215,20 @@ export function HeroSearch() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <MarkerClusterGroup chunkedLoading>
-              {markers.map((m) => (
-                <Marker key={m.p.id} position={m.coords}>
-                  <Popup>
-                    <strong>{m.p.specialtyName}</strong>
-                    <br />
-                    {m.p.city}, {m.p.state}
-                    <br />${totalPrice(m.p).toLocaleString()}
-                  </Popup>
-                </Marker>
-              ))}
-            </MarkerClusterGroup>
+            {/* Markers rendered directly. Clustering (legacy used react-leaflet-cluster) is deferred:
+                that package is CJS-only and resolves to a non-component object under the Vite/rolldown
+                production bundle (React error #130), crashing the page. Tracked as a follow-up to
+                restore via a build-compatible clustering approach. */}
+            {markers.map((m) => (
+              <Marker key={m.p.id} position={m.coords}>
+                <Popup>
+                  <strong>{m.p.specialtyName}</strong>
+                  <br />
+                  {m.p.city}, {m.p.state}
+                  <br />${totalPrice(m.p).toLocaleString()}
+                </Popup>
+              </Marker>
+            ))}
           </MapContainer>
         </div>
 

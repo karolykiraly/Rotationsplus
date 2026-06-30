@@ -13,7 +13,6 @@ vi.mock("react-leaflet", () => ({
   Marker: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Popup: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }));
-vi.mock("react-leaflet-cluster", () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock("./publicApi", () => ({ getPublicPrograms: () => h.getPublicPrograms() }));
 vi.mock("react-router-dom", async (orig) => ({
   ...(await orig<typeof import("react-router-dom")>()),
