@@ -241,6 +241,24 @@ public static class RotationEndpoints
         })
         .WithName("DeleteRotation");
 
+        // Toggle the dashboard Upcoming-Starts row flags (legacy documents_approved / preceptor_confirmed).
+        // A focused write — it sets just the two booleans (not the full booking) so it doesn't touch the
+        // status state machine or re-snapshot the student. AdminOnly via the group.
+        group.MapPut("/{id:guid}/confirmations", async (Guid id, RotationConfirmationsRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            var rotation = await db.Rotations.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+            if (rotation is null)
+            {
+                return Results.NotFound();
+            }
+
+            rotation.DocumentsApproved = request.DocumentsApproved;
+            rotation.PreceptorConfirmed = request.PreceptorConfirmed;
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("SetRotationConfirmations");
+
         return routes;
     }
 

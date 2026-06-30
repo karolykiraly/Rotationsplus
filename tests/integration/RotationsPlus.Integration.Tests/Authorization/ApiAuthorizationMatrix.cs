@@ -82,6 +82,7 @@ public static class ApiAuthorizationMatrix
         new("POST", "/api/rotations", [RoleNames.Admin], "Create rotation (admin)"),
         new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update rotation (admin)"),
         new("DELETE", "/api/rotations/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete rotation (admin)"),
+        new("PUT", "/api/rotations/00000000-0000-0000-0000-000000000000/confirmations", [RoleNames.Admin], "Toggle rotation dashboard flags (admin)"),
         // Admin hub aggregate (totals + rotation pipeline + upcoming starts).
         new("GET", "/api/dashboard", [RoleNames.Admin], "Admin dashboard aggregate"),
         new("GET", "/api/dashboard/todos", [RoleNames.Admin], "Admin dashboard to-do queues"),

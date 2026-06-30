@@ -41,10 +41,15 @@ public sealed record TodayMetrics(
     int RotationsCompleting,
     int RotationsCancelled);
 
-/// <summary>A rotation starting on/after today, for the "upcoming starts" widget.</summary>
+/// <summary>A rotation starting on/after today, for the "upcoming starts" calendar + day-table. The
+/// table shows the production columns: Preceptor · Student · Documents Approved · Preceptor Confirmed ·
+/// Needs Visa. <c>PreceptorName</c> is null when the program has no assigned preceptor; <c>NeedsVisa</c>
+/// is derived from the booked student's visa status; the two flags are admin-toggled on the row.</summary>
 public sealed record UpcomingRotation(
     Guid Id,
-    string StudentName,
-    string SpecialtyName,
     DateOnly StartDate,
-    RotationStatus Status);
+    string? PreceptorName,
+    string StudentName,
+    bool DocumentsApproved,
+    bool PreceptorConfirmed,
+    bool NeedsVisa);

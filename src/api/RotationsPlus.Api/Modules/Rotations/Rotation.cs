@@ -35,4 +35,13 @@ public sealed class Rotation : AuditableEntity
     public int Weeks { get; set; }
 
     public RotationStatus Status { get; set; } = RotationStatus.Pending;
+
+    /// <summary>Admin-toggled flag (legacy <c>documents_approved</c>) shown as a checkbox on the
+    /// dashboard's Upcoming-Starts row. A coarse "the student's paperwork is in order" marker the admin
+    /// sets by hand — distinct from the granular per-document review in the documents subsystem.</summary>
+    public bool DocumentsApproved { get; set; }
+
+    /// <summary>Admin-toggled flag (legacy <c>preceptor_confirmed</c>) shown as a checkbox on the
+    /// dashboard's Upcoming-Starts row — the preceptor has confirmed they will take the student.</summary>
+    public bool PreceptorConfirmed { get; set; }
 }

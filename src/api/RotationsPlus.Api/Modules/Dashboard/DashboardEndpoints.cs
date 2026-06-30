@@ -3,6 +3,7 @@ using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Dashboard;
 using RotationsPlus.Contracts.Rotations;
+using RotationsPlus.Contracts.Students;
 
 namespace RotationsPlus.Api.Modules.Dashboard;
 
@@ -15,7 +16,10 @@ namespace RotationsPlus.Api.Modules.Dashboard;
 /// </summary>
 public static class DashboardEndpoints
 {
-    private const int UpcomingCount = 8;
+    // The "Upcoming Starts" calendar marks every future day that has a start and the day-table filters
+    // to the clicked day, so this feeds the whole calendar — not just a short "next N" list. Bounded
+    // generously (admin-only, and future rotations are finite) so one cheap query covers the calendar.
+    private const int UpcomingCount = 500;
 
     /// <summary>Rotation statuses that count as a live rotation for the "today's cycle" breakdown
     /// (terminal/exception states — Cancelled/Refunded/Abandoned/Rejected/Completed — are excluded;
@@ -61,9 +65,18 @@ public static class DashboardEndpoints
             var upcoming = await db.Rotations
                 .Where(r => r.StartDate >= today)
                 .OrderBy(r => r.StartDate)
+                .ThenBy(r => r.Id) // deterministic tie-break so the 500-row cut is stable when dates collide
                 .Take(UpcomingCount)
                 .Select(r => new UpcomingRotation(
-                    r.Id, r.StudentName, r.Program.Specialty.Name, r.StartDate, r.Status))
+                    r.Id,
+                    r.StartDate,
+                    r.Program.Preceptor != null ? r.Program.Preceptor.FirstName + " " + r.Program.Preceptor.LastName : null,
+                    r.StudentName,
+                    r.DocumentsApproved,
+                    r.PreceptorConfirmed,
+                    // Derived (the rotation has no Student navigation; StudentId may be null) — same
+                    // EXISTS pattern as the admin rotations list's Needs-Visa column.
+                    db.Students.Any(s => s.Id == r.StudentId && s.VisaStatus == VisaStatus.NeedsVisaHelp)))
                 .ToListAsync(cancellationToken);
 
             // ---- Today's LiveScore (movement within the current business day) ----

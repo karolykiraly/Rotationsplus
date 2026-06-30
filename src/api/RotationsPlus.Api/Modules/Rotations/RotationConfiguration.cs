@@ -39,6 +39,10 @@ public sealed class RotationConfiguration : IEntityTypeConfiguration<Rotation>
             .HasMaxLength(32)
             .IsRequired();
 
+        // Admin-toggled dashboard flags; default false so existing/seed rows read as un-confirmed.
+        builder.Property(x => x.DocumentsApproved).HasDefaultValue(false);
+        builder.Property(x => x.PreceptorConfirmed).HasDefaultValue(false);
+
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.ModifiedBy).HasMaxLength(64);
         builder.Property(x => x.DeletedBy).HasMaxLength(64);

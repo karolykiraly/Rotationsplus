@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useMe } from "../useMe";
-import { useDashboard } from "./useDashboard";
+import { useDashboard, useRotationConfirmations } from "./useDashboard";
 import { DashboardTodosPanel } from "./DashboardTodosPanel";
 import { DashboardRevenuePanel } from "./DashboardRevenuePanel";
 import { DashboardReportsPanel } from "./DashboardReportsPanel";
 import { DashboardCampaignPanel } from "./DashboardCampaignPanel";
 import { Tabs } from "../components/Tabs";
-import { rotationStatusLabel } from "../rotations/rotationStatuses";
 import { programFamilyCount } from "../programs/programTypes";
+import type { UpcomingRotation } from "../api";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -15,12 +15,9 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-/** Format a YYYY-MM-DD wire date for display without a timezone shift (parse the parts directly). */
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** The YYYY-MM-DD wire key for a calendar day, matching the rotation startDate strings. */
+const dayKey = (year: number, month: number, day: number) => `${year}-${pad2(month + 1)}-${pad2(day)}`;
 
 /** Monday-first month grid: a flat array of day numbers (or null for padding cells). */
 function monthCells(year: number, month: number): (number | null)[] {
@@ -52,8 +49,13 @@ function Pill({ value }: { value: number | string }) {
 export function DashboardPage() {
   const { user } = useMe();
   const dash = useDashboard();
+  const confirmations = useRotationConfirmations();
   const today = new Date();
+  const todayKey = dayKey(today.getFullYear(), today.getMonth(), today.getDate());
   const [cal, setCal] = useState({ year: today.getFullYear(), month: today.getMonth() });
+  // The day whose rotations the Upcoming-Starts table shows; clicking a calendar day re-selects it
+  // (defaults to today, matching the live dashboard's selected-day → day-table behaviour).
+  const [selectedDate, setSelectedDate] = useState(todayKey);
   const [tab, setTab] = useState(0);
 
   if (user && !user.isAdmin) {
@@ -69,7 +71,14 @@ export function DashboardPage() {
   // The Rotations-Cycle circle is the sum of its (disjoint) breakdown buckets.
   const cycleTotal = t.rotationsStarting + t.rotationsInProgress + t.rotationsCompleting + t.rotationsCancelled;
 
-  // Days in the shown month that have an upcoming rotation start (pink calendar dots).
+  // Rotations starting on the selected calendar day — the Upcoming-Starts table's rows.
+  const selectedRotations = data.upcomingStarts.filter((u) => u.startDate === selectedDate);
+  const toggleDocs = (r: UpcomingRotation) =>
+    confirmations.mutate({ id: r.id, documentsApproved: !r.documentsApproved, preceptorConfirmed: r.preceptorConfirmed });
+  const togglePreceptor = (r: UpcomingRotation) =>
+    confirmations.mutate({ id: r.id, documentsApproved: r.documentsApproved, preceptorConfirmed: !r.preceptorConfirmed });
+
+  // Days in the shown month that have an upcoming rotation start (calendar dots).
   const eventDays = new Set(
     data.upcomingStarts
       .map((u) => u.startDate.split("-").map(Number))
@@ -90,7 +99,7 @@ export function DashboardPage() {
   return (
     <div className="dash">
       <section className="dash-card">
-        <h2 className="dash-title">Upcoming starts</h2>
+        <h2 className="dash-title">Upcoming Starts</h2>
         <div className="cal-head">
           <button className="cal-nav" onClick={() => step(-1)} aria-label="Previous month">‹</button>
           <div className="cal-month">{MONTHS[cal.month]} {cal.year}</div>
@@ -98,31 +107,62 @@ export function DashboardPage() {
         </div>
         <div className="cal-grid">
           {WEEKDAYS.map((w) => <div key={w} className="cal-weekday">{w}</div>)}
-          {cells.map((d, i) => (
-            <div key={i} className="cal-cell">
-              {d && (
-                <div className={`cal-day${eventDays.has(d) ? " has-event" : ""}${isToday(d) ? " today" : ""}`}>
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} className="cal-cell" />;
+            const key = dayKey(cal.year, cal.month, d);
+            const cls = `cal-day${eventDays.has(d) ? " has-event" : ""}${isToday(d) ? " today" : ""}${selectedDate === key ? " selected" : ""}`;
+            // Clicking a day selects it → the table below filters to that day's rotations (legacy behaviour).
+            return (
+              <div key={i} className="cal-cell">
+                <button type="button" className={cls} onClick={() => setSelectedDate(key)} aria-pressed={selectedDate === key}>
                   {d}
-                </div>
-              )}
-            </div>
-          ))}
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         <table className="dash-upcoming">
           <thead>
-            <tr><th>Student</th><th>Specialty</th><th>Starts</th><th>Status</th></tr>
+            <tr>
+              <th>Preceptor</th>
+              <th>Student</th>
+              <th>Documents Approved</th>
+              <th>Preceptor Confirmed</th>
+              <th>Needs Visa</th>
+            </tr>
           </thead>
           <tbody>
-            {data.upcomingStarts.length === 0 ? (
-              <tr><td colSpan={4} className="muted">No upcoming rotations.</td></tr>
+            {selectedRotations.length === 0 ? (
+              <tr><td colSpan={5} className="muted">No rotation</td></tr>
             ) : (
-              data.upcomingStarts.map((u) => (
+              selectedRotations.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.studentName}</td>
-                  <td>{u.specialtyName}</td>
-                  <td>{formatDate(u.startDate)}</td>
-                  <td><span className="badge">{rotationStatusLabel(u.status)}</span></td>
+                  {/* Production links the names to the member-profile pages; styled to match (blue),
+                      navigation deferred until those routes exist (Contacts) — same as the Rotations list. */}
+                  <td className="rot-name">{u.preceptorName ?? "—"}</td>
+                  <td className="rot-name">{u.studentName}</td>
+                  <td className="text-center">
+                    <input
+                      type="checkbox"
+                      checked={u.documentsApproved}
+                      onChange={() => toggleDocs(u)}
+                      disabled={confirmations.isPending}
+                      aria-label={`Documents approved for ${u.studentName}`}
+                    />
+                  </td>
+                  <td className="text-center">
+                    <input
+                      type="checkbox"
+                      checked={u.preceptorConfirmed}
+                      onChange={() => togglePreceptor(u)}
+                      disabled={confirmations.isPending}
+                      aria-label={`Preceptor confirmed for ${u.studentName}`}
+                    />
+                  </td>
+                  <td className="text-center">
+                    <input type="checkbox" checked={u.needsVisa} readOnly aria-label={`Needs visa for ${u.studentName}`} />
+                  </td>
                 </tr>
               ))
             )}
@@ -183,10 +223,10 @@ export function DashboardPage() {
             <h2 className="dash-title">LiveScore</h2>
             <div className="score-grid">
               <div className="score-metric">
-                <div className="score-metric-title">Total Programs</div>
+                <div className="score-metric-title">TOTAL PROGRAMS</div>
                 <div className="score-row">
                   <Circle value={data.programs} />
-                  {/* The legacy/Figma breakdown shows only these three families; Dental (if any) folds
+                  {/* The legacy breakdown shows only these three families; Dental (if any) folds
                       out, so the circle can exceed the sum of the three rows by the Dental count. */}
                   <ul className="score-breakdown">
                     <li>InPerson <Badge value={programFamilyCount(data.programsByType, "InPerson")} /></li>
@@ -196,12 +236,11 @@ export function DashboardPage() {
                 </div>
               </div>
               <div className="score-metric">
-                <div className="score-pill-row"><div className="score-metric-title">Total Students</div><Pill value={data.students} /></div>
-                <div className="score-pill-row"><div className="score-metric-title">Total Preceptors</div><Pill value={data.preceptors} /></div>
-                <div className="score-pill-row"><div className="score-metric-title">Total Specialties</div><Pill value={data.specialties} /></div>
+                <div className="score-pill-row"><div className="score-metric-title">TOTAL STUDENTS</div><Pill value={data.students} /></div>
+                <div className="score-pill-row"><div className="score-metric-title">TOTAL PRECEPTORS</div><Pill value={data.preceptors} /></div>
               </div>
               <div className="score-metric">
-                <div className="score-metric-title">Total Rotations</div>
+                <div className="score-metric-title">TOTAL ROTATIONS</div>
                 <div className="score-row">
                   <Circle value={data.rotations} />
                   <ul className="score-breakdown">

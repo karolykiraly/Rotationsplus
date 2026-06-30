@@ -132,6 +132,61 @@ public class DashboardEndpointTests(RotationsApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task Upcoming_starts_row_carries_the_preceptor_flags_and_visa()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A far-future rotation is always "upcoming"; it books Sam Rivera into the seeded Internal
+        // Medicine program (preceptor Jane Carter).
+        var id = await CreateRotationAsync(admin, new DateOnly(2098, 3, 1), new DateOnly(2098, 4, 1));
+
+        var dash = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+        var row = dash!.UpcomingStarts.Single(u => u.Id == id);
+
+        row.PreceptorName.Should().Be("Jane Carter");
+        row.StudentName.Should().Be("Sam Rivera");
+        row.DocumentsApproved.Should().BeFalse(); // defaults until an admin toggles them
+        row.PreceptorConfirmed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Admin_can_toggle_the_documents_and_preceptor_confirmation_flags()
+    {
+        var admin = Client(RoleNames.Admin);
+        var id = await CreateRotationAsync(admin, new DateOnly(2097, 3, 1), new DateOnly(2097, 4, 1));
+
+        var put = await admin.PutAsJsonAsync($"/api/rotations/{id}/confirmations",
+            new RotationConfirmationsRequest(DocumentsApproved: true, PreceptorConfirmed: true), JsonOptions);
+        put.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var dash = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+        var row = dash!.UpcomingStarts.Single(u => u.Id == id);
+        row.DocumentsApproved.Should().BeTrue();
+        row.PreceptorConfirmed.Should().BeTrue();
+
+        // The request is the full desired state of both flags, so clearing one is honoured independently.
+        var put2 = await admin.PutAsJsonAsync($"/api/rotations/{id}/confirmations",
+            new RotationConfirmationsRequest(DocumentsApproved: false, PreceptorConfirmed: true), JsonOptions);
+        put2.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var dash2 = await admin.GetFromJsonAsync<DashboardResponse>("/api/dashboard", JsonOptions);
+        var row2 = dash2!.UpcomingStarts.Single(u => u.Id == id);
+        row2.DocumentsApproved.Should().BeFalse();
+        row2.PreceptorConfirmed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Toggling_confirmations_on_a_missing_rotation_is_404()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var response = await admin.PutAsJsonAsync($"/api/rotations/{Guid.NewGuid()}/confirmations",
+            new RotationConfirmationsRequest(true, true), JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Non_admin_staff_are_rejected_with_403()
     {
         var response = await Client(RoleNames.Sales).GetAsync("/api/dashboard");

@@ -292,13 +292,16 @@ export interface RotationStatusCount {
   count: number;
 }
 
-/** Mirror of the API's UpcomingRotation contract. */
+/** Mirror of the API's UpcomingRotation contract — one row of the dashboard's Upcoming-Starts day table
+ *  (Preceptor · Student · Documents Approved · Preceptor Confirmed · Needs Visa). */
 export interface UpcomingRotation {
   id: string;
-  studentName: string;
-  specialtyName: string;
   startDate: string;
-  status: RotationStatus;
+  preceptorName?: string | null;
+  studentName: string;
+  documentsApproved: boolean;
+  preceptorConfirmed: boolean;
+  needsVisa: boolean;
 }
 
 /** Mirror of the API's ProgramTypeCount contract — how many programs are of a given delivery type. */
@@ -755,6 +758,12 @@ export const updateRotation = (id: string, input: RotationInput): Promise<Rotati
   request<RotationDetail>("PUT", `/api/rotations/${id}`, input);
 export const deleteRotation = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/rotations/${id}`);
+/** Sets the dashboard Upcoming-Starts row flags (documents approved / preceptor confirmed). Both are
+ *  sent each time — the request is the full desired state of the two checkboxes. */
+export const setRotationConfirmations = (
+  id: string,
+  flags: { documentsApproved: boolean; preceptorConfirmed: boolean }
+): Promise<void> => request<void>("PUT", `/api/rotations/${id}/confirmations`, flags);
 /** Refunds a rotation's captured payments and moves it to Refunded (admin; rotation must be
  *  Cancelled/Completed with a captured payment). */
 export const refundRotation = (id: string): Promise<RefundResult> =>

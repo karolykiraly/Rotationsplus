@@ -683,14 +683,15 @@ table.data { width: 100%; border-collapse: collapse; }
 .cal-cell { display: grid; place-items: center; height: 46px; }
 .cal-day {
   position: relative; width: 42px; height: 42px; border-radius: 50%;
-  border: 1px solid var(--line); display: grid; place-items: center;
+  border: 1px solid var(--line); background: #fff; cursor: pointer;
+  display: grid; place-items: center; padding: 0;
   font-family: var(--font-head); font-weight: 700; font-size: 15px; color: var(--ink);
 }
+/* Days with an upcoming rotation start (and today) are filled blue — matching the live calendar. */
+.cal-day.has-event,
 .cal-day.today { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
-.cal-day.has-event::after {
-  content: ""; position: absolute; top: 3px; right: 3px;
-  width: 9px; height: 9px; border-radius: 50%; background: var(--brand);
-}
+/* The selected day (whose rotations the table shows) gets a brand ring on top of any fill. */
+.cal-day.selected { outline: 2px solid var(--brand); outline-offset: 1px; }
 
 /* Upcoming-starts table inside the calendar card */
 .dash-upcoming { width: 100%; border-collapse: collapse; margin-top: 22px; }
