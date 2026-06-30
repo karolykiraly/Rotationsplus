@@ -14,6 +14,7 @@ const money = z.coerce
 
 const schema = z.object({
   specialtyId: z.string().min(1, "Select a specialty."),
+  programName: z.string().max(200, "At most 200 characters.").optional(),
   programType: z.string().min(1, "Select a type."),
   maxStudentsPerRotation: z.coerce.number().int("Whole number.").min(1, "At least 1.").max(1000, "At most 1000."),
   minWeeksPerRotation: z.coerce.number().int("Whole number.").min(1, "At least 1.").max(520, "At most 520."),
@@ -26,6 +27,7 @@ type FormValues = z.infer<typeof schema>;
 
 export interface ProgramFormInitial {
   specialtyId: string;
+  programName: string; // "" when none — falls back to "{Specialty} Physician" in the list
   programType: ProgramType;
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
@@ -62,6 +64,7 @@ export function ProgramFormModal({ title, initial, specialties, preceptors, pend
   const submit = handleSubmit((v) =>
     onSubmit({
       specialtyId: v.specialtyId,
+      programName: v.programName?.trim() ? v.programName.trim() : null,
       programType: v.programType as ProgramType,
       maxStudentsPerRotation: v.maxStudentsPerRotation,
       minWeeksPerRotation: v.minWeeksPerRotation,
@@ -88,6 +91,12 @@ export function ProgramFormModal({ title, initial, specialties, preceptors, pend
                 {specialties.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               {errors.specialtyId && <span className="err">{errors.specialtyId.message}</span>}
+            </div>
+
+            <div className="field span-2">
+              <label htmlFor="p-name">Program name <span className="hint">(optional)</span></label>
+              <input id="p-name" type="text" placeholder="Defaults to “{Specialty} Physician”" {...register("programName")} />
+              {errors.programName && <span className="err">{errors.programName.message}</span>}
             </div>
 
             <div className="field">

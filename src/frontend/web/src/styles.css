@@ -615,6 +615,36 @@ table.data { width: 100%; border-collapse: collapse; }
 .filter-label { font-size: 13px; font-weight: 600; color: #4b5159; }
 .filter-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .filter-tags { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px 14px; }
+/* FilterProgram checkbox lists (Specialty / Approval Type / Clinical Needs). */
+.filter-checks { display: flex; flex-direction: column; gap: 6px; }
+.filter-checks.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.filter-panel input[type="number"],
+.filter-panel input[type="text"],
+.filter-panel select {
+  height: 40px; padding: 0 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-btn); font-family: var(--font); font-size: 14px; background: #fff;
+}
+.filter-panel input:focus, .filter-panel select:focus { outline: 2px solid var(--brand-tint); border-color: var(--brand); }
+.amount-range-inputs { display: flex; align-items: center; gap: 8px; }
+.amount-range-inputs input { flex: 1; min-width: 0; }
+/* Dependency-free dual-range slider (FilterProgram Retail Amount), styled to match the legacy react-range. */
+.range-slider { position: relative; height: 28px; margin-top: 8px; }
+.range-track { position: absolute; top: 50%; left: 0; right: 0; height: 3px; transform: translateY(-50%); background: #E1E5E8; border-radius: 2px; }
+.range-fill { position: absolute; top: 50%; height: 3px; transform: translateY(-50%); background: var(--brand); border-radius: 2px; }
+.range-thumb {
+  position: absolute; top: 0; left: 0; width: 100%; height: 28px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none;
+}
+.range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; pointer-events: auto; width: 22px; height: 22px;
+  border-radius: 99px; background: #fff; border: 1px solid #B5BDC6; cursor: pointer;
+  box-shadow: 0 30px 40px rgba(17, 61, 126, 0.05);
+}
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto; width: 22px; height: 22px; border-radius: 99px; background: #fff;
+  border: 1px solid #B5BDC6; cursor: pointer;
+}
+.range-thumb::-moz-range-track { background: transparent; }
 .search-form2 { position: relative; width: 320px; max-width: 100%; }
 .search-form2 input {
   width: 100%; height: 48px; padding: 0 14px 0 42px;

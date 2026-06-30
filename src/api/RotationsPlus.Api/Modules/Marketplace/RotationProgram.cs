@@ -21,6 +21,13 @@ public sealed class RotationProgram : AuditableEntity
 
     public required ProgramType ProgramType { get; set; }
 
+    /// <summary>The program's human-facing name, distinct from its specialty (legacy
+    /// <c>preceptor.program_name</c>) — e.g. a "Physical Medicine &amp; Rehabilitation" specialty may be
+    /// offered as the "Physical Medicine &amp; Rehabilitation Physician" program. Optional: when null the
+    /// admin list falls back to the legacy default "{Specialty} Physician" so existing/migrated rows
+    /// without an explicit name still render a sensible label.</summary>
+    public string? ProgramName { get; set; }
+
     /// <summary>A short, human-facing sequential number (DB identity) shown to users as a typed code
     /// (e.g. "IP1042") — the rewrite analog of the legacy integer <c>program_id</c>. Server-assigned;
     /// never set from a request.</summary>

@@ -35,6 +35,8 @@ public sealed class RotationProgramConfiguration : IEntityTypeConfiguration<Rota
         builder.Property(x => x.ProgramNumber).UseIdentityByDefaultColumn();
         builder.HasIndex(x => x.ProgramNumber).IsUnique();
 
+        builder.Property(x => x.ProgramName).HasMaxLength(200);
+
         builder.Property(x => x.City).HasMaxLength(120);
         builder.Property(x => x.State).HasMaxLength(120);
         // Tags map to a Postgres text[]; existing rows default to an empty array. Tags are deliberately

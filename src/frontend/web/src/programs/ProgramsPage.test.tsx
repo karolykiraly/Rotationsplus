@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -13,7 +13,8 @@ const h = vi.hoisted(() => ({
   updateProgram: vi.fn(),
   deleteProgram: vi.fn(),
   getSpecialties: vi.fn(),
-  getPreceptorOptions: vi.fn()
+  getPreceptorOptions: vi.fn(),
+  getProgramLocations: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -25,6 +26,7 @@ vi.mock("../api", () => ({
   deleteProgram: (id: string) => h.deleteProgram(id),
   getSpecialties: () => h.getSpecialties(),
   getPreceptorOptions: () => h.getPreceptorOptions(),
+  getProgramLocations: () => h.getProgramLocations(),
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -96,6 +98,7 @@ describe("ProgramsPage", () => {
       { id: "s2", name: "Pediatrics" }
     ]);
     h.getPreceptorOptions.mockResolvedValue([{ id: "d1", fullName: "Jane Carter", email: "j@x", primarySpecialtyName: "IM", status: "MemberActivated" }]);
+    h.getProgramLocations.mockResolvedValue(["Houston, TX", "Los Angeles, CA"]);
   });
 
   it("lists programs with a derived name, a distinct specialty, and the honorarium under Retail Amount", async () => {
@@ -107,6 +110,36 @@ describe("ProgramsPage", () => {
     expect(screen.getByText("Internal Medicine")).toBeInTheDocument();
     expect(screen.getByText("$500")).toBeInTheDocument();
     expect(screen.queryByText("$1,500")).not.toBeInTheDocument(); // retail value is no longer the column shown
+  });
+
+  it("shows the program's own name when set (not the derived default), and pre-fills it for edit", async () => {
+    h.getPrograms.mockResolvedValue(paged([{ ...PROGRAM_ROW, programName: "Hospitalist Internal Medicine" }]));
+    h.getProgram.mockResolvedValue({ ...PROGRAM_DETAIL, programName: "Hospitalist Internal Medicine" });
+    renderPage();
+    await screen.findByText("Program ID");
+
+    // The Program Name column shows the explicit name; the derived "{Specialty} Physician" is NOT used.
+    expect(screen.getByText("Hospitalist Internal Medicine")).toBeInTheDocument();
+    expect(screen.queryByText("Internal Medicine Physician")).not.toBeInTheDocument();
+
+    // Opening the row pre-fills the Program name field with the stored value.
+    await userEvent.click(screen.getByText("Hospitalist Internal Medicine").closest("tr")!);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText(/Program name/)).toHaveValue("Hospitalist Internal Medicine");
+  });
+
+  it("sends the trimmed program name on create (null when blank)", async () => {
+    h.createProgram.mockResolvedValue({ ...PROGRAM_DETAIL, id: "p2" });
+    renderPage();
+    await screen.findByText("Program ID");
+
+    await userEvent.click(screen.getByRole("button", { name: "Add program" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Specialty"), "s2");
+    await userEvent.type(within(dialog).getByLabelText(/Program name/), "  Peds Hospitalist  ");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(h.createProgram).toHaveBeenCalledWith(expect.objectContaining({ programName: "Peds Hospitalist" }));
   });
 
   it("renders a dash under Retail Amount when the honorarium is absent (e.g. a customer-stripped row)", async () => {
@@ -147,15 +180,99 @@ describe("ProgramsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.selectOptions(within(dialog).getByLabelText("Specialty"), "s2");
-    // "Instant Approval" is also a tag checkbox — target the select by combobox role to disambiguate.
-    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Instant Approval" }), "yes");
-    await userEvent.click(within(dialog).getByLabelText("Research"));
+    // The production-faithful modal uses checkbox lists, not selects: a single-select Specialty list,
+    // an Approval Type group, and the "Clinical Needs" tag grid.
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Pediatrics" }));
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Yes (Instant Approval)" }));
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Research" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
 
     await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
       expect.objectContaining({ specialtyId: "s2", instantApproval: true, tags: ["Research"] })));
-    expect(screen.getByText("3")).toBeInTheDocument(); // filter-count badge
+    expect(screen.getByText("3")).toBeInTheDocument(); // filter-count badge (specialty + approval + tag = 3)
+  });
+
+  it("keeps filters independent per tab (legacy programFilter0..4 parity)", async () => {
+    renderPage();
+    await screen.findByText("Program ID");
+
+    // Apply a specialty filter on the InPerson tab.
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Pediatrics" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(expect.objectContaining({ specialtyId: "s2" })));
+
+    // Switch to TeleRotation — its filter is independent, so the InPerson specialty does NOT carry over.
+    await userEvent.click(screen.getByRole("tab", { name: "TeleRotation" }));
+    await waitFor(() => {
+      const last = h.getPrograms.mock.calls.at(-1)![0];
+      expect(last.programType).toEqual(["TeleRotation"]);
+      expect(last.specialtyId).toBeUndefined();
+    });
+
+    // Back to InPerson — its filter is remembered.
+    await userEvent.click(screen.getByRole("tab", { name: "InPerson" }));
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(expect.objectContaining({ specialtyId: "s2" })));
+  });
+
+  it("sends honorarium bounds only when the amount range narrows from the full 0–15000", async () => {
+    renderPage();
+    await screen.findByText("Program ID");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // Narrowing only the max sends honorariumMax but NOT honorariumMin (lower bound still 0).
+    // fireEvent.change drives the controlled+clamped number input deterministically.
+    fireEvent.change(within(dialog).getByRole("spinbutton", { name: "Retail amount maximum" }), { target: { value: "8000" } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => {
+      const last = h.getPrograms.mock.calls.at(-1)![0];
+      expect(last.honorariumMax).toBe(8000);
+      expect(last.honorariumMin).toBeUndefined();
+    });
+    // Lower bound at 0 → the amount filter does NOT count toward the badge (legacy getFilterCount rule).
+    expect(document.querySelector(".filter-count")).toBeNull();
+
+    // Raising the min too sends both bounds and now counts.
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog2 = await screen.findByRole("dialog");
+    await userEvent.clear(within(dialog2).getByRole("spinbutton", { name: "Retail amount minimum" }));
+    await userEvent.type(within(dialog2).getByRole("spinbutton", { name: "Retail amount minimum" }), "1000");
+    await userEvent.click(within(dialog2).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ honorariumMin: 1000, honorariumMax: 8000 })));
+    expect(screen.getByText("1", { selector: ".filter-count" })).toBeInTheDocument(); // amount filter now badged
+  });
+
+  it("renders uppercase YES / NO for Instant Approval (production casing)", async () => {
+    h.getPrograms.mockResolvedValue(paged([{ ...PROGRAM_ROW, isOpen: true }]));
+    renderPage();
+    await screen.findByText("Program ID");
+    expect(screen.getByText("YES")).toBeInTheDocument();
+    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
+  });
+
+  it("shows the location dropdown only on the InPerson tabs and applies a chosen city", async () => {
+    h.getPrograms.mockImplementation((params?: { city?: string }) => Promise.resolve(paged(params?.city ? [] : [PROGRAM_ROW])));
+    renderPage();
+    await screen.findByText("Program ID");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog = await screen.findByRole("dialog");
+    // Location dropdown is present on InPerson (tab 0) and lists the distinct "City, State" values.
+    await userEvent.selectOptions(within(dialog).getByLabelText("Location: City/State"), "Houston, TX");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => expect(h.getPrograms).toHaveBeenLastCalledWith(
+      expect.objectContaining({ city: "Houston, TX" })));
+
+    // On the Consultation tab the legacy modal hides the location filter.
+    await userEvent.click(screen.getByRole("tab", { name: "Consultation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Filter programs" }));
+    const dialog2 = await screen.findByRole("dialog");
+    expect(within(dialog2).queryByLabelText("Location: City/State")).not.toBeInTheDocument();
   });
 
   it("blocks non-admins", async () => {

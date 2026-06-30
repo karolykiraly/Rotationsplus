@@ -41,8 +41,8 @@ export function SelectedRotationPanel({ detail, programs, pending, serverError, 
 
   const selectedProgram = programs.find((p) => p.id === programId);
   const programLabel = selectedProgram
-    ? `${programDisplayName(selectedProgram.specialtyName)} · ${programCode(selectedProgram.programType, selectedProgram.programNumber)}`
-    : `${programDisplayName(detail.specialtyName)} · ${programCode(detail.programType, detail.programNumber)}`;
+    ? `${programDisplayName(selectedProgram.programName, selectedProgram.specialtyName)} · ${programCode(selectedProgram.programType, selectedProgram.programNumber)}`
+    : `${programDisplayName(null, detail.specialtyName)} · ${programCode(detail.programType, detail.programNumber)}`;
 
   const save = () => {
     if (!detail.studentId) return; // a legacy row with no directory student can't be re-saved here
@@ -79,7 +79,7 @@ export function SelectedRotationPanel({ detail, programs, pending, serverError, 
                 >
                   {programs.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {programDisplayName(p.specialtyName)} · {programCode(p.programType, p.programNumber)}
+                      {programDisplayName(p.programName, p.specialtyName)} · {programCode(p.programType, p.programNumber)}
                     </option>
                   ))}
                 </select>

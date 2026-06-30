@@ -3,6 +3,7 @@ import {
   createProgram,
   deleteProgram,
   getPreceptorOptions,
+  getProgramLocations,
   getPrograms,
   getSpecialties,
   updateProgram,
@@ -59,9 +60,11 @@ export function usePrograms(
   return { list, create, update, remove };
 }
 
-/** Specialty + preceptor option lists for the program form dropdowns. */
+/** Specialty + preceptor option lists for the program form dropdowns, plus the distinct "City, State"
+ *  locations the FilterProgram modal's city dropdown lists. */
 export function useProgramFormOptions() {
   const specialties = useQuery<Specialty[]>({ queryKey: ["specialties"], queryFn: getSpecialties });
   const preceptors = useQuery<Preceptor[]>({ queryKey: ["preceptor-options"], queryFn: getPreceptorOptions });
-  return { specialties, preceptors };
+  const locations = useQuery<string[]>({ queryKey: ["program-locations"], queryFn: getProgramLocations });
+  return { specialties, preceptors, locations };
 }

@@ -35,11 +35,12 @@ const CODE_PREFIX: Record<ProgramType, string> = {
 export const programCode = (type: ProgramType | string, number: number): string =>
   `${CODE_PREFIX[type as ProgramType] ?? "PR"}${number}`;
 
-/** The program's display name. The rewrite has no standalone program-name field; the legacy admin
- *  Programs list derives it the same way (preceptor.program_name defaults to "{Specialty} Physician"),
- *  so we mirror that default — the "Program Name" column shows "{Specialty} Physician" while the
- *  separate "Specialty" column shows the bare specialty. */
-export const programDisplayName = (specialtyName: string): string => `${specialtyName} Physician`;
+/** The program's display name shown in the admin Programs list's "Program Name" column. Uses the
+ *  program's own name when set; otherwise falls back to the legacy default "{Specialty} Physician"
+ *  (preceptor.program_name's default) so rows without an explicit name still render a sensible label.
+ *  The separate "Specialty" column always shows the bare specialty. */
+export const programDisplayName = (programName: string | null | undefined, specialtyName: string): string =>
+  programName?.trim() ? programName.trim() : `${specialtyName} Physician`;
 
 /** The display families the dashboard breaks programs into (research/sub variants fold into their base). */
 export type ProgramFamily = "InPerson" | "Consultation" | "TeleRotation" | "Dental";

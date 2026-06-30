@@ -139,6 +139,23 @@ public static class ProgramEndpoints
         })
         .WithName("ListProgramCatalog");
 
+        // Distinct "City, State" locations for the FilterProgram modal's city dropdown (legacy
+        // AdminProgram builds this list client-side from every program; with server pagination the
+        // client no longer holds the full set, so the API supplies it). Only rows with both city and
+        // state, ordered case-insensitively to match the legacy sort. MarketplaceViewer like the rest.
+        group.MapGet("/locations", async (RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            var locations = await db.Programs
+                .Where(p => p.City != null && p.City != "" && p.State != null && p.State != "")
+                .Select(p => p.City + ", " + p.State)
+                .Distinct()
+                .OrderBy(loc => loc.ToLower())
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(locations);
+        })
+        .WithName("ListProgramLocations");
+
         group.MapGet("/{id:guid}", async (Guid id, ICurrentUser user, RotationsDbContext db, IProgramImageStore imageStore, CancellationToken cancellationToken) =>
         {
             // Honorarium (preceptor pay → platform margin) is staff-only; hide it from customers.
@@ -150,6 +167,7 @@ public static class ProgramEndpoints
                     p.Id,
                     p.SpecialtyId,
                     p.Specialty.Name,
+                    p.ProgramName,
                     p.ProgramType,
                     p.MaxStudentsPerRotation,
                     p.MinWeeksPerRotation,
@@ -181,7 +199,7 @@ public static class ProgramEndpoints
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
                     request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
-                    out var description, out var city, out var state, out var tags, out var error))
+                    request.ProgramName, out var description, out var city, out var state, out var tags, out var programName, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -203,6 +221,7 @@ public static class ProgramEndpoints
                 SpecialtyId = request.SpecialtyId,
                 PreceptorId = request.PreceptorId,
                 ProgramType = request.ProgramType,
+                ProgramName = programName,
                 MaxStudentsPerRotation = request.MaxStudentsPerRotation,
                 MinWeeksPerRotation = request.MinWeeksPerRotation,
                 RetailAmountPerWeek = request.RetailAmountPerWeek,
@@ -225,7 +244,7 @@ public static class ProgramEndpoints
         {
             if (!TryValidate(request.ProgramType, request.MaxStudentsPerRotation, request.MinWeeksPerRotation,
                     request.RetailAmountPerWeek, request.WeeklyHonorarium, request.Description, request.City, request.State, request.Tags,
-                    out var description, out var city, out var state, out var tags, out var error))
+                    request.ProgramName, out var description, out var city, out var state, out var tags, out var programName, out var error))
             {
                 return Results.BadRequest(error);
             }
@@ -251,6 +270,7 @@ public static class ProgramEndpoints
             program.SpecialtyId = request.SpecialtyId;
             program.PreceptorId = request.PreceptorId;
             program.ProgramType = request.ProgramType;
+            program.ProgramName = programName;
             program.MaxStudentsPerRotation = request.MaxStudentsPerRotation;
             program.MinWeeksPerRotation = request.MinWeeksPerRotation;
             program.RetailAmountPerWeek = request.RetailAmountPerWeek;
@@ -304,6 +324,7 @@ public static class ProgramEndpoints
             p.Id,
             p.ProgramNumber,
             p.Specialty.Name,
+            p.ProgramName,
             p.ProgramType,
             p.MaxStudentsPerRotation,
             p.MinWeeksPerRotation,
@@ -336,21 +357,30 @@ public static class ProgramEndpoints
     private const int MaxTags = 20;
     private const int MaxTagLength = 60;
 
+    private const int MaxProgramNameLength = 200;
+
     private static bool TryValidate(
         ProgramType programType, int maxStudents, int minWeeks, decimal retailPerWeek, decimal weeklyHonorarium,
-        string? description, string? city, string? state, IReadOnlyList<string>? tags,
+        string? description, string? city, string? state, IReadOnlyList<string>? tags, string? programName,
         out string? normalizedDescription, out string? normalizedCity, out string? normalizedState,
-        out List<string> normalizedTags, out string error)
+        out List<string> normalizedTags, out string? normalizedProgramName, out string error)
     {
         normalizedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         normalizedCity = string.IsNullOrWhiteSpace(city) ? null : city.Trim();
         normalizedState = string.IsNullOrWhiteSpace(state) ? null : state.Trim();
+        normalizedProgramName = string.IsNullOrWhiteSpace(programName) ? null : programName.Trim();
         normalizedTags = [];
         error = string.Empty;
 
         if (!Enum.IsDefined(programType))
         {
             error = "ProgramType is invalid.";
+            return false;
+        }
+
+        if (normalizedProgramName is { Length: > MaxProgramNameLength })
+        {
+            error = $"Program name must be {MaxProgramNameLength} characters or fewer.";
             return false;
         }
 
@@ -446,7 +476,7 @@ public static class ProgramEndpoints
     }
 
     private static ProgramDetailResponse ToDetail(RotationProgram p, string specialtyName, string? preceptorName, IProgramImageStore imageStore) =>
-        new(p.Id, p.SpecialtyId, specialtyName, p.ProgramType, p.MaxStudentsPerRotation,
+        new(p.Id, p.SpecialtyId, specialtyName, p.ProgramName, p.ProgramType, p.MaxStudentsPerRotation,
             p.MinWeeksPerRotation, p.RetailAmountPerWeek, p.WeeklyHonorarium, p.Description, p.PreceptorId, preceptorName,
             p.IsOpen, p.ProgramNumber, p.City, p.State, p.Tags, imageStore.GetReadUrl(p.ImageBlobName));
 }

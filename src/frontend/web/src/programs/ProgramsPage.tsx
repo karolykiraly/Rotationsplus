@@ -17,6 +17,7 @@ import searchIcon from "../assets/icons/search.png";
 
 const DEFAULTS: ProgramFormInitial = {
   specialtyId: "",
+  programName: "",
   programType: "InPerson",
   maxStudentsPerRotation: 1,
   minWeeksPerRotation: 4,
@@ -39,6 +40,10 @@ const TAB_TYPES: ProgramType[][] = [
 
 const PAGE_SIZE = 10;
 
+// Stable empty-filter reference so an un-filtered tab keeps the same `filter` identity across renders
+// (the page-reset effect depends on it; a fresh {} each render would loop).
+const EMPTY_FILTER: ProgramFilter = {};
+
 /** "new" = create; a guid = edit that program; null = no modal. */
 type EditId = string | "new" | null;
 
@@ -48,14 +53,29 @@ export function ProgramsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search.trim());
-  const [filter, setFilter] = useState<ProgramFilter>({});
+  // Per-tab filter state (legacy parity): each program-type tab keeps its own independent filter, so a
+  // filter set on one tab neither applies to nor is visible on another. This also means the location
+  // filter — only offered on the InPerson tabs — can never leak onto a tab that doesn't show it.
+  const [filtersByTab, setFiltersByTab] = useState<Record<number, ProgramFilter>>({});
+  const filter = filtersByTab[tab] ?? EMPTY_FILTER;
   const [showFilter, setShowFilter] = useState(false);
-  const filterCount = Object.values(filter).filter(
-    (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)
-  ).length;
+  // Count active filter CATEGORIES (legacy parity): the honorarium min/max is one "amount" filter, and —
+  // matching legacy getFilterCount — it only counts when the lower bound is raised above 0.
+  const filterCount =
+    (filter.programNumber ? 1 : 0) +
+    (filter.city ? 1 : 0) +
+    (filter.specialtyId ? 1 : 0) +
+    (filter.instantApproval !== undefined ? 1 : 0) +
+    (filter.honorariumMin !== undefined ? 1 : 0) +
+    (filter.tags && filter.tags.length ? 1 : 0);
+
+  const setTabFilter = (f: ProgramFilter) => setFiltersByTab((m) => ({ ...m, [tab]: f }));
 
   const { list, create, update, remove } = usePrograms(TAB_TYPES[tab], debouncedSearch, page, PAGE_SIZE, filter);
-  const { specialties, preceptors } = useProgramFormOptions();
+  const { specialties, preceptors, locations } = useProgramFormOptions();
+
+  // The legacy filter shows the location dropdown only on the InPerson (tab 0) and InPersonResearch (tab 1) tabs.
+  const showFilterLocation = tab === 0 || tab === 1;
 
   const [editId, setEditId] = useState<EditId>(null);
   const [docsProgram, setDocsProgram] = useState<{ id: string; label: string } | null>(null);
@@ -115,6 +135,7 @@ export function ProgramsPage() {
 
   const mapDetail = (d: NonNullable<typeof detail.data>): ProgramFormInitial => ({
     specialtyId: d.specialtyId,
+    programName: d.programName ?? "",
     programType: d.programType,
     maxStudentsPerRotation: d.maxStudentsPerRotation,
     minWeeksPerRotation: d.minWeeksPerRotation,
@@ -179,7 +200,7 @@ export function ProgramsPage() {
                       <img className="hospital-img" src={noImage} alt="" />
                     </td>
                     <td className="hospital-name">
-                      <div className="heading-xxxs">{programDisplayName(p.specialtyName)}</div>
+                      <div className="heading-xxxs">{programDisplayName(p.programName, p.specialtyName)}</div>
                     </td>
                     <td>
                       <div className="place-holder">Program ID</div>
@@ -195,7 +216,8 @@ export function ProgramsPage() {
                     </td>
                     <td>
                       <div className="place-holder">Instant Approval</div>
-                      <div className="heading-xxxs-normal">{p.isOpen ? "Yes" : "No"}</div>
+                      {/* Production renders uppercase YES/NO (AdminProgram.js). */}
+                      <div className="heading-xxxs-normal">{p.isOpen ? "YES" : "NO"}</div>
                     </td>
                     <td className="last-td">
                       <div className="place-holder">Retail Amount</div>
@@ -284,8 +306,10 @@ export function ProgramsPage() {
         <FilterProgramModal
           initial={filter}
           specialties={specialties.data ?? []}
-          onApply={(f) => { setFilter(f); setShowFilter(false); }}
-          onClear={() => { setFilter({}); setShowFilter(false); }}
+          cities={locations.data ?? []}
+          showLocation={showFilterLocation}
+          onApply={(f) => { setTabFilter(f); setShowFilter(false); }}
+          onClear={() => { setTabFilter({}); setShowFilter(false); }}
           onClose={() => setShowFilter(false)}
         />
       )}

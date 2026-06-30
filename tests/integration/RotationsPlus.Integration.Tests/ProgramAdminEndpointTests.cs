@@ -415,4 +415,90 @@ public class ProgramAdminEndpointTests(RotationsApiFactory factory) : IClassFixt
         var list = await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions);
         list!.Select(p => p.Id).Should().NotContain(created.Id);
     }
+
+    [Fact]
+    public async Task Create_and_update_round_trip_the_program_name()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var body = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, "Named offering.", null,
+            ProgramName: "Hospitalist Internal Medicine");
+        var created = await (await admin.PostAsJsonAsync("/api/programs", body, JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+        created!.ProgramName.Should().Be("Hospitalist Internal Medicine");
+
+        // Surfaces on the detail read AND the admin list summary.
+        var fetched = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        fetched!.ProgramName.Should().Be("Hospitalist Internal Medicine");
+        var summary = (await admin.GetFromJsonAsync<List<ProgramSummaryResponse>>("/api/programs/catalog", JsonOptions))!
+            .Single(p => p.Id == created.Id);
+        summary.ProgramName.Should().Be("Hospitalist Internal Medicine");
+
+        // Update can clear it back to null (falls back to the derived label client-side).
+        var clear = new UpdateProgramRequest(InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null,
+            ProgramName: null);
+        (await admin.PutAsJsonAsync($"/api/programs/{created.Id}", clear, JsonOptions)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterClear = await admin.GetFromJsonAsync<ProgramDetailResponse>($"/api/programs/{created.Id}", JsonOptions);
+        afterClear!.ProgramName.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_trims_program_name_whitespace()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var body = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null,
+            ProgramName: "   Peds Hospitalist   ");
+        var created = await (await admin.PostAsJsonAsync("/api/programs", body, JsonOptions))
+            .Content.ReadFromJsonAsync<ProgramDetailResponse>(JsonOptions);
+
+        created!.ProgramName.Should().Be("Peds Hospitalist");
+    }
+
+    [Fact]
+    public async Task Create_with_oversized_program_name_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        var body = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null,
+            ProgramName: new string('x', 201));
+        var response = await admin.PostAsJsonAsync("/api/programs", body, JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Locations_returns_the_distinct_city_state_of_located_programs()
+    {
+        var admin = Client(RoleNames.Admin);
+
+        // A program with a distinctive location; another with no location at all (must be excluded).
+        var located = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null, City: "Testburg", State: "ZZ");
+        (await admin.PostAsJsonAsync("/api/programs", located, JsonOptions)).StatusCode.Should().Be(HttpStatusCode.Created);
+        var unlocated = new CreateProgramRequest(
+            InternalMedicineId, ProgramType.InPerson, 2, 4, 1500m, 500m, null, null, City: null, State: null);
+        (await admin.PostAsJsonAsync("/api/programs", unlocated, JsonOptions)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var locations = await admin.GetFromJsonAsync<List<string>>("/api/programs/locations", JsonOptions);
+
+        locations.Should().Contain("Testburg, ZZ");
+        locations.Should().OnlyHaveUniqueItems();              // distinct
+        locations.Should().NotContain(loc => loc.StartsWith(",") || loc.EndsWith(", ")); // no half-empty rows
+    }
+
+    [Fact]
+    public async Task Non_admin_staff_can_read_program_locations()
+    {
+        // Locations populate the admin filter dropdown but are plain MarketplaceViewer reads (no honorarium,
+        // no margin) — any staff viewer may fetch them, matching the rest of the read group.
+        var sales = Client(RoleNames.Sales);
+
+        var response = await sales.GetAsync("/api/programs/locations");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }

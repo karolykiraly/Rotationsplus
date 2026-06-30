@@ -42,6 +42,9 @@ export interface Program {
   id: string;
   programNumber: number;
   specialtyName: string;
+  /** The program's human-facing name (legacy program_name), distinct from the specialty. Null when
+   *  unset — the admin list falls back to "{Specialty} Physician". */
+  programName?: string | null;
   programType: ProgramType;
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
@@ -63,6 +66,8 @@ export interface ProgramDetail {
   id: string;
   specialtyId: string;
   specialtyName: string;
+  /** The program's human-facing name (legacy program_name), distinct from the specialty. */
+  programName?: string | null;
   programType: ProgramType;
   maxStudentsPerRotation: number;
   minWeeksPerRotation: number;
@@ -91,6 +96,7 @@ export interface ProgramInput {
   weeklyHonorarium: number;
   description?: string | null;
   preceptorId?: string | null;
+  programName?: string | null;
 }
 
 /** Preceptor lifecycle statuses (mirrors the API's PreceptorStatus enum; serialized as these names). */
@@ -642,6 +648,9 @@ export const getPrograms = (params?: {
 /** Full program catalog (unpaginated) — the rotation form's program picker needs every option. */
 export const getProgramCatalog = (): Promise<Program[]> =>
   request<Program[]>("GET", "/api/programs/catalog");
+/** Distinct "City, State" locations across all programs — the FilterProgram modal's city dropdown. */
+export const getProgramLocations = (): Promise<string[]> =>
+  request<string[]>("GET", "/api/programs/locations");
 export const getProgram = (id: string): Promise<ProgramDetail> =>
   request<ProgramDetail>("GET", `/api/programs/${id}`);
 export const createProgram = (input: ProgramInput): Promise<ProgramDetail> =>
