@@ -16,7 +16,7 @@ const PRICE_BANDS = ["$1001 - $2000", "$2001 - $3000", "$3001 - $4000", "> $5001
 /** The landing hero — a faithful clone of the live www.rotationsplus.org home hero (Home.js `<Hero/>`
  *  + the embedded NewHome search): the doctor hero illustration as a full-width background, the
  *  headline + subtitle, then the search bar and the eight filter dropdowns. As on production, an
- *  anonymous visitor gets the search UI but NOT the results/map — running a search routes them into
+ *  anonymous visitor gets the search UI but NOT the results — running a search routes them into
  *  the customer (CIAM) sign-in at /portal. The dropdown options are populated from the anonymous
  *  public catalog feed so they show real specialties/cities/states/durations. */
 export function HeroSearch() {
@@ -44,14 +44,23 @@ export function HeroSearch() {
   );
 
   /** Anonymous visitors must sign in to run a search and see results — matches the live site, which
-   *  gates the search results (and map) behind login. */
+   *  gates the search results behind login. */
   const requireLogin = () => navigate("/portal");
 
   return (
     <section className="hero">
-      <div className="hero-title">Find Your Perfect</div>
-      <div className="hero-title">
+      {/* Headline wraps differently on desktop vs mobile, exactly as the live Hero.js does:
+          desktop = 2 lines, mobile = 3 lines. */}
+      <div className="hero-title desktop-only-show">Find Your Perfect</div>
+      <div className="hero-title desktop-only-show">
         <span className="hero-accent">Clinical Experience</span>&nbsp;Today
+      </div>
+      <div className="hero-title mobile-only-show">Find Your</div>
+      <div className="hero-title mobile-only-show">
+        Perfect&nbsp;<span className="hero-accent">Clinical</span>
+      </div>
+      <div className="hero-title mobile-only-show">
+        <span className="hero-accent">Experience</span>&nbsp;Today
       </div>
       <p className="hero-text">
         Gain Valuable Clinical Experience and Earn Letters of Recommendations to Make Your Medical

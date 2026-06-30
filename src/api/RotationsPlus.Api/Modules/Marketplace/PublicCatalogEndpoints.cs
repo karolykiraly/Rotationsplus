@@ -4,11 +4,12 @@ using RotationsPlus.Contracts.Marketplace;
 
 namespace RotationsPlus.Api.Modules.Marketplace;
 
-/// <summary>The ANONYMOUS public marketing feed. Powers the landing page's hero search/map/results for
-/// visitors who aren't signed in. It returns only open programs with public-safe fields (no honorarium,
-/// preceptor identity, or description) — the real search and program detail still require a customer
-/// sign-in. Kept as its own endpoint (not the MarketplaceViewer-gated /api/programs group) so it can be
-/// <c>AllowAnonymous</c> without loosening the authenticated catalog.</summary>
+/// <summary>The ANONYMOUS public marketing feed. Powers the landing hero's filter dropdowns
+/// (specialties, cities, states, durations) for visitors who aren't signed in. It returns only open
+/// programs with public-safe fields (no honorarium, preceptor identity, or description) — the real
+/// search and program detail still require a customer sign-in. Kept as its own endpoint (not the
+/// MarketplaceViewer-gated /api/programs group) so it can be <c>AllowAnonymous</c> without loosening
+/// the authenticated catalog.</summary>
 public static class PublicCatalogEndpoints
 {
     public static IEndpointRouteBuilder MapPublicCatalogEndpoints(this IEndpointRouteBuilder routes)
@@ -17,8 +18,8 @@ public static class PublicCatalogEndpoints
             .AllowAnonymous()
             .WithTags("Public");
 
-        // Open programs for the public landing map + results preview. No paging — the public marketing
-        // feed is small and the landing renders all markers at once; a generous server cap bounds it.
+        // Open programs that populate the public landing hero's filter dropdowns. No paging — the public
+        // marketing feed is small and a generous server cap bounds it.
         group.MapGet("/programs", async (
             IProgramImageStore imageStore, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
