@@ -1,16 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type { ReactNode } from "react";
 
-// The landing hero embeds a Leaflet map; stub the map libs so it renders headlessly in jsdom.
-vi.mock("react-leaflet", () => ({
-  MapContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  TileLayer: () => null,
-  Marker: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Popup: ({ children }: { children: ReactNode }) => <div>{children}</div>
-}));
-vi.mock("react-leaflet-cluster", () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
+// The hero pulls dropdown options from the public catalog feed; stub it for a headless render.
 vi.mock("./publicApi", () => ({ getPublicPrograms: vi.fn().mockResolvedValue([]) }));
 
 import { LandingPage } from "./LandingPage";
