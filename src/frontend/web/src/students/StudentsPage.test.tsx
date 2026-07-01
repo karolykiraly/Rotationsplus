@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 /** Wraps rows in the server's PagedResponse envelope (single page). */
@@ -42,7 +43,11 @@ const STUDENT_ROW = {
   visaStatus: "NeedsVisaHelp",
   city: "Chicago",
   state: "IL",
-  status: "MemberActivated"
+  status: "MemberActivated",
+  dollarsSpent: 4500,
+  outstandingPayments: 1200,
+  outstandingDocuments: 2,
+  weeksPurchased: 8
 };
 const STUDENT_DETAIL = {
   id: "s1",
@@ -69,7 +74,9 @@ function newClient() {
 function renderPage(qc = newClient()) {
   return render(
     <QueryClientProvider client={qc}>
-      <StudentsPage />
+      <MemoryRouter>
+        <StudentsPage />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
@@ -82,25 +89,36 @@ describe("StudentsPage", () => {
     h.getStudent.mockResolvedValue(STUDENT_DETAIL);
   });
 
-  it("lists students with academic/visa/status labels", async () => {
+  it("lists students with the production achievements columns (Type / money rollups / External)", async () => {
     renderPage();
     expect(await screen.findByText("Sam Rivera")).toBeInTheDocument();
-    expect(screen.getByText("sam@x.com")).toBeInTheDocument();
-    expect(screen.getByText("International Medical Graduate")).toBeInTheDocument();
-    expect(screen.getByText("Needs help with visa")).toBeInTheDocument();
-    // "Activated" renders as the status badge (scoped: it's also a filter-dropdown option).
-    expect(screen.getByText("Activated", { selector: ".badge" })).toBeInTheDocument();
+    const row = screen.getByText("Sam Rivera").closest("tr")!;
+    // Type renders the raw academic-status slug, matching production exactly.
+    expect(within(row).getByText("international-medical-graduate")).toBeInTheDocument();
+    // Money rollups render "$"-prefixed with thousands separators.
+    expect(within(row).getByText("$1,200")).toBeInTheDocument(); // Outstanding Payments
+    expect(within(row).getByText("$4,500")).toBeInTheDocument(); // Dollars Spent
+    // Outstanding Documents (2) + Weeks Purchased (8) render as bare counts.
+    expect(within(row).getByText("2")).toBeInTheDocument();
+    expect(within(row).getByText("8")).toBeInTheDocument();
+    // External has no source model yet → always "No" (production's non-external default).
+    expect(within(row).getByText("No")).toBeInTheDocument();
+    // Name links to the student profile.
+    expect(within(row).getByText("Sam Rivera").closest("a")).toHaveAttribute("href", "/admin/students/s1");
   });
 
-  it("renders an em-dash for a student with no visa status or location", async () => {
+  it("renders zeroed achievements ($0 / 0) for a student with no paid rotations", async () => {
     h.getStudents.mockResolvedValue(paged([
-      { ...STUDENT_ROW, id: "s3", fullName: "No Visa", visaStatus: null, city: null, state: null }
+      { ...STUDENT_ROW, id: "s3", fullName: "New Student",
+        dollarsSpent: 0, outstandingPayments: 0, outstandingDocuments: 0, weeksPurchased: 0 }
     ]));
     renderPage();
 
-    const row = (await screen.findByText("No Visa")).closest("tr")!;
-    // Both the visa cell and the location cell fall back to "—".
-    expect(within(row).getAllByText("—")).toHaveLength(2);
+    const row = (await screen.findByText("New Student")).closest("tr")!;
+    // Outstanding Payments + Dollars Spent both read "$0".
+    expect(within(row).getAllByText("$0")).toHaveLength(2);
+    // Outstanding Documents + Weeks Purchased both read "0".
+    expect(within(row).getAllByText("0")).toHaveLength(2);
   });
 
   it("blocks non-admins", async () => {

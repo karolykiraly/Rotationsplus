@@ -30,3 +30,23 @@ public sealed record UpdateStudentRequest(
     string? State,
     StudentStatus Status,
     string? StudentOid);
+
+/// <summary>
+/// Save payload for the student profile's <b>Personal Information</b> tab (legacy <c>onSaveProfile1</c>).
+/// Email is deliberately absent — it is the CIAM/Entra-linked identity and is read-only on the profile
+/// (same rationale as the omitted password). Optional fields left null clear the value.
+/// </summary>
+public sealed record UpdateStudentPersonalInfoRequest(
+    string FirstName,
+    string LastName,
+    string? MobilePhone,
+    AcademicStatus AcademicStatus,
+    DateOnly? Birthdate,
+    Gender? Gender,
+    ImmigrationStatus? ImmigrationStatus,
+    string? ImmigrationStatusOther,
+    DateOnly? VisaInterviewDate,
+    string? PassportIssuedCountry,
+    string? PassportNumber,
+    StudentIdType? SelectedIdType,
+    string? IdNumber);

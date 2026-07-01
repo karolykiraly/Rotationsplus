@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
+using RotationsPlus.Contracts.Documents;
+using RotationsPlus.Contracts.Payments;
 using RotationsPlus.Contracts.Students;
 
 namespace RotationsPlus.Api.Modules.Students;
@@ -47,7 +49,44 @@ public static class StudentEndpoints
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .ThenBy(x => x.Id) // tie-break so paging is deterministic when names collide
-                .Select(x => ToSummary(x))
+                // Inline projection (NOT ToSummary): the rollups are correlated subqueries that must
+                // translate to SQL — a compiled helper would client-evaluate them (one query per row).
+                .Select(x => new StudentSummaryResponse(
+                    x.Id,
+                    x.FirstName + " " + x.LastName,
+                    x.Email,
+                    x.MobilePhone,
+                    x.AcademicStatus,
+                    x.VisaStatus,
+                    x.City,
+                    x.State,
+                    x.Status,
+                    // Dollars Spent: money actually collected — the sum of SUCCEEDED payment amounts on
+                    // this student's rotations (mirrors RotationEndpoints' PaidAmount).
+                    db.Payments
+                        .Where(p => p.Rotation.StudentId == x.Id && p.Status == PaymentStatus.Succeeded)
+                        .Sum(p => (decimal?)p.Amount) ?? 0m,
+                    // Outstanding Payments: the remainder still billed-later on those paid bookings — the
+                    // payment's own recorded OutstandingAmount, summed over SUCCEEDED payments (refunded/
+                    // failed/pending excluded, so nothing that isn't a live collected booking counts).
+                    db.Payments
+                        .Where(p => p.Rotation.StudentId == x.Id && p.Status == PaymentStatus.Succeeded)
+                        .Sum(p => (decimal?)p.OutstandingAmount) ?? 0m,
+                    // Outstanding Documents: required documents still needing a (re)upload across this
+                    // student's rotations (UploadNeeded/Rejected/Expired = the "Missing" states). Excludes
+                    // docs on a soft-deleted rotation, matching the dashboards' `!Rotation.IsDeleted` rule.
+                    db.RotationDocuments
+                        .Count(rd => rd.StudentId == x.Id
+                            && !rd.Rotation.IsDeleted
+                            && (rd.Status == DocumentStatus.UploadNeeded
+                                || rd.Status == DocumentStatus.Rejected
+                                || rd.Status == DocumentStatus.Expired)),
+                    // Weeks Purchased: weeks on bookings the student has actually paid toward (a rotation
+                    // with at least one SUCCEEDED payment) — keeps the two "purchase" columns consistent.
+                    db.Rotations
+                        .Where(r => r.StudentId == x.Id
+                            && db.Payments.Any(p => p.RotationId == r.Id && p.Status == PaymentStatus.Succeeded))
+                        .Sum(r => (int?)r.Weeks) ?? 0))
                 .ToPagedResponseAsync(page, pageSize, cancellationToken);
 
             return Results.Ok(students);
@@ -184,6 +223,43 @@ public static class StudentEndpoints
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("UpdateStudent");
 
+        // Profile → Personal Information tab save (legacy onSaveProfile1). Updates the identity core + the
+        // Personal-Info fields; Email/Status/StudentOid are managed elsewhere (identity-linked), so this
+        // tab leaves them untouched.
+        group.MapPut("/{id:guid}/personal-info", async (
+            Guid id, UpdateStudentPersonalInfoRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (!TryNormalizePersonalInfo(request, out var norm, out var error))
+            {
+                return Results.BadRequest(error);
+            }
+
+            var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (student is null)
+            {
+                return Results.NotFound();
+            }
+
+            student.FirstName = norm.FirstName;
+            student.LastName = norm.LastName;
+            student.MobilePhone = norm.MobilePhone;
+            student.AcademicStatus = norm.AcademicStatus;
+            student.Birthdate = norm.Birthdate;
+            student.Gender = norm.Gender;
+            student.ImmigrationStatus = norm.ImmigrationStatus;
+            student.ImmigrationStatusOther = norm.ImmigrationStatusOther;
+            student.VisaInterviewDate = norm.VisaInterviewDate;
+            student.PassportIssuedCountry = norm.PassportIssuedCountry;
+            student.PassportNumber = norm.PassportNumber;
+            student.SelectedIdType = norm.SelectedIdType;
+            student.IdNumber = norm.IdNumber;
+
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ToDetail(student));
+        })
+        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
+        .WithName("UpdateStudentPersonalInfo");
+
         group.MapDelete("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -311,6 +387,54 @@ public static class StudentEndpoints
         return true;
     }
 
+    private const int ImmigrationOtherMaxLength = 120;
+    private const int PassportNumberMaxLength = 60;
+    private const int IdNumberMaxLength = 60;
+
+    /// <summary>Validated Personal-Information tab values ready to persist.</summary>
+    private sealed record NormalizedPersonalInfo(
+        string FirstName, string LastName, string? MobilePhone, AcademicStatus AcademicStatus,
+        DateOnly? Birthdate, Gender? Gender, ImmigrationStatus? ImmigrationStatus, string? ImmigrationStatusOther,
+        DateOnly? VisaInterviewDate, string? PassportIssuedCountry, string? PassportNumber,
+        StudentIdType? SelectedIdType, string? IdNumber);
+
+    private static bool TryNormalizePersonalInfo(
+        UpdateStudentPersonalInfoRequest r, out NormalizedPersonalInfo norm, out string error)
+    {
+        norm = null!;
+        error = string.Empty;
+
+        if (!TryRequired(r.FirstName, NameMaxLength, "FirstName", out var first, out error)) return false;
+        if (!TryRequired(r.LastName, NameMaxLength, "LastName", out var last, out error)) return false;
+
+        if (!Enum.IsDefined(r.AcademicStatus)) { error = "AcademicStatus is invalid."; return false; }
+        if (r.Gender is { } g && !Enum.IsDefined(g)) { error = "Gender is invalid."; return false; }
+        if (r.ImmigrationStatus is { } im && !Enum.IsDefined(im)) { error = "ImmigrationStatus is invalid."; return false; }
+        if (r.SelectedIdType is { } sid && !Enum.IsDefined(sid)) { error = "SelectedIdType is invalid."; return false; }
+
+        if (!TryOptional(r.MobilePhone, PhoneMaxLength, "MobilePhone", out var phone, out error)) return false;
+        if (!TryOptional(r.ImmigrationStatusOther, ImmigrationOtherMaxLength, "ImmigrationStatusOther", out var imOther, out error)) return false;
+        if (!TryOptional(r.PassportIssuedCountry, CountryMaxLength, "PassportIssuedCountry", out var passportCountry, out error)) return false;
+        if (!TryOptional(r.PassportNumber, PassportNumberMaxLength, "PassportNumber", out var passportNo, out error)) return false;
+        if (!TryOptional(r.IdNumber, IdNumberMaxLength, "IdNumber", out var idNo, out error)) return false;
+
+        // Enforce the tab's conditional invariants server-side (don't trust the client): the D.O. track
+        // carries an ID instead of a passport; the free-text override and interview date apply only to
+        // their triggering immigration status. Mirrors the client's null-out so a direct API caller can't
+        // persist an inconsistent combination.
+        var isDo = r.AcademicStatus == AcademicStatus.DoStudent;
+        norm = new NormalizedPersonalInfo(
+            first, last, phone, r.AcademicStatus, r.Birthdate, r.Gender,
+            r.ImmigrationStatus,
+            r.ImmigrationStatus == ImmigrationStatus.Other ? imOther : null,
+            r.ImmigrationStatus == ImmigrationStatus.NeedVisaInterviewScheduled ? r.VisaInterviewDate : null,
+            isDo ? null : passportCountry,
+            isDo ? null : passportNo,
+            isDo ? r.SelectedIdType : null,
+            isDo ? idNo : null);
+        return true;
+    }
+
     private static void Apply(Student student, NormalizedStudent norm)
     {
         student.FirstName = norm.FirstName;
@@ -329,9 +453,14 @@ public static class StudentEndpoints
 
     private static StudentDetailResponse ToDetail(Student x) =>
         new(x.Id, x.FirstName, x.LastName, x.Email, x.MobilePhone, x.AcademicStatus, x.VisaStatus,
-            x.MedicalSchool, x.MedicalSchoolCountry, x.City, x.State, x.Status, x.StudentOid);
+            x.MedicalSchool, x.MedicalSchoolCountry, x.City, x.State, x.Status, x.StudentOid,
+            x.Birthdate, x.Gender, x.ImmigrationStatus, x.ImmigrationStatusOther, x.VisaInterviewDate,
+            x.PassportIssuedCountry, x.PassportNumber, x.SelectedIdType, x.IdNumber, x.AvatarBlobName);
 
+    // Lightweight summary for form pickers (the /options list): identity core only, rollups zeroed —
+    // pickers show a name, not the achievements columns. The paginated directory list projects the
+    // rollups inline (correlated subqueries) instead of calling this.
     private static StudentSummaryResponse ToSummary(Student x) =>
         new(x.Id, x.FirstName + " " + x.LastName, x.Email, x.MobilePhone,
-            x.AcademicStatus, x.VisaStatus, x.City, x.State, x.Status);
+            x.AcademicStatus, x.VisaStatus, x.City, x.State, x.Status, 0m, 0m, 0, 0);
 }

@@ -22,6 +22,7 @@ import { PermissionPage } from "./preceptors/PermissionPage";
 import { RotationsPage } from "./rotations/RotationsPage";
 import { HonorariumPage } from "./honorarium/HonorariumPage";
 import { ContactsPage } from "./contacts/ContactsPage";
+import { StudentProfilePage } from "./students/StudentProfilePage";
 import { CustomerMsalShell } from "./portal/CustomerMsalShell";
 import { BrowsePage } from "./portal/BrowsePage";
 import { ProgramDetailPage } from "./portal/ProgramDetailPage";
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
           // production, which has no standalone Students/Preceptors nav items); their per-id profile
           // pages arrive in later slices.
           { path: "contacts", element: <ContactsPage /> },
+          { path: "students/:id", element: <StudentProfilePage /> },
           { path: "permission", element: <PermissionPage /> },
           { path: "rotations", element: <RotationsPage /> },
           { path: "honorarium", element: <HonorariumPage /> }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../components/Modal";
 import { Pagination } from "../components/Pagination";
@@ -9,7 +10,7 @@ import searchIcon from "../assets/icons/search.png";
 import { useStudents } from "./useStudents";
 import { StudentFormModal, type StudentFormInitial } from "./StudentFormModal";
 import { StudentDocumentsModal } from "./StudentDocumentsModal";
-import { STUDENT_STATUSES, academicStatusLabel, studentStatusLabel, visaStatusLabel } from "./studentStatuses";
+import { STUDENT_STATUSES, academicStatusSlug } from "./studentStatuses";
 
 const DEFAULTS: StudentFormInitial = {
   firstName: "",
@@ -30,6 +31,11 @@ const DEFAULTS: StudentFormInitial = {
 type EditId = string | "new" | null;
 
 const PAGE_SIZE = 10;
+
+/** Whole-dollar currency for the achievements columns ("$1,500"), matching production's "$"-prefixed
+ *  amounts. Cents are shown only when present so round figures read cleanly. Locale pinned to en-US so
+ *  the grouping separator is stable across runtimes (production formatting + deterministic tests). */
+const money = (n: number): string => `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
 export function StudentsPage() {
   const { user } = useMe();
@@ -156,27 +162,37 @@ export function StudentsPage() {
                   <tr key={s.id} className="rot-row">
                     <td className="first-td">
                       <div className="place-holder">Name</div>
-                      <div className="heading-xxxs">{s.fullName}</div>
+                      {/* Name links to the student profile (production: blue link → /admin/students/:id). */}
+                      <Link to={`/admin/students/${s.id}`} className="heading-xxxs rot-name">{s.fullName}</Link>
                     </td>
                     <td>
-                      <div className="place-holder">Email</div>
-                      <div className="heading-xxxs-normal">{s.email}</div>
+                      <div className="place-holder">Type</div>
+                      {/* Production's "Type" column renders the raw academic-status slug
+                          (e.g. "international-medical-graduate"), not a humanized label. */}
+                      <div className="body-md">{academicStatusSlug(s.academicStatus)}</div>
                     </td>
                     <td>
-                      <div className="place-holder">Academic Status</div>
-                      <div className="heading-xxxs-normal">{academicStatusLabel(s.academicStatus)}</div>
+                      <div className="place-holder">Outstanding Payments</div>
+                      <div className="body-md">{money(s.outstandingPayments)}</div>
                     </td>
                     <td>
-                      <div className="place-holder">Visa</div>
-                      <div className="heading-xxxs-normal">{visaStatusLabel(s.visaStatus)}</div>
+                      <div className="place-holder">Outstanding Documents</div>
+                      <div className="body-md">{s.outstandingDocuments}</div>
                     </td>
                     <td>
-                      <div className="place-holder">Location</div>
-                      <div className="heading-xxxs-normal">{[s.city, s.state].filter(Boolean).join(", ") || "—"}</div>
+                      <div className="place-holder">Dollars Spent</div>
+                      <div className="body-md">{money(s.dollarsSpent)}</div>
                     </td>
                     <td>
-                      <div className="place-holder">Status</div>
-                      <div><span className="badge">{studentStatusLabel(s.status)}</span></div>
+                      <div className="place-holder">Weeks Purchased</div>
+                      <div className="body-md">{s.weeksPurchased}</div>
+                    </td>
+                    <td>
+                      <div className="place-holder">External</div>
+                      {/* Production shows the external lead source (`from`) or "No". The rewrite has no
+                          lead-source model yet (arrives with the Leads/Contacts CRM slice), so every
+                          student reads "No" — production's default for a non-external student. */}
+                      <div className="body-md">No</div>
                     </td>
                     <td className="last-td">
                       <div className="row-actions">

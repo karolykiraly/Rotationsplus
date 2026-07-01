@@ -44,6 +44,16 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasConversion<string>()
             .HasMaxLength(32);
 
+        // ---- Profile → Personal Information tab ----
+        builder.Property(x => x.Gender).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.ImmigrationStatus).HasConversion<string>().HasMaxLength(40);
+        builder.Property(x => x.ImmigrationStatusOther).HasMaxLength(120);
+        builder.Property(x => x.PassportIssuedCountry).HasMaxLength(100);
+        builder.Property(x => x.PassportNumber).HasMaxLength(60);
+        builder.Property(x => x.SelectedIdType).HasConversion<string>().HasMaxLength(24);
+        builder.Property(x => x.IdNumber).HasMaxLength(60);
+        builder.Property(x => x.AvatarBlobName).HasMaxLength(256);
+
         builder.Property(x => x.Status)
             .HasConversion<string>()
             .HasMaxLength(32)

@@ -1,4 +1,4 @@
-import type { AcademicStatus, StudentStatus, VisaStatus } from "../api";
+import type { AcademicStatus, Gender, ImmigrationStatus, StudentIdType, StudentStatus, VisaStatus } from "../api";
 
 /** Display labels for the StudentStatus enum, in lifecycle order (status dropdown + filter). */
 export const STUDENT_STATUSES: { value: StudentStatus; label: string }[] = [
@@ -43,6 +43,53 @@ export const studentStatusLabel = (value: StudentStatus | string): string =>
 /** Human label for an academic status, falling back to the raw value. */
 export const academicStatusLabel = (value: AcademicStatus | string): string =>
   ACADEMIC_LABELS[value as AcademicStatus] ?? value;
+
+/** Legacy production slug for each academic status (the raw `academic_status` string the production
+ *  Contacts → Students "Type" column renders, e.g. "international-medical-graduate"). Matches the
+ *  legacy AddNewStudent modal's ids; `UsPreMed` is the one non-kebab special case ("pre-med"). */
+const ACADEMIC_SLUGS: Record<AcademicStatus, string> = {
+  UsPreMed: "pre-med",
+  MdStudent: "md-student",
+  DoStudent: "do-student",
+  DentalStudent: "dental-student",
+  InternationalMedicalStudent: "international-medical-student",
+  InternationalMedicalGraduate: "international-medical-graduate",
+  PhysicianAssistantStudent: "physician-assistant-student",
+  NursePractitionerStudent: "nurse-practitioner-student"
+};
+
+/** Production "Type" value for a student — the raw academic-status slug, matching production exactly. */
+export const academicStatusSlug = (value: AcademicStatus | string): string =>
+  ACADEMIC_SLUGS[value as AcademicStatus] ?? value;
+
+/** Gender options (profile Personal Information). Legacy stored 'male'/'female'/'none'. */
+export const GENDERS: { value: Gender; label: string }[] = [
+  { value: "Male", label: "Male" },
+  { value: "Female", label: "Female" },
+  { value: "NonBinary", label: "Non binary" }
+];
+
+/** Immigration-status options (profile Personal Information) — the exact legacy `visa_status` list. */
+export const IMMIGRATION_STATUSES: { value: ImmigrationStatus; label: string }[] = [
+  { value: "UsCitizen", label: "US Citizen" },
+  { value: "UsPermanentResident", label: "US Permanent Resident" },
+  { value: "PermanentResidentPending", label: "Permanent Resident Pending" },
+  { value: "B1B2", label: "B1/B2" },
+  { value: "F1", label: "F1" },
+  { value: "J1", label: "J1" },
+  { value: "H1B", label: "H1-B" },
+  { value: "H4", label: "H4" },
+  { value: "Esta", label: "ESTA" },
+  { value: "NeedVisaInterviewScheduled", label: "I need a Visa, but I have interview scheduled" },
+  { value: "NeedVisaNoInterview", label: "I need a Visa, and I do NOT have an interview scheduled" },
+  { value: "Other", label: "Other" }
+];
+
+/** ID-type options (profile Personal Information — D.O. students provide an ID in place of a passport). */
+export const ID_TYPES: { value: StudentIdType; label: string }[] = [
+  { value: "DrivingLicense", label: "Driving License" },
+  { value: "Passport", label: "Passport" }
+];
 
 /** Human label for a visa status (or a dash when none), falling back to the raw value. */
 export const visaStatusLabel = (value: VisaStatus | string | null | undefined): string =>

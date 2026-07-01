@@ -104,6 +104,7 @@ public static class ApiAuthorizationMatrix
         new("GET", "/api/students/ffffffff-0000-0000-0000-000000000001", RoleNames.Staff, "Get student by id (staff)"),
         new("POST", "/api/students", [RoleNames.Admin], "Create student (admin)"),
         new("PUT", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Update student (admin)"),
+        new("PUT", "/api/students/00000000-0000-0000-0000-000000000000/personal-info", [RoleNames.Admin], "Update student personal-info tab (admin)"),
         new("DELETE", "/api/students/00000000-0000-0000-0000-000000000000", [RoleNames.Admin], "Delete student (admin)"),
         // Admin document review + config (PHASE 2g-3a) — all AdminOnly. Seeded ids route through to real
         // resources; non-existent ids / empty bodies give authorized admins 404/400 (authorized-through).

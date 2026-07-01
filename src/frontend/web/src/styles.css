@@ -791,6 +791,26 @@ table.data { width: 100%; border-collapse: collapse; }
 /* Admin rotation Preceptor/Student names — production renders them as bold blue profile links
    (Bootstrap link blue). Navigation to the member-profile page is deferred (Contacts slice). */
 .rot-name { color: #007bff; }
+a.rot-name { text-decoration: none; }
+a.rot-name:hover { text-decoration: underline; }
+
+/* ---- Admin profile screens (Student/Preceptor/Sales/SDR) ---- */
+.profile-page { background: #fff; border-radius: 12px; padding: 28px 32px; }
+.profile-header { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 8px; }
+.profile-avatar {
+  width: 96px; height: 96px; border-radius: 50%; background: #f1f3f5;
+  display: flex; align-items: center; justify-content: center; color: #9aa0a6;
+}
+.profile-avatar-icon { font-size: 28px; }
+.profile-name { margin: 0; }
+.profile-location { color: #007bff; font-size: 14px; }
+.profile-body { margin-top: 20px; }
+.profile-form { display: flex; flex-direction: column; gap: 20px; }
+.profile-form .radio-group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.profile-form .radio-group legend { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.profile-form .radio { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+.profile-form-foot { display: flex; justify-content: flex-end; }
+.profile-form input[readonly] { background: #f6f7f8; color: #6b7075; }
 .heading-xxs { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 30px; margin: 0; }
 /* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
 .list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }

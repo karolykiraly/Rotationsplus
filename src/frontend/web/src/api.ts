@@ -240,7 +240,18 @@ export type VisaStatus = "CitizenOrGreenCard" | "ValidVisa" | "InterviewSchedule
 /** Student lifecycle status (mirrors the API's StudentStatus enum; serialized as these names). */
 export type StudentStatus = "Registered" | "MemberProfileCompleted" | "MemberActivated" | "TurnedIntoContact";
 
-/** Mirror of the API's StudentSummaryResponse contract (enums serialized as strings). */
+/** Profile Personal-Information enums (mirror the API; serialized as these names). */
+export type Gender = "Male" | "Female" | "NonBinary";
+export type ImmigrationStatus =
+  | "UsCitizen" | "UsPermanentResident" | "PermanentResidentPending"
+  | "B1B2" | "F1" | "J1" | "H1B" | "H4" | "Esta"
+  | "NeedVisaInterviewScheduled" | "NeedVisaNoInterview" | "Other";
+export type StudentIdType = "DrivingLicense" | "Passport";
+
+/** Mirror of the API's StudentSummaryResponse contract (enums serialized as strings). The four rollups
+ *  (dollarsSpent / outstandingPayments / outstandingDocuments / weeksPurchased) are the production
+ *  "achievements" columns on the Contacts → Students tab, computed server-side from succeeded payments +
+ *  document statuses. */
 export interface Student {
   id: string;
   fullName: string;
@@ -251,6 +262,10 @@ export interface Student {
   city?: string | null;
   state?: string | null;
   status: StudentStatus;
+  dollarsSpent: number;
+  outstandingPayments: number;
+  outstandingDocuments: number;
+  weeksPurchased: number;
 }
 
 /** Mirror of the API's StudentDetailResponse contract — the editable shape. */
@@ -268,6 +283,35 @@ export interface StudentDetail {
   state?: string | null;
   status: StudentStatus;
   studentOid?: string | null;
+  // Personal Information tab
+  birthdate?: string | null;
+  gender?: Gender | null;
+  immigrationStatus?: ImmigrationStatus | null;
+  immigrationStatusOther?: string | null;
+  visaInterviewDate?: string | null;
+  passportIssuedCountry?: string | null;
+  passportNumber?: string | null;
+  selectedIdType?: StudentIdType | null;
+  idNumber?: string | null;
+  avatarBlobName?: string | null;
+}
+
+/** Save payload for the profile's Personal Information tab (mirrors UpdateStudentPersonalInfoRequest).
+ *  Email is omitted — it's the CIAM/Entra-linked identity, read-only on the profile. */
+export interface StudentPersonalInfoInput {
+  firstName: string;
+  lastName: string;
+  mobilePhone?: string | null;
+  academicStatus: AcademicStatus;
+  birthdate?: string | null;
+  gender?: Gender | null;
+  immigrationStatus?: ImmigrationStatus | null;
+  immigrationStatusOther?: string | null;
+  visaInterviewDate?: string | null;
+  passportIssuedCountry?: string | null;
+  passportNumber?: string | null;
+  selectedIdType?: StudentIdType | null;
+  idNumber?: string | null;
 }
 
 /** Admin create/update payload (mirrors Create/UpdateStudentRequest). */
@@ -903,6 +947,9 @@ export const createStudent = (input: StudentInput): Promise<StudentDetail> =>
   request<StudentDetail>("POST", "/api/students", input);
 export const updateStudent = (id: string, input: StudentInput): Promise<StudentDetail> =>
   request<StudentDetail>("PUT", `/api/students/${id}`, input);
+/** Saves the profile's Personal Information tab (per-tab save, mirroring production's onSaveProfile1). */
+export const updateStudentPersonalInfo = (id: string, input: StudentPersonalInfoInput): Promise<StudentDetail> =>
+  request<StudentDetail>("PUT", `/api/students/${id}/personal-info`, input);
 export const deleteStudent = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/students/${id}`);
 

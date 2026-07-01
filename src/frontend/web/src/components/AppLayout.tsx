@@ -79,7 +79,10 @@ export function AppLayout() {
     };
   }, [menuOpen]);
 
-  const title = TITLES[pathname] ?? "Staff console";
+  // Dynamic per-id profile routes (e.g. /admin/students/:id) don't have a static title-map entry.
+  const title = TITLES[pathname]
+    ?? (pathname.startsWith("/admin/students/") ? "Student Profile" : undefined)
+    ?? "Staff console";
 
   return (
     <>

@@ -3,8 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using RotationsPlus.Api.Infrastructure;
 using RotationsPlus.Common.Authorization;
 using RotationsPlus.Contracts.Common;
+using RotationsPlus.Contracts.Documents;
+using RotationsPlus.Contracts.Payments;
 using RotationsPlus.Contracts.Rotations;
 using RotationsPlus.Contracts.Students;
 
@@ -494,5 +499,120 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
 
         var list = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>("/api/students?pageSize=100", JsonOptions);
         list!.Items.Select(s => s.Id).Should().NotContain(created.Id);
+    }
+
+    // ---- Profile → Personal Information tab ----
+
+    [Fact]
+    public async Task Admin_saves_the_personal_information_tab_and_it_round_trips()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = new UpdateStudentPersonalInfoRequest(
+            "Greeshma", "James", "+1 555 0142", AcademicStatus.InternationalMedicalGraduate,
+            new DateOnly(1996, 4, 22), Gender.Female, ImmigrationStatus.B1B2, null, null,
+            "India", "P1234567", null, null);
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/personal-info", req, JsonOptions);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.FirstName.Should().Be("Greeshma");
+        fetched.LastName.Should().Be("James");
+        fetched.Birthdate.Should().Be(new DateOnly(1996, 4, 22));
+        fetched.Gender.Should().Be(Gender.Female);
+        fetched.ImmigrationStatus.Should().Be(ImmigrationStatus.B1B2);
+        fetched.PassportIssuedCountry.Should().Be("India");
+        fetched.PassportNumber.Should().Be("P1234567");
+    }
+
+    [Fact]
+    public async Task Personal_info_save_with_a_blank_first_name_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = new UpdateStudentPersonalInfoRequest(
+            "   ", "James", null, AcademicStatus.MdStudent, null, null, null, null, null, null, null, null, null);
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/personal-info", req, JsonOptions);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Personal_info_save_for_an_unknown_id_returns_404()
+    {
+        var admin = Client(RoleNames.Admin);
+        var req = new UpdateStudentPersonalInfoRequest(
+            "A", "B", null, AcademicStatus.MdStudent, null, null, null, null, null, null, null, null, null);
+        var resp = await admin.PutAsJsonAsync($"/api/students/{Guid.NewGuid()}/personal-info", req, JsonOptions);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ---- Achievements rollups (money-sensitive: the Contacts → Students tab columns) ----
+
+    // Non-open program: 1500/wk. A 4-week booking → total 6000, deposit 600, outstanding 5400 (matches
+    // PaymentCheckoutEndpointTests). The rollups are all keyed off SUCCEEDED payments, so an unpaid
+    // second booking must NOT inflate DollarsSpent / OutstandingPayments / WeeksPurchased.
+    private static readonly Guid InternalMedicineProgram = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
+
+    [Fact]
+    public async Task Student_summary_rolls_up_only_paid_bookings_into_the_achievements_columns()
+    {
+        var admin = Client(RoleNames.Admin);
+        var oid = $"ciam-{Guid.NewGuid():N}";
+        var token = $"Rollup{Guid.NewGuid():N}";
+
+        // A student with a distinctive surname token so the list query returns exactly this row.
+        var student = await (await admin.PostAsJsonAsync("/api/students",
+                new CreateStudentRequest("Rolla", token, UniqueEmail(), null,
+                    AcademicStatus.MdStudent, null, null, null, null, null, StudentStatus.MemberActivated, oid), JsonOptions))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        // Paid booking: 4 weeks, deposit driven to Succeeded via the DEV simulate round-trip.
+        var paidRotation = await (await admin.PostAsJsonAsync("/api/rotations",
+                new CreateRotationRequest(InternalMedicineProgram, student!.Id,
+                    new DateOnly(2026, 9, 7), new DateOnly(2026, 10, 5), RotationStatus.Pending), JsonOptions))
+            .Content.ReadFromJsonAsync<RotationDetailResponse>(JsonOptions);
+
+        var customer = factory.CreateClient();
+        customer.DefaultRequestHeaders.Add("X-Test-Oid", oid);
+        customer.DefaultRequestHeaders.Add("X-Test-Roles", RoleNames.Student);
+        var paymentId = (await (await customer.PostAsync($"/api/rotations/{paidRotation!.Id}/payment-intent", null))
+            .Content.ReadFromJsonAsync<PaymentIntentResponse>(JsonOptions))!.PaymentId;
+        (await customer.PostAsJsonAsync($"/api/dev/payments/{paymentId}/simulate", new { outcome = "succeeded" }, JsonOptions))
+            .EnsureSuccessStatusCode();
+
+        // A SECOND, unpaid booking (still Pending) — must not touch the money/weeks rollups.
+        (await admin.PostAsJsonAsync("/api/rotations",
+                new CreateRotationRequest(InternalMedicineProgram, student.Id,
+                    new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 30), RotationStatus.Pending), JsonOptions))
+            .EnsureSuccessStatusCode();
+
+        var list = await admin.GetFromJsonAsync<PagedResponse<StudentSummaryResponse>>(
+            $"/api/students?q={token}&pageSize=100", JsonOptions);
+        var summary = list!.Items.Single(s => s.Id == student.Id);
+
+        // Only the paid rotation counts.
+        summary.DollarsSpent.Should().Be(600m);          // deposit collected
+        summary.OutstandingPayments.Should().Be(5400m);  // remainder billed later
+        summary.WeeksPurchased.Should().Be(4);           // weeks on the paid booking only
+
+        // Outstanding documents = every not-yet-uploaded required doc across BOTH bookings; cross-check
+        // the projection against a direct DB count so the "needs action" state set stays honest.
+        int expectedOutstandingDocs;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RotationsDbContext>();
+            expectedOutstandingDocs = await db.RotationDocuments.CountAsync(rd =>
+                rd.StudentId == student.Id
+                && (rd.Status == DocumentStatus.UploadNeeded
+                    || rd.Status == DocumentStatus.Rejected
+                    || rd.Status == DocumentStatus.Expired));
+        }
+        summary.OutstandingDocuments.Should().Be(expectedOutstandingDocs);
     }
 }
