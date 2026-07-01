@@ -158,7 +158,11 @@ stages:
                       export VITE_AAD_TENANT_ID="$(aadTenantId)"
                       export VITE_AAD_CLIENT_ID="$(aadClientId)"
                       export VITE_API_SCOPE="$(apiScope)"
-                      export VITE_AAD_REDIRECT_URI="https://${swaHost}"
+                      # Staff MSAL redirect target is /admin (the authenticated console root, inside the
+                      # StaffMsalShell provider), NOT the site root — "/" is the public, anonymous landing
+                      # with no MsalProvider, so a response hash there is never processed. Both this and
+                      # the root are registered SPA redirect URIs on rplus-web. (Must include /admin.)
+                      export VITE_AAD_REDIRECT_URI="https://${swaHost}/admin"
 
                       pushd src/frontend/web
                       npm ci
