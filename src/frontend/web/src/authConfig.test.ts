@@ -24,6 +24,12 @@ describe("authConfig", () => {
   it("has an http API base URL", () => {
     expect(apiBaseUrl).toMatch(/^http/);
   });
+
+  it("uses the /admin authenticated console as the redirect URI", () => {
+    // The redirect response is processed at /admin; processStaffRedirect (authRedirect.ts) keeps the
+    // user there (navigateToLoginRequestUrl:false) instead of bouncing back to the public landing "/".
+    expect(msalConfig.auth.redirectUri).toMatch(/\/admin$/);
+  });
 });
 
 describe("customer (CIAM) authConfig", () => {

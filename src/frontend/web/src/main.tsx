@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { EventType, type AuthenticationResult, type IPublicClientApplication } from "@azure/msal-browser";
 import { customerMsalInstance, msalInstance } from "./authConfig";
+import { processStaffRedirect } from "./authRedirect";
 import { queryClient } from "./queryClient";
 import { router } from "./router";
 // Figma design-system fonts, self-hosted (the CSP forbids external Google Fonts).
@@ -31,7 +32,12 @@ function wireActiveAccount(instance: IPublicClientApplication) {
 }
 
 // MSAL v5 requires initialize() before use; do both instances before rendering.
-void Promise.all([msalInstance.initialize(), customerMsalInstance.initialize()]).then(() => {
+void Promise.all([msalInstance.initialize(), customerMsalInstance.initialize()])
+  // Consume a pending STAFF redirect response BEFORE the provider mounts, with
+  // navigateToLoginRequestUrl:false, so staff land on /admin instead of being bounced back to the
+  // public landing that started the login (customer /portal responses are untouched — see authRedirect).
+  .then(() => processStaffRedirect(msalInstance))
+  .then(() => {
   wireActiveAccount(msalInstance);
   wireActiveAccount(customerMsalInstance);
 
