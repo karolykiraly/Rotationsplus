@@ -260,6 +260,46 @@ public static class StudentEndpoints
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("UpdateStudentPersonalInfo");
 
+        // Profile → Needs tab save (legacy onSaveProfile2). Interests / preferred specialty / preferred
+        // locations (+ free-text "Other") / priorities. Selections are stored as titles.
+        group.MapPut("/{id:guid}/needs", async (
+            Guid id, UpdateStudentNeedsRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            var interests = CleanTitleList(request.Interests);
+            var locations = CleanTitleList(request.SpecialtyLocations);
+            var importants = CleanTitleList(request.Importants);
+            var preferred = TrimmedOrNull(request.PreferredSpecialty);
+            var custom = TrimmedOrNull(request.CustomSpecialtyLocation);
+
+            if (preferred is { Length: > 200 }) return Results.BadRequest("PreferredSpecialty must be 200 characters or fewer.");
+            if (custom is { Length: > 120 }) return Results.BadRequest("CustomSpecialtyLocation must be 120 characters or fewer.");
+            // Legacy rule: selecting the "Other" location requires the free-text value.
+            if (locations is not null
+                && locations.Contains("Other", StringComparer.OrdinalIgnoreCase)
+                && string.IsNullOrEmpty(custom))
+            {
+                return Results.BadRequest("Enter the specialty location for 'Other'.");
+            }
+
+            var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (student is null)
+            {
+                return Results.NotFound();
+            }
+
+            student.Interests = interests;
+            student.PreferredSpecialty = preferred;
+            student.SpecialtyLocations = locations;
+            // Only keep the free-text when "Other" is actually selected.
+            student.CustomSpecialtyLocation =
+                locations is not null && locations.Contains("Other", StringComparer.OrdinalIgnoreCase) ? custom : null;
+            student.Importants = importants;
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ToDetail(student));
+        })
+        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
+        .WithName("UpdateStudentNeeds");
+
         group.MapDelete("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -451,11 +491,32 @@ public static class StudentEndpoints
         student.StudentOid = norm.StudentOid;
     }
 
+    private const int NeedsItemMaxLength = 120;
+    private const int NeedsListMaxCount = 200;
+
+    /// <summary>Trims, drops blanks/oversized items, de-dupes, and caps a title list from a Needs-tab
+    /// selection; returns null for an empty result so the column clears cleanly.</summary>
+    private static List<string>? CleanTitleList(IReadOnlyList<string>? items)
+    {
+        if (items is null) return null;
+        var cleaned = items
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Where(s => s.Length <= NeedsItemMaxLength)
+            .Distinct(StringComparer.Ordinal)
+            .Take(NeedsListMaxCount)
+            .ToList();
+        return cleaned.Count == 0 ? null : cleaned;
+    }
+
+    private static string? TrimmedOrNull(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
     private static StudentDetailResponse ToDetail(Student x) =>
         new(x.Id, x.FirstName, x.LastName, x.Email, x.MobilePhone, x.AcademicStatus, x.VisaStatus,
             x.MedicalSchool, x.MedicalSchoolCountry, x.City, x.State, x.Status, x.StudentOid,
             x.Birthdate, x.Gender, x.ImmigrationStatus, x.ImmigrationStatusOther, x.VisaInterviewDate,
-            x.PassportIssuedCountry, x.PassportNumber, x.SelectedIdType, x.IdNumber, x.AvatarBlobName);
+            x.PassportIssuedCountry, x.PassportNumber, x.SelectedIdType, x.IdNumber, x.AvatarBlobName,
+            x.Interests, x.PreferredSpecialty, x.SpecialtyLocations, x.CustomSpecialtyLocation, x.Importants);
 
     // Lightweight summary for form pickers (the /options list): identity core only, rollups zeroed —
     // pickers show a name, not the achievements columns. The paginated directory list projects the

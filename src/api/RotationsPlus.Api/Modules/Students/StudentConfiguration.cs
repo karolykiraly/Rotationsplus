@@ -54,6 +54,10 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(x => x.IdNumber).HasMaxLength(60);
         builder.Property(x => x.AvatarBlobName).HasMaxLength(256);
 
+        // ---- Profile → Needs tab (text[] arrays map automatically; not seeded) ----
+        builder.Property(x => x.PreferredSpecialty).HasMaxLength(200);
+        builder.Property(x => x.CustomSpecialtyLocation).HasMaxLength(120);
+
         builder.Property(x => x.Status)
             .HasConversion<string>()
             .HasMaxLength(32)

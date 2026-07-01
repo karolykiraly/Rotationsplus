@@ -52,4 +52,10 @@ public sealed record StudentDetailResponse(
     string? PassportNumber,
     StudentIdType? SelectedIdType,
     string? IdNumber,
-    string? AvatarBlobName);
+    string? AvatarBlobName,
+    // ---- Needs tab ----
+    IReadOnlyList<string>? Interests,
+    string? PreferredSpecialty,
+    IReadOnlyList<string>? SpecialtyLocations,
+    string? CustomSpecialtyLocation,
+    IReadOnlyList<string>? Importants);

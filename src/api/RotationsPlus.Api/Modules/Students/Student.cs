@@ -60,6 +60,27 @@ public sealed class Student : AuditableEntity
     /// its own slice. Null until a photo is uploaded.</summary>
     public string? AvatarBlobName { get; set; }
 
+    // ---- Profile → Needs tab (legacy StudentProfile.js tab 1) ----
+    // Selections stored as titles (not the legacy positional numeric ids, which are ambiguous — dental id 1
+    // ≠ non-dental id 1). Postgres text[] via Npgsql; null until the student fills the tab.
+
+    /// <summary>Specialty interests chosen in the grid (legacy <c>interests</c>, stored as titles).</summary>
+    public List<string>? Interests { get; set; }
+
+    /// <summary>The single specialty picked from the "or add from the list" dropdown (legacy
+    /// <c>specialty</c>).</summary>
+    public string? PreferredSpecialty { get; set; }
+
+    /// <summary>Preferred rotation locations (legacy <c>specialty_locations</c>, stored as city titles).</summary>
+    public List<string>? SpecialtyLocations { get; set; }
+
+    /// <summary>Free-text location when "Other" is chosen (legacy <c>custom_specialty_location</c>).</summary>
+    public string? CustomSpecialtyLocation { get; set; }
+
+    /// <summary>What matters most when finding a rotation (legacy <c>importants</c>, a CSV in Strapi;
+    /// stored here as a clean string list). Hidden for the dental track.</summary>
+    public List<string>? Importants { get; set; }
+
     public StudentStatus Status { get; set; } = StudentStatus.Registered;
 
     /// <summary>CIAM object id, set once the student signs in to the portal (null until linked).</summary>

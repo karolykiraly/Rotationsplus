@@ -294,6 +294,21 @@ export interface StudentDetail {
   selectedIdType?: StudentIdType | null;
   idNumber?: string | null;
   avatarBlobName?: string | null;
+  // Needs tab
+  interests?: string[] | null;
+  preferredSpecialty?: string | null;
+  specialtyLocations?: string[] | null;
+  customSpecialtyLocation?: string | null;
+  importants?: string[] | null;
+}
+
+/** Save payload for the profile's Needs tab (mirrors UpdateStudentNeedsRequest). Selections are titles. */
+export interface StudentNeedsInput {
+  interests?: string[] | null;
+  preferredSpecialty?: string | null;
+  specialtyLocations?: string[] | null;
+  customSpecialtyLocation?: string | null;
+  importants?: string[] | null;
 }
 
 /** Save payload for the profile's Personal Information tab (mirrors UpdateStudentPersonalInfoRequest).
@@ -950,6 +965,9 @@ export const updateStudent = (id: string, input: StudentInput): Promise<StudentD
 /** Saves the profile's Personal Information tab (per-tab save, mirroring production's onSaveProfile1). */
 export const updateStudentPersonalInfo = (id: string, input: StudentPersonalInfoInput): Promise<StudentDetail> =>
   request<StudentDetail>("PUT", `/api/students/${id}/personal-info`, input);
+/** Saves the profile's Needs tab (per-tab save, mirroring production's onSaveProfile2). */
+export const updateStudentNeeds = (id: string, input: StudentNeedsInput): Promise<StudentDetail> =>
+  request<StudentDetail>("PUT", `/api/students/${id}/needs`, input);
 export const deleteStudent = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/students/${id}`);
 

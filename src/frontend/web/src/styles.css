@@ -811,6 +811,28 @@ a.rot-name:hover { text-decoration: underline; }
 .profile-form .radio { display: flex; align-items: center; gap: 8px; font-weight: 400; }
 .profile-form-foot { display: flex; justify-content: flex-end; }
 .profile-form input[readonly] { background: #f6f7f8; color: #6b7075; }
+
+/* Needs tab — interests toggle grid (production: 3-column, selected = filled blue). */
+.needs-interests-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.interest-btn {
+  padding: 10px 12px; border: 1px solid #5aa6ff; border-radius: 6px;
+  background: #fff; color: #4a90e2; font-weight: 400; cursor: pointer; text-align: center;
+}
+.interest-btn.selected { background: #5aa6ff; color: #fff; border-color: #5aa6ff; }
+.needs-multiselect { position: relative; }
+.needs-multiselect-field {
+  width: 100%; text-align: left; padding: 10px 12px; border: 1px solid #d7dbe0; border-radius: 6px;
+  background: #fff; cursor: pointer; color: #4a90e2;
+}
+.needs-multiselect-panel {
+  position: absolute; z-index: 20; left: 0; right: 0; margin-top: 4px; max-height: 260px; overflow: auto;
+  background: #fff; border: 1px solid #d7dbe0; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.12); padding: 8px;
+}
+.needs-multiselect-opt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-weight: 400; }
+.needs-other { margin-top: 8px; }
+.profile-form .needs-importants { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; }
+.profile-form .needs-importants legend { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.profile-form .checkbox { display: flex; align-items: center; gap: 8px; font-weight: 400; }
 .heading-xxs { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 30px; margin: 0; }
 /* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
 .list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }

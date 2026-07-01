@@ -552,6 +552,61 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // ---- Profile → Needs tab ----
+
+    [Fact]
+    public async Task Admin_saves_the_needs_tab_and_it_round_trips()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = new UpdateStudentNeedsRequest(
+            new[] { "Internal Medicine", "Radiology" },
+            "Cardiology",
+            new[] { "Chicago", "Other" },
+            "Remote City",
+            new[] { "Hands-on", "Residency audition" });
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/needs", req, JsonOptions);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.Interests.Should().Equal("Internal Medicine", "Radiology");
+        fetched.PreferredSpecialty.Should().Be("Cardiology");
+        fetched.SpecialtyLocations.Should().Equal("Chicago", "Other");
+        fetched.CustomSpecialtyLocation.Should().Be("Remote City");
+        fetched.Importants.Should().Equal("Hands-on", "Residency audition");
+    }
+
+    [Fact]
+    public async Task Needs_save_with_Other_location_but_no_free_text_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = new UpdateStudentNeedsRequest(null, null, new[] { "Other" }, null, null);
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/needs", req, JsonOptions);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Needs_save_drops_the_custom_location_when_Other_is_not_selected()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        // "Other" not in the locations → the free text is ignored (cleared), not persisted.
+        var req = new UpdateStudentNeedsRequest(null, null, new[] { "Chicago" }, "should-be-dropped", null);
+        (await admin.PutAsJsonAsync($"/api/students/{created!.Id}/needs", req, JsonOptions)).EnsureSuccessStatusCode();
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.SpecialtyLocations.Should().Equal("Chicago");
+        fetched.CustomSpecialtyLocation.Should().BeNull();
+    }
+
     // ---- Achievements rollups (money-sensitive: the Contacts → Students tab columns) ----
 
     // Non-open program: 1500/wk. A 4-week booking → total 6000, deposit 600, outstanding 5400 (matches

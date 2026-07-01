@@ -50,3 +50,16 @@ public sealed record UpdateStudentPersonalInfoRequest(
     string? PassportNumber,
     StudentIdType? SelectedIdType,
     string? IdNumber);
+
+/// <summary>
+/// Save payload for the student profile's <b>Needs</b> tab (legacy <c>onSaveProfile2</c>): specialty
+/// interests, a single "add from the list" specialty, preferred locations (+ a free-text "Other"), and
+/// the "what matters most" priorities. Selections are titles. <c>CustomSpecialtyLocation</c> is required
+/// when the locations include "Other". The priorities list is hidden for the dental track.
+/// </summary>
+public sealed record UpdateStudentNeedsRequest(
+    IReadOnlyList<string>? Interests,
+    string? PreferredSpecialty,
+    IReadOnlyList<string>? SpecialtyLocations,
+    string? CustomSpecialtyLocation,
+    IReadOnlyList<string>? Importants);
