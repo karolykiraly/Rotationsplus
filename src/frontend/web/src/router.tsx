@@ -18,11 +18,10 @@ import { AppLayout } from "./components/AppLayout";
 import { SpecialtiesPage } from "./specialties/SpecialtiesPage";
 import { ProgramsPage } from "./programs/ProgramsPage";
 import { DashboardPage } from "./dashboard/DashboardPage";
-import { PreceptorsPage } from "./preceptors/PreceptorsPage";
 import { PermissionPage } from "./preceptors/PermissionPage";
 import { RotationsPage } from "./rotations/RotationsPage";
 import { HonorariumPage } from "./honorarium/HonorariumPage";
-import { StudentsPage } from "./students/StudentsPage";
+import { ContactsPage } from "./contacts/ContactsPage";
 import { CustomerMsalShell } from "./portal/CustomerMsalShell";
 import { BrowsePage } from "./portal/BrowsePage";
 import { ProgramDetailPage } from "./portal/ProgramDetailPage";
@@ -68,11 +67,13 @@ export const router = createBrowserRouter([
           { path: "dashboard", element: <DashboardPage /> },
           { path: "specialties", element: <SpecialtiesPage /> },
           { path: "programs", element: <ProgramsPage /> },
-          { path: "preceptors", element: <PreceptorsPage /> },
+          // The Students + Preceptors directories now live as tabs inside the Contacts hub (matching
+          // production, which has no standalone Students/Preceptors nav items); their per-id profile
+          // pages arrive in later slices.
+          { path: "contacts", element: <ContactsPage /> },
           { path: "permission", element: <PermissionPage /> },
           { path: "rotations", element: <RotationsPage /> },
-          { path: "honorarium", element: <HonorariumPage /> },
-          { path: "students", element: <StudentsPage /> }
+          { path: "honorarium", element: <HonorariumPage /> }
         ]
       }
     ]

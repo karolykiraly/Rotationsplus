@@ -57,7 +57,7 @@ describe("DashboardTodosPanel", () => {
     renderPanel();
     // documentsToReview: count 3, 2 items shown → "+1 more"
     const more = await screen.findByText(/\+1 more — review documents/);
-    expect(more.closest("a")).toHaveAttribute("href", "/admin/students");
+    expect(more.closest("a")).toHaveAttribute("href", "/admin/contacts");
   });
 
   it("shows an all-clear empty state for a queue with no items", async () => {

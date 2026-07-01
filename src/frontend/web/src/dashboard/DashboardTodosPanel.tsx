@@ -80,7 +80,7 @@ export function DashboardTodosPanel() {
           title="Documents to review"
           count={data.documentsToReview.count}
           items={data.documentsToReview.items}
-          to="/admin/students"
+          to="/admin/contacts"
           linkLabel="review documents"
           itemKey={(d) => d.documentId}
           renderItem={(d) => (

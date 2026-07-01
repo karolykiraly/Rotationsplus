@@ -36,7 +36,7 @@ const NAV: { label: string; icon: string; iconSel?: string; to?: string }[] = [
   { label: "Permissions", icon: permissionIcon, to: "/admin/permission" },
   { label: "Rotations", icon: rotationsIcon, iconSel: rotationsSel, to: "/admin/rotations" },
   { label: "Honorarium", icon: honorariumIcon, to: "/admin/honorarium" },
-  { label: "Contacts", icon: contactsIcon },
+  { label: "Contacts", icon: contactsIcon, to: "/admin/contacts" },
   { label: "Programs", icon: programIcon, iconSel: programSel, to: "/admin/programs" },
   { label: "Leads", icon: leadIcon },
   { label: "Customer Service", icon: customerIcon },
@@ -50,10 +50,9 @@ const TITLES: Record<string, string> = {
   "/admin/programs": "Programs",
   "/admin/rotations": "Rotations",
   "/admin/specialties": "Specialties",
-  "/admin/preceptors": "Preceptors",
+  "/admin/contacts": "Contacts",
   "/admin/permission": "Permission",
-  "/admin/honorarium": "Honorarium",
-  "/admin/students": "Students"
+  "/admin/honorarium": "Honorarium"
 };
 
 /** The authenticated staff shell: a cloned admin sidebar + header + routed content + footer.
