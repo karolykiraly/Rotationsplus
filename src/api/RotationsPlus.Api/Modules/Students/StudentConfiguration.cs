@@ -58,6 +58,21 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(x => x.PreferredSpecialty).HasMaxLength(200);
         builder.Property(x => x.CustomSpecialtyLocation).HasMaxLength(120);
 
+        // ---- Profile → Education tab ----
+        builder.Property(x => x.UsmleStep1).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.UsmleStep2).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.UsmleStep3).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.UsmleScore1).HasMaxLength(16);
+        builder.Property(x => x.UsmleScore2).HasMaxLength(16);
+        builder.Property(x => x.UsmleScore3).HasMaxLength(16);
+        builder.Property(x => x.ComlexLevel2).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.ComlexLevel3).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.ComlexLevel2Score).HasMaxLength(16);
+        builder.Property(x => x.ComlexLevel3Score).HasMaxLength(16);
+        builder.Property(x => x.EducationYear).HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.Undergrad).HasMaxLength(200);
+        builder.Property(x => x.Association).HasMaxLength(200);
+
         builder.Property(x => x.Status)
             .HasConversion<string>()
             .HasMaxLength(32)

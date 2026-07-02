@@ -63,3 +63,20 @@ public sealed record UpdateStudentNeedsRequest(
     IReadOnlyList<string>? SpecialtyLocations,
     string? CustomSpecialtyLocation,
     IReadOnlyList<string>? Importants);
+
+/// <summary>
+/// Save payload for the student profile's <b>Education</b> tab (legacy <c>onSaveProfile3</c>). The tab
+/// branches by academic track (IMS/IMG USMLE, D.O. COMLEX, Pre-med, Dental); the client sends the active
+/// branch's fields and leaves the rest null. School + country are shared by the IMS/IMG + Dental branches.
+/// </summary>
+public sealed record UpdateStudentEducationRequest(
+    string? MedicalSchool, string? MedicalSchoolCountry, DateOnly? GraduationDate,
+    ExamStatus? UsmleStep1, string? UsmleScore1, int? UsmleAttempts1, DateOnly? UsmleDate1,
+    ExamStatus? UsmleStep2, string? UsmleScore2, int? UsmleAttempts2, DateOnly? UsmleDate2,
+    ExamStatus? UsmleStep3, string? UsmleScore3, int? UsmleAttempts3, DateOnly? UsmleDate3,
+    bool? EcfmgCertified, bool? AppliedMatch,
+    bool? ComlexLevel1Taken, bool? ComlexLevel1Passed,
+    ExamStatus? ComlexLevel2, string? ComlexLevel2Score, int? ComlexLevel2Attempts, DateOnly? ComlexLevel2Date,
+    ExamStatus? ComlexLevel3, string? ComlexLevel3Score, int? ComlexLevel3Attempts, DateOnly? ComlexLevel3Date,
+    string? Undergrad, EducationYear? EducationYear, bool? IsAmsa, string? Association, bool? IsLeadership,
+    bool? IsToefl, bool? IsIndbe);

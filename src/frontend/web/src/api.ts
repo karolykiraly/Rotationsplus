@@ -248,6 +248,11 @@ export type ImmigrationStatus =
   | "NeedVisaInterviewScheduled" | "NeedVisaNoInterview" | "Other";
 export type StudentIdType = "DrivingLicense" | "Passport";
 
+/** Profile Education-tab enums (mirror the API; serialized as these names). <c>ExamStatus</c> maps the
+ *  legacy USMLE/COMLEX radio (1→Taken, 2→WillTake, 3→NoPlan). <c>FifthPlus</c> is the legacy "5th+". */
+export type ExamStatus = "Taken" | "WillTake" | "NoPlan";
+export type EducationYear = "Freshman" | "Sophomore" | "Junior" | "Senior" | "FifthPlus";
+
 /** Mirror of the API's StudentSummaryResponse contract (enums serialized as strings). The four rollups
  *  (dollarsSpent / outstandingPayments / outstandingDocuments / weeksPurchased) are the production
  *  "achievements" columns on the Contacts → Students tab, computed server-side from succeeded payments +
@@ -300,6 +305,78 @@ export interface StudentDetail {
   specialtyLocations?: string[] | null;
   customSpecialtyLocation?: string | null;
   importants?: string[] | null;
+  // Education tab
+  graduationDate?: string | null;
+  usmleStep1?: ExamStatus | null;
+  usmleScore1?: string | null;
+  usmleAttempts1?: number | null;
+  usmleDate1?: string | null;
+  usmleStep2?: ExamStatus | null;
+  usmleScore2?: string | null;
+  usmleAttempts2?: number | null;
+  usmleDate2?: string | null;
+  usmleStep3?: ExamStatus | null;
+  usmleScore3?: string | null;
+  usmleAttempts3?: number | null;
+  usmleDate3?: string | null;
+  ecfmgCertified?: boolean | null;
+  appliedMatch?: boolean | null;
+  comlexLevel1Taken?: boolean | null;
+  comlexLevel1Passed?: boolean | null;
+  comlexLevel2?: ExamStatus | null;
+  comlexLevel2Score?: string | null;
+  comlexLevel2Attempts?: number | null;
+  comlexLevel2Date?: string | null;
+  comlexLevel3?: ExamStatus | null;
+  comlexLevel3Score?: string | null;
+  comlexLevel3Attempts?: number | null;
+  comlexLevel3Date?: string | null;
+  undergrad?: string | null;
+  educationYear?: EducationYear | null;
+  isAmsa?: boolean | null;
+  association?: string | null;
+  isLeadership?: boolean | null;
+  isToefl?: boolean | null;
+  isIndbe?: boolean | null;
+}
+
+/** Save payload for the profile's Education tab (mirrors UpdateStudentEducationRequest). The client sends
+ *  the active academic-track branch's fields and leaves the rest null. */
+export interface StudentEducationInput {
+  medicalSchool?: string | null;
+  medicalSchoolCountry?: string | null;
+  graduationDate?: string | null;
+  usmleStep1?: ExamStatus | null;
+  usmleScore1?: string | null;
+  usmleAttempts1?: number | null;
+  usmleDate1?: string | null;
+  usmleStep2?: ExamStatus | null;
+  usmleScore2?: string | null;
+  usmleAttempts2?: number | null;
+  usmleDate2?: string | null;
+  usmleStep3?: ExamStatus | null;
+  usmleScore3?: string | null;
+  usmleAttempts3?: number | null;
+  usmleDate3?: string | null;
+  ecfmgCertified?: boolean | null;
+  appliedMatch?: boolean | null;
+  comlexLevel1Taken?: boolean | null;
+  comlexLevel1Passed?: boolean | null;
+  comlexLevel2?: ExamStatus | null;
+  comlexLevel2Score?: string | null;
+  comlexLevel2Attempts?: number | null;
+  comlexLevel2Date?: string | null;
+  comlexLevel3?: ExamStatus | null;
+  comlexLevel3Score?: string | null;
+  comlexLevel3Attempts?: number | null;
+  comlexLevel3Date?: string | null;
+  undergrad?: string | null;
+  educationYear?: EducationYear | null;
+  isAmsa?: boolean | null;
+  association?: string | null;
+  isLeadership?: boolean | null;
+  isToefl?: boolean | null;
+  isIndbe?: boolean | null;
 }
 
 /** Save payload for the profile's Needs tab (mirrors UpdateStudentNeedsRequest). Selections are titles. */
@@ -968,6 +1045,9 @@ export const updateStudentPersonalInfo = (id: string, input: StudentPersonalInfo
 /** Saves the profile's Needs tab (per-tab save, mirroring production's onSaveProfile2). */
 export const updateStudentNeeds = (id: string, input: StudentNeedsInput): Promise<StudentDetail> =>
   request<StudentDetail>("PUT", `/api/students/${id}/needs`, input);
+
+export const updateStudentEducation = (id: string, input: StudentEducationInput): Promise<StudentDetail> =>
+  request<StudentDetail>("PUT", `/api/students/${id}/education`, input);
 export const deleteStudent = (id: string): Promise<void> =>
   request<void>("DELETE", `/api/students/${id}`);
 

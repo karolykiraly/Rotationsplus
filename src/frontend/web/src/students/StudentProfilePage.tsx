@@ -6,6 +6,7 @@ import { Tabs } from "../components/Tabs";
 import { getStudent, type StudentDetail } from "../api";
 import { StudentPersonalInfoTab } from "./StudentPersonalInfoTab";
 import { StudentNeedsTab } from "./StudentNeedsTab";
+import { StudentEducationTab } from "./StudentEducationTab";
 
 /** Admin Student Profile (legacy StudentProfile.js, route `/admin/students/:id`) — the name-link target
  *  from the Contacts → Students tab. Seven sub-tabs match production; Personal Information is built here,
@@ -63,6 +64,8 @@ export function StudentProfilePage() {
           <StudentPersonalInfoTab student={student} onSaved={onSaved} />
         ) : tab === 1 ? (
           <StudentNeedsTab student={student} onSaved={onSaved} />
+        ) : tab === 2 ? (
+          <StudentEducationTab student={student} onSaved={onSaved} />
         ) : (
           <ComingSoon label={TAB_LABELS[tab]} />
         )}

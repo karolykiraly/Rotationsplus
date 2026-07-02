@@ -833,6 +833,16 @@ a.rot-name:hover { text-decoration: underline; }
 .profile-form .needs-importants { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; }
 .profile-form .needs-importants legend { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
 .profile-form .checkbox { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+
+/* Education tab — per-step exam controls (status radios + conditional score/attempts/date). */
+.profile-form .exam-step { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.profile-form .exam-step legend { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.profile-form .exam-step-detail {
+  display: flex; flex-wrap: wrap; gap: 16px; margin: 4px 0 4px 26px; align-items: flex-end;
+}
+.profile-form .exam-step-detail .field { flex: 1 1 180px; }
+.profile-form .field-label { font-weight: 700; font-size: 13px; width: 100%; }
+.profile-form .comlex-l1 .exam-step-detail { flex-direction: row; align-items: center; }
 .heading-xxs { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 30px; margin: 0; }
 /* List header: section title + a muted item count (legacy "Honorarium Deposit  N items"). */
 .list-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }

@@ -300,6 +300,69 @@ public static class StudentEndpoints
         .RequireAuthorization(AuthorizationPolicies.AdminOnly)
         .WithName("UpdateStudentNeeds");
 
+        // Profile → Education tab save (legacy onSaveProfile3). Branches by academic track (IMS/IMG USMLE,
+        // D.O. COMLEX, Pre-med, Dental); the client sends the active branch's fields and leaves the rest
+        // null. We apply all fields — a student has a single academic track, so unused branches stay null.
+        group.MapPut("/{id:guid}/education", async (
+            Guid id, UpdateStudentEducationRequest request, RotationsDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (!TryNormalizeEducation(request, out var norm, out var error))
+            {
+                return Results.BadRequest(error);
+            }
+
+            var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (student is null)
+            {
+                return Results.NotFound();
+            }
+
+            // School + country are shared by the IMS/IMG + Dental branches (same columns as the identity core).
+            student.MedicalSchool = norm.MedicalSchool;
+            student.MedicalSchoolCountry = norm.MedicalSchoolCountry;
+            student.GraduationDate = norm.GraduationDate;
+
+            student.UsmleStep1 = norm.UsmleStep1;
+            student.UsmleScore1 = norm.UsmleScore1;
+            student.UsmleAttempts1 = norm.UsmleAttempts1;
+            student.UsmleDate1 = norm.UsmleDate1;
+            student.UsmleStep2 = norm.UsmleStep2;
+            student.UsmleScore2 = norm.UsmleScore2;
+            student.UsmleAttempts2 = norm.UsmleAttempts2;
+            student.UsmleDate2 = norm.UsmleDate2;
+            student.UsmleStep3 = norm.UsmleStep3;
+            student.UsmleScore3 = norm.UsmleScore3;
+            student.UsmleAttempts3 = norm.UsmleAttempts3;
+            student.UsmleDate3 = norm.UsmleDate3;
+            student.EcfmgCertified = norm.EcfmgCertified;
+            student.AppliedMatch = norm.AppliedMatch;
+
+            student.ComlexLevel1Taken = norm.ComlexLevel1Taken;
+            student.ComlexLevel1Passed = norm.ComlexLevel1Passed;
+            student.ComlexLevel2 = norm.ComlexLevel2;
+            student.ComlexLevel2Score = norm.ComlexLevel2Score;
+            student.ComlexLevel2Attempts = norm.ComlexLevel2Attempts;
+            student.ComlexLevel2Date = norm.ComlexLevel2Date;
+            student.ComlexLevel3 = norm.ComlexLevel3;
+            student.ComlexLevel3Score = norm.ComlexLevel3Score;
+            student.ComlexLevel3Attempts = norm.ComlexLevel3Attempts;
+            student.ComlexLevel3Date = norm.ComlexLevel3Date;
+
+            student.Undergrad = norm.Undergrad;
+            student.EducationYear = norm.EducationYear;
+            student.IsAmsa = norm.IsAmsa;
+            student.Association = norm.Association;
+            student.IsLeadership = norm.IsLeadership;
+
+            student.IsToefl = norm.IsToefl;
+            student.IsIndbe = norm.IsIndbe;
+
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ToDetail(student));
+        })
+        .RequireAuthorization(AuthorizationPolicies.AdminOnly)
+        .WithName("UpdateStudentEducation");
+
         group.MapDelete("/{id:guid}", async (Guid id, RotationsDbContext db, CancellationToken cancellationToken) =>
         {
             var student = await db.Students.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -511,12 +574,119 @@ public static class StudentEndpoints
 
     private static string? TrimmedOrNull(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
+    private const int ScoreMaxLength = 16;
+    private const int EducationTextMaxLength = 200;
+    private const int MinAttempts = 1;
+    private const int MaxAttempts = 10;
+
+    /// <summary>Validated, normalized Education-tab values ready to persist. Exam sub-fields are already
+    /// null-ed to match their step status (score/attempts only when Taken, date only when WillTake).</summary>
+    private sealed record NormalizedEducation(
+        string? MedicalSchool, string? MedicalSchoolCountry, DateOnly? GraduationDate,
+        ExamStatus? UsmleStep1, string? UsmleScore1, int? UsmleAttempts1, DateOnly? UsmleDate1,
+        ExamStatus? UsmleStep2, string? UsmleScore2, int? UsmleAttempts2, DateOnly? UsmleDate2,
+        ExamStatus? UsmleStep3, string? UsmleScore3, int? UsmleAttempts3, DateOnly? UsmleDate3,
+        bool? EcfmgCertified, bool? AppliedMatch,
+        bool? ComlexLevel1Taken, bool? ComlexLevel1Passed,
+        ExamStatus? ComlexLevel2, string? ComlexLevel2Score, int? ComlexLevel2Attempts, DateOnly? ComlexLevel2Date,
+        ExamStatus? ComlexLevel3, string? ComlexLevel3Score, int? ComlexLevel3Attempts, DateOnly? ComlexLevel3Date,
+        string? Undergrad, EducationYear? EducationYear, bool? IsAmsa, string? Association, bool? IsLeadership,
+        bool? IsToefl, bool? IsIndbe);
+
+    private static bool TryNormalizeEducation(
+        UpdateStudentEducationRequest r, out NormalizedEducation norm, out string error)
+    {
+        norm = null!;
+        error = string.Empty;
+
+        // Enums must be in range if supplied.
+        if (r.UsmleStep1 is { } s1 && !Enum.IsDefined(s1)) { error = "UsmleStep1 is invalid."; return false; }
+        if (r.UsmleStep2 is { } s2 && !Enum.IsDefined(s2)) { error = "UsmleStep2 is invalid."; return false; }
+        if (r.UsmleStep3 is { } s3 && !Enum.IsDefined(s3)) { error = "UsmleStep3 is invalid."; return false; }
+        if (r.ComlexLevel2 is { } c2 && !Enum.IsDefined(c2)) { error = "ComlexLevel2 is invalid."; return false; }
+        if (r.ComlexLevel3 is { } c3 && !Enum.IsDefined(c3)) { error = "ComlexLevel3 is invalid."; return false; }
+        if (r.EducationYear is { } ey && !Enum.IsDefined(ey)) { error = "EducationYear is invalid."; return false; }
+
+        // Attempts, when supplied, must be within 1–10 (legacy dropdown range).
+        if (!TryAttempts(r.UsmleAttempts1, "UsmleAttempts1", out error)) return false;
+        if (!TryAttempts(r.UsmleAttempts2, "UsmleAttempts2", out error)) return false;
+        if (!TryAttempts(r.UsmleAttempts3, "UsmleAttempts3", out error)) return false;
+        if (!TryAttempts(r.ComlexLevel2Attempts, "ComlexLevel2Attempts", out error)) return false;
+        if (!TryAttempts(r.ComlexLevel3Attempts, "ComlexLevel3Attempts", out error)) return false;
+
+        if (!TryOptional(r.MedicalSchool, SchoolMaxLength, "MedicalSchool", out var school, out error)) return false;
+        if (!TryOptional(r.MedicalSchoolCountry, CountryMaxLength, "MedicalSchoolCountry", out var country, out error)) return false;
+        if (!TryOptional(r.UsmleScore1, ScoreMaxLength, "UsmleScore1", out var score1, out error)) return false;
+        if (!TryOptional(r.UsmleScore2, ScoreMaxLength, "UsmleScore2", out var score2, out error)) return false;
+        if (!TryOptional(r.UsmleScore3, ScoreMaxLength, "UsmleScore3", out var score3, out error)) return false;
+        if (!TryOptional(r.ComlexLevel2Score, ScoreMaxLength, "ComlexLevel2Score", out var cScore2, out error)) return false;
+        if (!TryOptional(r.ComlexLevel3Score, ScoreMaxLength, "ComlexLevel3Score", out var cScore3, out error)) return false;
+        if (!TryOptional(r.Undergrad, EducationTextMaxLength, "Undergrad", out var undergrad, out error)) return false;
+        if (!TryOptional(r.Association, EducationTextMaxLength, "Association", out var association, out error)) return false;
+
+        // Null-out exam sub-fields to match the reported status server-side (don't trust the client): a step
+        // that was Taken keeps its score/attempts and drops the scheduled date; one that WillTake keeps only
+        // the date; NoPlan / unset keeps nothing. Mirrors the tab's own conditional rendering.
+        var (u1s, u1a, u1d) = ExamSubFields(r.UsmleStep1, score1, r.UsmleAttempts1, r.UsmleDate1);
+        var (u2s, u2a, u2d) = ExamSubFields(r.UsmleStep2, score2, r.UsmleAttempts2, r.UsmleDate2);
+        var (u3s, u3a, u3d) = ExamSubFields(r.UsmleStep3, score3, r.UsmleAttempts3, r.UsmleDate3);
+        var (c2s, c2a, c2d) = ExamSubFields(r.ComlexLevel2, cScore2, r.ComlexLevel2Attempts, r.ComlexLevel2Date);
+        var (c3s, c3a, c3d) = ExamSubFields(r.ComlexLevel3, cScore3, r.ComlexLevel3Attempts, r.ComlexLevel3Date);
+
+        norm = new NormalizedEducation(
+            school, country, r.GraduationDate,
+            r.UsmleStep1, u1s, u1a, u1d,
+            r.UsmleStep2, u2s, u2a, u2d,
+            r.UsmleStep3, u3s, u3a, u3d,
+            r.EcfmgCertified, r.AppliedMatch,
+            r.ComlexLevel1Taken,
+            // "How did you do?" only applies when Level 1 was actually taken.
+            r.ComlexLevel1Taken == true ? r.ComlexLevel1Passed : null,
+            r.ComlexLevel2, c2s, c2a, c2d,
+            r.ComlexLevel3, c3s, c3a, c3d,
+            undergrad, r.EducationYear, r.IsAmsa, association, r.IsLeadership,
+            r.IsToefl, r.IsIndbe);
+        return true;
+    }
+
+    private static bool TryAttempts(int? value, string field, out string error)
+    {
+        error = string.Empty;
+        if (value is { } a && (a < MinAttempts || a > MaxAttempts))
+        {
+            error = $"{field} must be between {MinAttempts} and {MaxAttempts}.";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Keeps only the exam sub-fields that the given status justifies (Taken → score+attempts;
+    /// WillTake → scheduled date; NoPlan/null → nothing).</summary>
+    private static (string? Score, int? Attempts, DateOnly? Date) ExamSubFields(
+        ExamStatus? status, string? score, int? attempts, DateOnly? date) => status switch
+    {
+        ExamStatus.Taken => (score, attempts, null),
+        ExamStatus.WillTake => (null, null, date),
+        _ => (null, null, null),
+    };
+
     private static StudentDetailResponse ToDetail(Student x) =>
         new(x.Id, x.FirstName, x.LastName, x.Email, x.MobilePhone, x.AcademicStatus, x.VisaStatus,
             x.MedicalSchool, x.MedicalSchoolCountry, x.City, x.State, x.Status, x.StudentOid,
             x.Birthdate, x.Gender, x.ImmigrationStatus, x.ImmigrationStatusOther, x.VisaInterviewDate,
             x.PassportIssuedCountry, x.PassportNumber, x.SelectedIdType, x.IdNumber, x.AvatarBlobName,
-            x.Interests, x.PreferredSpecialty, x.SpecialtyLocations, x.CustomSpecialtyLocation, x.Importants);
+            x.Interests, x.PreferredSpecialty, x.SpecialtyLocations, x.CustomSpecialtyLocation, x.Importants,
+            x.GraduationDate,
+            x.UsmleStep1, x.UsmleScore1, x.UsmleAttempts1, x.UsmleDate1,
+            x.UsmleStep2, x.UsmleScore2, x.UsmleAttempts2, x.UsmleDate2,
+            x.UsmleStep3, x.UsmleScore3, x.UsmleAttempts3, x.UsmleDate3,
+            x.EcfmgCertified, x.AppliedMatch,
+            x.ComlexLevel1Taken, x.ComlexLevel1Passed,
+            x.ComlexLevel2, x.ComlexLevel2Score, x.ComlexLevel2Attempts, x.ComlexLevel2Date,
+            x.ComlexLevel3, x.ComlexLevel3Score, x.ComlexLevel3Attempts, x.ComlexLevel3Date,
+            x.Undergrad, x.EducationYear, x.IsAmsa, x.Association, x.IsLeadership,
+            x.IsToefl, x.IsIndbe);
 
     // Lightweight summary for form pickers (the /options list): identity core only, rollups zeroed —
     // pickers show a name, not the achievements columns. The paginated directory list projects the

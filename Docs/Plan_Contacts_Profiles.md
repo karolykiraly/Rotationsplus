@@ -33,6 +33,15 @@ SalesProfile.js).
   pre-existing enum decision covering the MD track from public signup; used across the app + seed.
 - Passport-issued-country is a text input (country-dropdown = a small follow-up); avatar upload deferred
   to its own slice; Password omitted + Email read-only (auth is IdP-owned).
+- **Education-tab pre-med undergrad is a text input**, not the legacy `AsyncSelect` over the multi-thousand
+  `undergradPrograms` list (whose free-text "Other" path stored a raw string anyway). The searchable
+  dropdown is a post-cutover enhancement; the stored value + admin capability are unchanged.
+- **USMLE/COMLEX scores stored as strings.** Step 1 legitimately allows `Pass`/`Fail` alongside 180–300;
+  legacy `Number(usmleScore1)` coerces those to `NaN`. Storing the string fixes that (a code-level bug fix).
+- **Education endpoint is a full-apply, not a partial PATCH** (legacy Strapi merged). A student has one
+  academic track, so the client sends the active branch and passes the shared school/country/graduation
+  columns through unchanged — a save never wipes another tab's data. Exam sub-fields are null-ed server-side
+  to match their status (Taken→score+attempts, WillTake→date), matching production's own conditional clears.
 
 ## Slice breakdown
 
@@ -42,8 +51,8 @@ SalesProfile.js).
   SelectedIdType/IdNumber (DO), AvatarBlobName. Name-link + Delete-only rows. *(avatar upload = A2)*
 - **A2. Avatar upload** — blob upload/serve for the profile photo (reuse program-image blob infra).
 - **B. Needs** — interests (specialty grid), specialty-locations (multi-select), importants (priorities).
-- **C. Education** — branches by academic status: USMLE (IMG/IMS), COMLEX (DO), undergrad/year (pre-med),
-  school/grad-date/TOEFL/INDBE (dental), ECFMG/applied-match.
+- **C. Education** ✅ — branches by academic status: USMLE (IMG/IMS), COMLEX (DO), undergrad/year (pre-med),
+  school/grad-date/TOEFL/INDBE (dental), ECFMG/applied-match. `PUT /{id}/education` (AdminOnly).
 - **D. Rotations** — per-rotation table (preceptor, dates/weeks-or-hours, dollars, docs-approved,
   preceptor-confirmed, status, discount, evaluation score/doc, PAL generate/upload). *Depends on:
   discount, evaluation docs/scores, PAL generation subsystems.*

@@ -81,6 +81,56 @@ public sealed class Student : AuditableEntity
     /// stored here as a clean string list). Hidden for the dental track.</summary>
     public List<string>? Importants { get; set; }
 
+    // ---- Profile → Education tab (legacy StudentProfile.js tab 2 / onSaveProfile3) ----
+    // Branches by academic track; all optional. MedicalSchool/MedicalSchoolCountry (above) are reused for
+    // the IMS/IMG + Dental branches. Scores are strings (Step 1 allows "Pass"/"Fail" alongside 180–300).
+
+    /// <summary>Graduation date (legacy <c>graduation_date</c>) — IMS/IMG, Dental, Pre-med.</summary>
+    public DateOnly? GraduationDate { get; set; }
+
+    // USMLE (IMS/IMG): step status + score/attempts (when Taken) + scheduled date (when WillTake).
+    public ExamStatus? UsmleStep1 { get; set; }
+    public string? UsmleScore1 { get; set; }
+    public int? UsmleAttempts1 { get; set; }
+    public DateOnly? UsmleDate1 { get; set; }
+    public ExamStatus? UsmleStep2 { get; set; }
+    public string? UsmleScore2 { get; set; }
+    public int? UsmleAttempts2 { get; set; }
+    public DateOnly? UsmleDate2 { get; set; }
+    public ExamStatus? UsmleStep3 { get; set; }
+    public string? UsmleScore3 { get; set; }
+    public int? UsmleAttempts3 { get; set; }
+    public DateOnly? UsmleDate3 { get; set; }
+
+    /// <summary>ECFMG certified (legacy <c>ecfmg_certified</c>) — IMS/IMG.</summary>
+    public bool? EcfmgCertified { get; set; }
+
+    /// <summary>Applied to the MATCH before (legacy <c>applied_match</c>) — IMS/IMG + Dental.</summary>
+    public bool? AppliedMatch { get; set; }
+
+    // COMLEX (D.O.): Level 1 is a simple taken(yes/no) + passed; Levels 2CE/3 mirror the USMLE shape.
+    public bool? ComlexLevel1Taken { get; set; }
+    public bool? ComlexLevel1Passed { get; set; }
+    public ExamStatus? ComlexLevel2 { get; set; }
+    public string? ComlexLevel2Score { get; set; }
+    public int? ComlexLevel2Attempts { get; set; }
+    public DateOnly? ComlexLevel2Date { get; set; }
+    public ExamStatus? ComlexLevel3 { get; set; }
+    public string? ComlexLevel3Score { get; set; }
+    public int? ComlexLevel3Attempts { get; set; }
+    public DateOnly? ComlexLevel3Date { get; set; }
+
+    // Pre-med.
+    public string? Undergrad { get; set; }
+    public EducationYear? EducationYear { get; set; }
+    public bool? IsAmsa { get; set; }
+    public string? Association { get; set; }
+    public bool? IsLeadership { get; set; }
+
+    // Dental.
+    public bool? IsToefl { get; set; }
+    public bool? IsIndbe { get; set; }
+
     public StudentStatus Status { get; set; } = StudentStatus.Registered;
 
     /// <summary>CIAM object id, set once the student signs in to the portal (null until linked).</summary>

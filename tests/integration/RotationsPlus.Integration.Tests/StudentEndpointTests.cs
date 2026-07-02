@@ -607,6 +607,150 @@ public class StudentEndpointTests(RotationsApiFactory factory) : IClassFixture<R
         fetched.CustomSpecialtyLocation.Should().BeNull();
     }
 
+    // ---- Profile → Education tab ----
+
+    // An all-null education request; individual tests override just the fields they exercise via `with`.
+    private static readonly UpdateStudentEducationRequest EmptyEdu = new(
+        null, null, null,
+        null, null, null, null,
+        null, null, null, null,
+        null, null, null, null,
+        null, null,
+        null, null,
+        null, null, null, null,
+        null, null, null, null,
+        null, null, null, null, null,
+        null, null);
+
+    [Fact]
+    public async Task Admin_saves_the_IMSIMG_education_branch_and_it_round_trips()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate(academicStatus: AcademicStatus.InternationalMedicalGraduate)))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = EmptyEdu with
+        {
+            MedicalSchool = "St. George's",
+            MedicalSchoolCountry = "Grenada",
+            GraduationDate = new DateOnly(2025, 5, 15),
+            UsmleStep1 = ExamStatus.Taken,
+            UsmleScore1 = "Pass",
+            UsmleAttempts1 = 2,
+            UsmleStep2 = ExamStatus.WillTake,
+            UsmleDate2 = new DateOnly(2027, 3, 1),
+            EcfmgCertified = true,
+            AppliedMatch = false
+        };
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/education", req, JsonOptions);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.MedicalSchool.Should().Be("St. George's");
+        fetched.GraduationDate.Should().Be(new DateOnly(2025, 5, 15));
+        fetched.UsmleStep1.Should().Be(ExamStatus.Taken);
+        fetched.UsmleScore1.Should().Be("Pass");
+        fetched.UsmleAttempts1.Should().Be(2);
+        fetched.UsmleStep2.Should().Be(ExamStatus.WillTake);
+        fetched.UsmleDate2.Should().Be(new DateOnly(2027, 3, 1));
+        fetched.EcfmgCertified.Should().BeTrue();
+        fetched.AppliedMatch.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Education_nulls_out_exam_subfields_that_dont_match_the_status()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        // Taken carries a stray date; WillTake carries a stray score/attempts. Both strays are dropped server-side.
+        var req = EmptyEdu with
+        {
+            UsmleStep1 = ExamStatus.Taken,
+            UsmleScore1 = "250",
+            UsmleAttempts1 = 1,
+            UsmleDate1 = new DateOnly(2027, 1, 1),
+            UsmleStep2 = ExamStatus.WillTake,
+            UsmleScore2 = "260",
+            UsmleAttempts2 = 3,
+            UsmleDate2 = new DateOnly(2027, 6, 1)
+        };
+        (await admin.PutAsJsonAsync($"/api/students/{created!.Id}/education", req, JsonOptions)).EnsureSuccessStatusCode();
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.UsmleDate1.Should().BeNull();            // Taken → date dropped
+        fetched.UsmleScore1.Should().Be("250");
+        fetched.UsmleScore2.Should().BeNull();            // WillTake → score/attempts dropped
+        fetched.UsmleAttempts2.Should().BeNull();
+        fetched.UsmleDate2.Should().Be(new DateOnly(2027, 6, 1));
+    }
+
+    [Fact]
+    public async Task Admin_saves_the_DO_COMLEX_branch_and_it_round_trips()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate(academicStatus: AcademicStatus.DoStudent)))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = EmptyEdu with
+        {
+            ComlexLevel1Taken = true,
+            ComlexLevel1Passed = true,
+            ComlexLevel2 = ExamStatus.Taken,
+            ComlexLevel2Score = "500",
+            ComlexLevel2Attempts = 1,
+            ComlexLevel3 = ExamStatus.NoPlan
+        };
+        (await admin.PutAsJsonAsync($"/api/students/{created!.Id}/education", req, JsonOptions)).EnsureSuccessStatusCode();
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.ComlexLevel1Taken.Should().BeTrue();
+        fetched.ComlexLevel1Passed.Should().BeTrue();
+        fetched.ComlexLevel2.Should().Be(ExamStatus.Taken);
+        fetched.ComlexLevel2Score.Should().Be("500");
+        fetched.ComlexLevel3.Should().Be(ExamStatus.NoPlan);
+    }
+
+    [Fact]
+    public async Task Admin_saves_the_premed_branch_and_it_round_trips()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate(academicStatus: AcademicStatus.UsPreMed)))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = EmptyEdu with
+        {
+            Undergrad = "State University",
+            EducationYear = EducationYear.FifthPlus,
+            IsAmsa = true,
+            Association = "AMA",
+            IsLeadership = false,
+            GraduationDate = new DateOnly(2026, 6, 1)
+        };
+        (await admin.PutAsJsonAsync($"/api/students/{created!.Id}/education", req, JsonOptions)).EnsureSuccessStatusCode();
+
+        var fetched = await admin.GetFromJsonAsync<StudentDetailResponse>($"/api/students/{created.Id}", JsonOptions);
+        fetched!.Undergrad.Should().Be("State University");
+        fetched.EducationYear.Should().Be(EducationYear.FifthPlus);
+        fetched.IsAmsa.Should().BeTrue();
+        fetched.Association.Should().Be("AMA");
+        fetched.IsLeadership.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Education_save_with_out_of_range_attempts_returns_400()
+    {
+        var admin = Client(RoleNames.Admin);
+        var created = await (await PostAsync(admin, ValidCreate()))
+            .Content.ReadFromJsonAsync<StudentDetailResponse>(JsonOptions);
+
+        var req = EmptyEdu with { UsmleStep1 = ExamStatus.Taken, UsmleScore1 = "250", UsmleAttempts1 = 11 };
+        var resp = await admin.PutAsJsonAsync($"/api/students/{created!.Id}/education", req, JsonOptions);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---- Achievements rollups (money-sensitive: the Contacts → Students tab columns) ----
 
     // Non-open program: 1500/wk. A 4-week booking → total 6000, deposit 600, outstanding 5400 (matches

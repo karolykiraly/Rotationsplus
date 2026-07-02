@@ -4,11 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const h = vi.hoisted(() => ({ useMe: vi.fn(), getStudent: vi.fn(), updateStudentPersonalInfo: vi.fn() }));
+const h = vi.hoisted(() => ({
+  useMe: vi.fn(), getStudent: vi.fn(), updateStudentPersonalInfo: vi.fn(),
+  updateStudentNeeds: vi.fn(), updateStudentEducation: vi.fn(), getSpecialties: vi.fn()
+}));
 vi.mock("../useMe", () => ({ useMe: () => h.useMe() }));
 vi.mock("../api", () => ({
   getStudent: (id: string) => h.getStudent(id),
-  updateStudentPersonalInfo: (id: string, input: unknown) => h.updateStudentPersonalInfo(id, input)
+  updateStudentPersonalInfo: (id: string, input: unknown) => h.updateStudentPersonalInfo(id, input),
+  updateStudentNeeds: (id: string, input: unknown) => h.updateStudentNeeds(id, input),
+  updateStudentEducation: (id: string, input: unknown) => h.updateStudentEducation(id, input),
+  getSpecialties: () => h.getSpecialties()
 }));
 
 import { StudentProfilePage } from "./StudentProfilePage";
@@ -93,11 +99,18 @@ describe("StudentProfilePage", () => {
     expect(screen.queryByLabelText("Which country issued your passport?")).not.toBeInTheDocument();
   });
 
-  it("shows a coming-soon placeholder for a not-yet-built tab", async () => {
+  it("renders the Education tab for the student's academic track", async () => {
     renderPage();
     await userEvent.click(await screen.findByRole("tab", { name: "Education" }));
+    // The IMG student sees the IMS/IMG USMLE branch.
+    expect(await screen.findByText("Education (IMS/IMG)")).toBeInTheDocument();
+  });
+
+  it("shows a coming-soon placeholder for a not-yet-built tab", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole("tab", { name: "Rotations" }));
     const placeholder = screen.getByText(/being ported next/i);
-    expect(within(placeholder).getByText("Education")).toBeInTheDocument();
+    expect(within(placeholder).getByText("Rotations")).toBeInTheDocument();
   });
 
   it("blocks non-admins", async () => {
